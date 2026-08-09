@@ -2,7 +2,7 @@
 
 A diff engine that tells you what actually happened to your code.
 
-`git diff` compares lines. That was a good idea in 1974, but it has no idea what those lines mean. Rename a function and you get a deletion plus an addition. Move a block of code across files and you get two unrelated chunks of noise. Reformat a file and you get "everything changed." It works, but it makes you do the thinking.
+`git diff` compares lines. The line-diff approach dates back to the original Unix `diff` in 1974, and it still has no idea what those lines mean. Rename a function and you get a deletion plus an addition. Move a block of code across files and you get two unrelated chunks of noise. Reformat a file and you get "everything changed." It works, but it makes you do the thinking.
 
 Differens parses your code into trees, matches nodes between them, and tells you what changed in terms you actually use: *renamed*, *moved*, *extracted*, *added*, *removed*, *reformatted only*.
 
