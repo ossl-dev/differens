@@ -58,8 +58,7 @@ differens/
 ├── apps/
 │   ├── cli/          # the differens command line tool
 │   └── desktop/      # Tauri desktop app (post-v1)
-├── docs/
-└── plan.md           # detailed design document
+└── docs/
 ```
 
 ## Design principles
@@ -72,7 +71,7 @@ differens/
 
 ## Status
 
-Early stage. Working through [plan.md](plan.md) toward Milestone 0: diff core + JSON/YAML adapters + TypeScript extractor + git difftool integration.
+Milestone 0 shipped: diff core with 64-bit hashing, JSON/YAML/TOML adapters, tree-sitter code adapter with TypeScript/Python/Rust/Go extractors, git difftool integration, cross-file correlator, narration engine. 96 tests, zero failures.
 
 ## Prior art worth reading before contributing
 
