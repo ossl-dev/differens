@@ -1,0 +1,8 @@
+{
+  "name": "@differens/tsconfig",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    "./tsconfig.json": "./tsconfig.json"
+  }
+}
