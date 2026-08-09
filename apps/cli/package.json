@@ -1,0 +1,19 @@
+{
+  "name": "@differens/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src/",
+    "test": "bun test",
+    "clean": "rm -rf dist/"
+  },
+  "dependencies": {
+    "@differens/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@differens/tsconfig": "workspace:*"
+  }
+}
