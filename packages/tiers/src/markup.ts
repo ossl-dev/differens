@@ -1,8 +1,8 @@
 /**
- * Tier 3 — Markup adapter (HTML, XML, SVG).
+ * Tier 3  --  Markup adapter (HTML, XML, SVG).
  *
  * Parses markup into a DOM-like element tree.
- * Uses a lightweight tokenizer — no full HTML parser dependency.
+ * Uses a lightweight tokenizer  --  no full HTML parser dependency.
  * Handles well-formed XML/HTML; malformed input falls back to T1.
  */
 
@@ -108,7 +108,7 @@ export function parseMarkup(source: string): MarkupNode {
       text = source.slice(pos);
       pos = source.length;
     } else if (textEnd === pos) {
-      // No regex match and no text — advance to avoid infinite loop
+      // No regex match and no text  --  advance to avoid infinite loop
       text = source.slice(pos, pos + 1);
       pos += 1;
     } else {

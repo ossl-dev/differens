@@ -3,7 +3,7 @@
  *
  * Each extractor maps tree-sitter CST node types to canonical concepts
  * and extracts labels (names) from nodes. This is the per-language
- * investment — a few dozen match arms, not a parser.
+ * investment  --  a few dozen match arms, not a parser.
  */
 
 import type Parser from "tree-sitter";

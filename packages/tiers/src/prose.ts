@@ -1,5 +1,5 @@
 /**
- * Tier 2 — Prose / plain text adapter.
+ * Tier 2  --  Prose / plain text adapter.
  *
  * Word-level diff for prose documents where line breaks are
  * often just wrapping, not structure.

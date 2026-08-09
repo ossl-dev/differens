@@ -1,5 +1,5 @@
 /**
- * Tier Adapters — parse files into Node trees for the diff core.
+ * Tier Adapters  --  parse files into Node trees for the diff core.
  *
  * The content router picks a tier based on file extension and magic bytes,
  * then delegates to the appropriate adapter. Each adapter produces a Node
@@ -172,24 +172,16 @@ export function diffWithTier(
 // ---------- Tier implementations ----------
 
 function diffBinary(oldSource: string, newSource: string): TierDiffResult {
-  const changed = oldSource !== newSource;
   return {
-    changes: changed
-      ? [
-          {
-            type: "Update" as const,
-            node: createNode({
-              kind: "binary_file",
-              byteRange: [0, oldSource.length],
-            }),
-            detail: {
-              kind: "ValueChanged" as const,
-              from: `${oldSource.length} bytes`,
-              to: `${newSource.length} bytes`,
-            },
-          },
-        ]
-      : [],
+    changes: [{
+      type: "Update" as const,
+      node: createNode({ kind: "binary_file", byteRange: [0, oldSource.length] }),
+      detail: {
+        kind: "ValueChanged" as const,
+        from: `${oldSource.length} bytes`,
+        to: `${newSource.length} bytes`,
+      },
+    }],
     nodeCount: 0,
     tier: Tier.Binary,
   };

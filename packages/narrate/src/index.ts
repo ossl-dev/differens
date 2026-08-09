@@ -1,5 +1,5 @@
 /**
- * Narration Engine — edit script to natural language.
+ * Narration Engine  --  edit script to natural language.
  *
  * Converts typed EditActions into human-readable sentences.
  * Template-based, deterministic, and fast. Per-language vocabulary
@@ -99,18 +99,6 @@ export function narrate(
   }));
 }
 
-// ---------- Whitespace-only detection ----------
-
-/**
- * Check if all changes are value-only changes (no structural edits).
- * Returns true when there are no Insert/Delete/Move actions.
- */
-export function isStructuralOnly(changes: SemanticChange[]): boolean {
-  return changes.every(
-    (c) => c.action.type === "Update" && c.action.detail.kind === "ValueChanged",
-  );
-}
-
 // ---------- Summary rolling-up ----------
 
 /**
@@ -157,7 +145,8 @@ export function formatChanges(
 ): string {
   switch (opts.format) {
     case "json":
-      return JSON.stringify(changes, null, 2);
+      return JSON.stringify(changes, (_key, val) =>
+        typeof val === "bigint" ? val.toString() : val, 2);
 
     case "markdown": {
       if (changes.length === 0) return "_no logical changes_";

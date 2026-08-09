@@ -1,5 +1,5 @@
 /**
- * Git Integration — shell out to the git binary.
+ * Git Integration  --  shell out to the git binary.
  *
  * Three levels of integration:
  * 1. GIT_EXTERNAL_DIFF / git difftool (MVP)
@@ -53,7 +53,7 @@ export async function getHeadContent(filePath: string): Promise<string> {
     const result = await $`git show HEAD:${filePath}`.quiet();
     return result.stdout.toString();
   } catch {
-    return ""; // New file — no content in HEAD
+    return ""; // New file  --  no content in HEAD
   }
 }
 
@@ -146,13 +146,13 @@ export function generateGitAttributes(extensions: string[]): string {
 export async function installGitDriver(): Promise<void> {
   const inRepo = await isGitRepo();
   if (!inRepo) {
-    throw new Error("not in a git repository — run this from inside a git repo");
+    throw new Error("not in a git repository  --  run this from inside a git repo");
   }
 
   try {
     await $`git config diff.differens.textconv bun differens diff --textconv`.quiet();
   } catch {
-    // Already configured — that's fine
+    // Already configured  --  that's fine
   }
 
   try {

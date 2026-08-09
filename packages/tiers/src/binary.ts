@@ -1,5 +1,5 @@
 /**
- * Tier 0 — Binary file detection.
+ * Tier 0  --  Binary file detection.
  *
  * Identifies binary files by extension. Default behavior is hash-only:
  * "changed" or "unchanged" plus byte-size delta.

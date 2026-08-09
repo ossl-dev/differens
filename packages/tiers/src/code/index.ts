@@ -1,5 +1,5 @@
 /**
- * Tier 5 — Source code adapter.
+ * Tier 5  --  Source code adapter.
  *
  * Uses tree-sitter to parse source code into CST nodes,
  * then applies per-language extractors to map node types
@@ -23,7 +23,7 @@ import { GoExtractor } from "./go";
 // Map file extension to tree-sitter language module
 const grammarRegistry: Map<string, { grammar: Parser.Language; name: string }> = new Map();
 
-// Map file extension to extractor (optional — L6)
+// Map file extension to extractor (optional  --  L6)
 const extractorRegistry: Map<string, LanguageExtractor> = new Map();
 
 let initPromise: Promise<void> | null = null;
@@ -71,7 +71,7 @@ async function ensureInitialized(): Promise<void> {
     extractorRegistry.set("rs", new RustExtractor());
     extractorRegistry.set("go", new GoExtractor());
     } catch (err) {
-      // Grammar loading failed — code tier won't work, but won't crash
+      // Grammar loading failed  --  code tier won't work, but won't crash
       console.error("Failed to load tree-sitter grammars:", err);
     }
   })();
@@ -122,7 +122,7 @@ function cstToNode(
 export function parseCode(source: string, extension: string): Node {
   const grammarInfo = grammarRegistry.get(extension);
   if (!grammarInfo) {
-    // No grammar for this extension — wrap as a raw file node
+    // No grammar for this extension  --  wrap as a raw file node
     return createNode({
       kind: "file",
       label: extension,

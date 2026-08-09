@@ -71,11 +71,9 @@ async function handleDiff(args: string[]): Promise<void> {
     // Git mode: diff working tree vs HEAD
     await handleGitDiff(format);
   } else if (nonFlagArgs.length === 1 && nonFlagArgs[0]!.includes("..")) {
-    // Commit range: main..feature
-    await handleRangeDiff(args[0]!, format);
+    await handleRangeDiff(nonFlagArgs[0]!, format);
   } else if (nonFlagArgs.length === 2) {
-    // Two files or two directories
-    await handleFileDiff(args[0]!, args[1]!, format);
+    await handleFileDiff(nonFlagArgs[0]!, nonFlagArgs[1]!, format);
   } else {
     console.error("usage: differens diff [<old> <new>] [--format=json|md]");
     process.exit(1);
@@ -199,9 +197,9 @@ function handleLanguages(): void {
   console.log("supported languages:\n");
   for (const ext of extractors) {
     const level = ext.level === "L6" ? "semantic" : "generic";
-    console.log(`  ${ext.language} (${level}, ${ext.level}) — ${ext.extensions.join(", ")}`);
+    console.log(`  ${ext.language} (${level}, ${ext.level})  --  ${ext.extensions.join(", ")}`);
   }
-  console.log("\nall other text files: raw (L1 — line diff)");
+  console.log("\nall other text files: raw (L1  --  line diff)");
   console.log("binary files: hash only (L0)");
 }
 
@@ -231,7 +229,7 @@ function parseFormat(args: string[]): string {
 }
 
 function printUsage(): void {
-  console.log(`differens — semantic diffing engine
+  console.log(`differens  --  semantic diffing engine
 
 usage:
   differens diff                      diff working tree vs HEAD

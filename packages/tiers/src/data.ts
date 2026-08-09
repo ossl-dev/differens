@@ -1,5 +1,5 @@
 /**
- * Tier 4 — Config / structured data adapter.
+ * Tier 4  --  Config / structured data adapter.
  *
  * Parses JSON, YAML (subset), TOML (subset) into value trees.
  * Uses native JSON.parse for JSON, simple parsers for YAML and TOML.
@@ -74,7 +74,7 @@ function parseYamlLines(
     if (indent < baseIndent) break; // Back to parent level
 
     if (indent > baseIndent) {
-      // Nested — skip (handled by recursion)
+      // Nested  --  skip (handled by recursion)
       i++;
       continue;
     }

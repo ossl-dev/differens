@@ -1,5 +1,5 @@
 /**
- * Cross-File Correlator — detect moves and renames across files.
+ * Cross-File Correlator  --  detect moves and renames across files.
  *
  * After per-file diffing, correlates deleted nodes from one file
  * with inserted nodes in another to detect cross-file moves.
@@ -128,7 +128,7 @@ export function correlate(
         }
       }
 
-      // No exact match — try similarity scoring
+      // No exact match  --  try similarity scoring
       if (!matchedDeletions.has(del)) {
         let bestIns: typeof insertions[0] | null = null;
         let bestScore = 0;

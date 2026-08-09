@@ -1,44 +1,27 @@
 /**
- * Differens Core — semantic diffing engine
+ * Differens Core: GumTree-style tree matching for semantic diffing.
  *
- * Implements a GumTree-style tree matching algorithm:
- * 1. Parse both sides into Node trees (tier adapters do the parsing)
- * 2. Top-down isomorphic matching by content hash
- * 3. Bottom-up container matching by descendant overlap
- * 4. Chawathe-style edit script generation with explicit Move actions
+ * Pipeline: parse -> top-down isomorphic match -> bottom-up container
+ * match -> Chawathe edit script with Move actions.
  *
- * @packageDocumentation
+ * Reference: Falleri et al. "Fine-grained and accurate source code
+ * differencing" (ASE 2014, the GumTree paper).
  */
 
-// ---------- Hashing ----------
+// 64-bit FNV-1a via BigInt. Birthday bound at 50k nodes:
+// 32-bit: ~30% collision chance. 64-bit: ~0.000007%.
+// Collision means wrongly matching different subtrees as identical.
+const FNV_PRIME = 0x100000001b3n;
+const FNV_SEED = 0xcbf29ce484222325n;
 
-/**
- * Fast non-cryptographic hash combining.
- * We use FNV-1a style hashing because it's deterministic, fast, and
- * good enough for structural deduplication (we're not preventing attacks).
- */
-function hashCombine(seed: number, input: number): number {
-  // FNV-1a 32-bit style combine
-  let h = (seed ^ input) >>> 0;
-  h = Math.imul(h, 0x01000193);
-  return h >>> 0;
+function hashFnv(seed: bigint, byte: number): bigint {
+  return ((seed ^ BigInt(byte)) * FNV_PRIME) & 0xffffffffffffffffn;
 }
 
-function hashString(seed: number, str: string): number {
+function hashStr(seed: bigint, str: string): bigint {
   let h = seed;
-  for (let i = 0; i < str.length; i++) {
-    h = hashCombine(h, str.charCodeAt(i));
-  }
+  for (let i = 0; i < str.length; i++) h = hashFnv(h, str.charCodeAt(i));
   return h;
-}
-
-function hashNumber(n: number): number {
-  // simple integer hash: spread bits
-  let h = (n | 0) >>> 0;
-  h = ((h >> 16) ^ h) * 0x45d9f3b;
-  h = ((h >> 16) ^ h) * 0x45d9f3b;
-  h = (h >> 16) ^ h;
-  return h >>> 0;
 }
 
 // ---------- Node ----------
@@ -52,7 +35,6 @@ export interface Position {
 /** Byte range in source text */
 export type ByteRange = [start: number, end: number];
 
-/** A node in the tree — emitted by tier adapters, consumed by the diff core */
 export interface Node {
   kind: string;
   label?: string;
@@ -60,8 +42,8 @@ export interface Node {
   children: Node[];
   byteRange: ByteRange;
   height: number;
-  contentHash: number;
-  structureHash: number;
+  contentHash: bigint;
+  structureHash: bigint;
 }
 
 /** Options for building a Node tree */
@@ -73,39 +55,32 @@ export interface BuildNodeOptions {
   byteRange: ByteRange;
 }
 
-/** Create a leaf node */
 export function createNode(opts: BuildNodeOptions): Node {
   const children = opts.children ?? [];
   let maxChildHeight = 0;
-  for (const child of children) {
-    if (child.height > maxChildHeight) maxChildHeight = child.height;
+  for (let i = 0; i < children.length; i++) {
+    if (children[i]!.height > maxChildHeight) maxChildHeight = children[i]!.height;
   }
   const height = maxChildHeight + 1;
 
-  // Compute hashes bottom-up (Merkle-style)
-  let contentH = hashString(0, opts.kind);
-  if (opts.label !== undefined) contentH = hashString(contentH, opts.label);
-  if (opts.value !== undefined) contentH = hashString(contentH, opts.value);
-  for (const child of children) {
-    contentH = hashCombine(contentH, hashNumber(child.contentHash));
+  // Merkle hash: contentHash covers kind + label + value + children's contentHash
+  let ch = hashStr(FNV_SEED, opts.kind);
+  if (opts.label !== undefined) ch = hashStr(ch, opts.label);
+  if (opts.value !== undefined) ch = hashStr(ch, opts.value);
+  for (let i = 0; i < children.length; i++) {
+    const kid = children[i]!;
+    for (let b = 0n; b < 64n; b += 8n) ch = hashFnv(ch, Number((kid.contentHash >> b) & 0xffn));
   }
 
-  // structure_hash = hash of (kind, children's structure_hash) — ignores label/value
-  let structH = hashString(0, opts.kind);
-  for (const child of children) {
-    structH = hashCombine(structH, hashNumber(child.structureHash));
+  // structureHash covers kind + children's structureHash, ignores label/value
+  let sh = hashStr(FNV_SEED, opts.kind);
+  for (let i = 0; i < children.length; i++) {
+    const kid = children[i]!;
+    for (let b = 0n; b < 64n; b += 8n) sh = hashFnv(sh, Number((kid.structureHash >> b) & 0xffn));
   }
 
-  return {
-    kind: opts.kind,
-    label: opts.label,
-    value: opts.value,
-    children,
-    byteRange: opts.byteRange,
-    height,
-    contentHash: contentH >>> 0,
-    structureHash: structH >>> 0,
-  };
+  return { kind: opts.kind, label: opts.label, value: opts.value, children,
+           byteRange: opts.byteRange, height, contentHash: ch, structureHash: sh };
 }
 
 // ---------- Edit actions ----------
@@ -201,7 +176,6 @@ function topDownMatch(
   oldRoot: Node,
   newRoot: Node,
   state: MatchState,
-  opts: MatchOptions,
 ): void {
   type Pair = [Node, Node];
   const stack: Pair[] = [[oldRoot, newRoot]];
@@ -213,7 +187,7 @@ function topDownMatch(
       continue;
     }
 
-    // Always match if same kind and content hash — perfect match regardless of height.
+    // Always match if same kind and content hash  --  perfect match regardless of height.
     // minHeight threshold only gates using this node as an anchor
     // for bottom-up container matching of its ancestors.
     if (
@@ -229,13 +203,6 @@ function topDownMatch(
         stack.push([oldNode.children[i]!, newNode.children[i]!]);
       }
     } else if (oldNode.kind === newNode.kind) {
-      // Same kind but different hash — try children anyway.
-      // Only use tall nodes as anchors for container matching.
-      if (oldNode.height >= opts.minHeight) {
-        // Mark as potential anchor for bottom-up phase
-        // (implicit: these unmatched same-kind tall nodes will be grouped
-        //  by bottomUpMatch and compared by descendant overlap)
-      }
       const minLen = Math.min(oldNode.children.length, newNode.children.length);
       for (let i = 0; i < minLen; i++) {
         stack.push([oldNode.children[i]!, newNode.children[i]!]);
@@ -389,7 +356,7 @@ function generateEditScript(
   const newParents = buildParentMap(newRoot);
 
   // Walk old tree to find deletions, updates, and moves
-  walkAndDiff(oldRoot, newRoot, state, actions, oldParents, newParents);
+  walkAndDiff(oldRoot, state, actions, oldParents, newParents);
 
   return actions;
 }
@@ -409,7 +376,6 @@ function buildParentMap(root: Node): Map<Node, Node> {
 
 function walkAndDiff(
   oldNode: Node,
-  newRoot: Node,
   state: MatchState,
   actions: EditAction[],
   oldParents: Map<Node, Node>,
@@ -436,7 +402,7 @@ function walkAndDiff(
         },
       });
     } else if (oldNode.label || partner.label) {
-      // One side has label, other doesn't — still a meaningful change
+      // One side has label, other doesn't  --  still a meaningful change
       actions.push({
         type: "Update",
         node: partner,
@@ -469,7 +435,7 @@ function walkAndDiff(
   if (oldParent && newParent) {
     const oldParentPartner = state.oldToNew.get(oldParent);
     if (oldParentPartner !== newParent) {
-      // Parent mismatch — this is a move
+      // Parent mismatch  --  this is a move
       actions.push({
         type: "Move",
         node: partner,
@@ -479,7 +445,7 @@ function walkAndDiff(
         toPosition: newParent.children.indexOf(partner),
       });
     } else {
-      // Same parent but different position — reorder
+      // Same parent but different position  --  reorder
       const oldPos = oldParent.children.indexOf(oldNode);
       const newPos = newParent.children.indexOf(partner);
       if (oldPos !== newPos && oldPos >= 0 && newPos >= 0) {
@@ -497,18 +463,8 @@ function walkAndDiff(
 
   // Recurse into children
   for (const child of oldNode.children) {
-    walkAndDiff(child, newRoot, state, actions, oldParents, newParents);
+    walkAndDiff(child, state, actions, oldParents, newParents);
   }
-}
-
-/** Find the parent of a node in a tree (linear search — ok for small trees) */
-function findParent(target: Node, root: Node): Node | null {
-  if (root.children.includes(target)) return root;
-  for (const child of root.children) {
-    const result = findParent(target, child);
-    if (result) return result;
-  }
-  return null;
 }
 
 // ---------- Main diff API ----------
@@ -551,7 +507,7 @@ export function diffTrees(
   };
 
   // Phase 1: Top-down isomorphic matching
-  topDownMatch(oldRoot, newRoot, state, opts);
+  topDownMatch(oldRoot, newRoot, state);
 
   // Phase 2: Bottom-up container matching
   bottomUpMatch(oldRoot, newRoot, state, opts);
@@ -559,20 +515,18 @@ export function diffTrees(
   // Phase 3: Edit script generation
   const actions = generateEditScript(oldRoot, newRoot, state);
 
-  // Detect inserts (nodes in new tree not matched to any old node)
+  // Detect inserts in new tree not matched to any old node.
+  // Use the parent map already built for walkAndDiff.
   const allNewNodes = collectUnmatched(newRoot, state.newToOld);
+  const movedNodes = new Set(actions.filter((a) => a.type === "Move").map((a) => a.node));
+  const newParents = buildParentMap(newRoot);
+
   for (const node of allNewNodes) {
-    // Skip if already referenced as target of an action
-    if (actions.some((a) => a.type === "Move" && a.node === node)) continue;
-    const parent = findParent(node, newRoot);
+    if (movedNodes.has(node)) continue;
+    const parent = newParents.get(node);
     if (parent) {
-      const position = parent.children.indexOf(node);
-      actions.push({
-        type: "Insert",
-        node,
-        parent,
-        position: position >= 0 ? position : parent.children.length,
-      });
+      const pos = parent.children.indexOf(node);
+      actions.push({ type: "Insert", node, parent, position: pos >= 0 ? pos : parent.children.length });
     }
   }
 

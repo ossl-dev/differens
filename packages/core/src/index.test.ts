@@ -5,7 +5,7 @@ import {
   fastUnchanged,
   treeFromValue,
 } from "./index";
-import type { Node } from "./index";
+import type { EditAction, Node } from "./index";
 
 // ---------- Helpers ----------
 
@@ -261,5 +261,400 @@ describe("treeFromValue", () => {
     });
     expect(n.kind).toBe("object");
     expect(n.children.length).toBe(2);
+  });
+});
+
+// ---------- Edge case helpers ----------
+
+function ofType<T extends EditAction["type"]>(
+  changes: EditAction[],
+  type: T,
+): Extract<EditAction, { type: T }>[] {
+  return changes.filter(
+    (a): a is Extract<EditAction, { type: T }> => a.type === type,
+  );
+}
+
+// ---------- diffTrees: empty trees ----------
+
+describe("diffTrees: empty trees", () => {
+  it("produces no changes for two empty nodes", () => {
+    const oldRoot = tree("root", []);
+    const newRoot = tree("root", []);
+    const result = diffTrees(oldRoot, newRoot);
+    expect(result.changes).toEqual([]);
+    expect(result.nodeCount).toBe(2);
+  });
+
+  it("produces no changes for identical childless leaves", () => {
+    const result = diffTrees(leaf("identifier", "x"), leaf("identifier", "x"));
+    expect(result.changes).toEqual([]);
+    expect(result.nodeCount).toBe(2);
+  });
+
+  it("deletes the empty root and inserts the child when the first child is added", () => {
+    const oldRoot = tree("root", []);
+    const newRoot = tree("root", [leaf("item", "a")]);
+    const result = diffTrees(oldRoot, newRoot);
+
+    expect(result.changes).toHaveLength(2);
+    const deletes = ofType(result.changes, "Delete");
+    const inserts = ofType(result.changes, "Insert");
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0]!.node).toBe(oldRoot);
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0]!.node).toBe(newRoot.children[0]!);
+    expect(inserts[0]!.parent).toBe(newRoot);
+    expect(inserts[0]!.position).toBe(0);
+  });
+});
+
+// ---------- diffTrees: deeply nested identical structures ----------
+
+describe("diffTrees: deeply nested identical structures", () => {
+  function deepChain(depth: number, bottomLabel = "leaf"): Node {
+    let node = leaf("leaf", bottomLabel);
+    for (let i = 0; i < depth; i++) {
+      node = tree("node", [node]);
+    }
+    return node;
+  }
+
+  it("produces no changes for identical depth-50 chains", () => {
+    const result = diffTrees(deepChain(50), deepChain(50));
+    expect(result.changes).toEqual([]);
+    expect(result.nodeCount).toBe(102); // 51 nodes per side
+  });
+
+  it("collapses to a root Delete + re-inserts when the deepest leaf changes", () => {
+    const oldTree = deepChain(50, "a");
+    const newTree = deepChain(50, "b");
+    const result = diffTrees(oldTree, newTree);
+
+    // No subtree hashes match, so the old chain is deleted as a unit (root
+    // Delete absorbs its children) and the new chain is re-inserted node by node.
+    const deletes = ofType(result.changes, "Delete");
+    const inserts = ofType(result.changes, "Insert");
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0]!.node).toBe(oldTree);
+    expect(inserts).toHaveLength(50);
+    expect(ofType(result.changes, "Update")).toHaveLength(0);
+    expect(ofType(result.changes, "Move")).toHaveLength(0);
+  });
+});
+
+// ---------- diffTrees: structural changes only (same shape, different labels) ----------
+
+describe("diffTrees: structural changes only", () => {
+  it("reports a single Renamed Update when only a container label changes", () => {
+    const oldTree = tree("function", [leaf("identifier", "foo")], "oldName");
+    const newTree = tree("function", [leaf("identifier", "foo")], "newName");
+    const result = diffTrees(oldTree, newTree);
+
+    expect(result.changes).toHaveLength(1);
+    const update = ofType(result.changes, "Update")[0]!;
+    expect(update.node).toBe(newTree);
+    expect(update.detail.kind).toBe("Renamed");
+    if (update.detail.kind === "Renamed") {
+      expect(update.detail.from).toBe("oldName");
+      expect(update.detail.to).toBe("newName");
+    }
+  });
+
+  it("deletes the root and re-inserts the new tree when every label differs", () => {
+    const oldTree = tree("program", [
+      tree("function", [leaf("identifier", "foo")]),
+    ]);
+    const newTree = tree("program", [
+      tree("function", [leaf("identifier", "bar")]),
+    ]);
+    const result = diffTrees(oldTree, newTree);
+
+    // Nothing matches: the unmatched old root absorbs its subtree into one
+    // Delete, and every new node except the root is inserted.
+    const deletes = ofType(result.changes, "Delete");
+    const inserts = ofType(result.changes, "Insert");
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0]!.node).toBe(oldTree);
+    expect(inserts).toHaveLength(2);
+    expect(inserts.map((i) => i.node)).toEqual([
+      newTree.children[0]!,
+      newTree.children[0]!.children[0]!,
+    ]);
+    expect(ofType(result.changes, "Update")).toHaveLength(0);
+    expect(ofType(result.changes, "Move")).toHaveLength(0);
+  });
+});
+
+// ---------- diffTrees: large child arrays ----------
+
+describe("diffTrees: large child arrays", () => {
+  function manyLeaves(count: number, changedAt = -1): Node {
+    const children: Node[] = [];
+    for (let i = 0; i < count; i++) {
+      children.push(leaf("leaf", i === changedAt ? "l73-changed" : `l${i}`));
+    }
+    return tree("root", children);
+  }
+
+  it("produces no changes for 150 identical children", () => {
+    const result = diffTrees(manyLeaves(150), manyLeaves(150));
+    expect(result.changes).toEqual([]);
+    expect(result.nodeCount).toBe(302);
+  });
+
+  it("isolates a single changed child among 150", () => {
+    const oldTree = manyLeaves(150);
+    const newTree = manyLeaves(150, 73);
+    const result = diffTrees(oldTree, newTree);
+
+    const deletes = ofType(result.changes, "Delete");
+    const inserts = ofType(result.changes, "Insert");
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0]!.node).toBe(oldTree.children[73]!);
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0]!.node).toBe(newTree.children[73]!);
+    expect(inserts[0]!.parent).toBe(newTree);
+    expect(inserts[0]!.position).toBe(73);
+    expect(ofType(result.changes, "Update")).toHaveLength(0);
+    expect(result.nodeCount).toBe(302);
+  });
+});
+
+// ---------- diffTrees: move detection ----------
+
+describe("diffTrees: move detection", () => {
+  it("emits a single Move when a node moves from one parent to another", () => {
+    const oldFoo = leaf("leaf", "foo");
+    const newFoo = leaf("leaf", "foo");
+    const oldA = tree("container", [
+      leaf("leaf", "keep1"),
+      leaf("leaf", "keep2"),
+      oldFoo,
+    ]);
+    const newA = tree("container", [
+      leaf("leaf", "keep1"),
+      leaf("leaf", "keep2"),
+    ]);
+    const oldB = tree("container", [
+      leaf("leaf", "keep3"),
+      leaf("leaf", "keep4"),
+    ]);
+    const newB = tree("container", [
+      leaf("leaf", "keep3"),
+      leaf("leaf", "keep4"),
+      newFoo,
+    ]);
+    const oldRoot = tree("program", [oldA, oldB]);
+    const newRoot = tree("program", [newA, newB]);
+
+    const result = diffTrees(oldRoot, newRoot);
+    expect(result.changes).toHaveLength(1);
+
+    const move = ofType(result.changes, "Move")[0]!;
+    expect(move.node).toBe(newFoo);
+    expect(move.fromParent).toBe(oldA);
+    expect(move.toParent).toBe(newB);
+    expect(move.fromPosition).toBe(2);
+    expect(move.toPosition).toBe(2);
+  });
+});
+
+// ---------- diffTrees: contentHash vs structureHash ----------
+
+describe("diffTrees: contentHash vs structureHash", () => {
+  function fakeNode(overrides: Partial<Node>): Node {
+    return {
+      kind: "thing",
+      label: "x",
+      children: [],
+      byteRange: [0, 1],
+      height: 1,
+      contentHash: 999n,
+      structureHash: 11n,
+      ...overrides,
+    };
+  }
+
+  it("matches nodes with identical contentHash even when structureHash differs", () => {
+    const result = diffTrees(fakeNode({}), fakeNode({ structureHash: 22n }));
+    expect(result.changes).toEqual([]);
+  });
+
+  it("does not match nodes with different contentHash even when structureHash is equal", () => {
+    // Wrap under a matched parent so the unmatched node has a parent to
+    // attach the Insert/Delete actions to.
+    const oldTree = tree("wrapper", [leaf("keeper", "k"), fakeNode({})]);
+    const newTree = tree("wrapper", [
+      leaf("keeper", "k"),
+      fakeNode({ contentHash: 888n }),
+    ]);
+    const result = diffTrees(oldTree, newTree);
+
+    const deletes = ofType(result.changes, "Delete");
+    const inserts = ofType(result.changes, "Insert");
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0]!.node).toBe(oldTree.children[1]!);
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0]!.node).toBe(newTree.children[1]!);
+    expect(inserts[0]!.parent).toBe(newTree);
+    expect(inserts[0]!.position).toBe(1);
+  });
+
+  it("does not match nodes with identical contentHash but different kind", () => {
+    const oldTree = tree("wrapper", [leaf("keeper", "k"), fakeNode({})]);
+    const newTree = tree("wrapper", [
+      leaf("keeper", "k"),
+      fakeNode({ kind: "other" }),
+    ]);
+    const result = diffTrees(oldTree, newTree);
+
+    expect(ofType(result.changes, "Delete")).toHaveLength(1);
+    expect(ofType(result.changes, "Insert")).toHaveLength(1);
+  });
+
+  it("emits only a Delete for an unmatched root (roots have no parent to insert under)", () => {
+    const result = diffTrees(fakeNode({}), fakeNode({ contentHash: 888n }));
+    expect(result.changes).toHaveLength(1);
+    expect(ofType(result.changes, "Delete")).toHaveLength(1);
+    expect(ofType(result.changes, "Insert")).toHaveLength(0);
+  });
+});
+
+// ---------- diffTrees: same object reference ----------
+
+describe("diffTrees: same object reference", () => {
+  it("is a no-op when oldRoot and newRoot are the same object", () => {
+    const root = tree("program", [
+      tree("function", [
+        leaf("identifier", "foo"),
+        leaf("number", undefined, "1"),
+      ]),
+      leaf("identifier", "bar"),
+    ]);
+    const result = diffTrees(root, root);
+    expect(result.changes).toEqual([]);
+    expect(result.fallback).toBeUndefined();
+    expect(result.nodeCount).toBe(10); // 5 nodes counted on each side
+  });
+});
+
+// ---------- diffTrees: wide shallow vs deep narrow ----------
+
+describe("diffTrees: wide shallow vs deep narrow", () => {
+  function wideShallow(width: number): Node {
+    const children: Node[] = [];
+    for (let i = 0; i < width; i++) {
+      children.push(leaf("leaf", `l${i}`));
+    }
+    return tree("root", children);
+  }
+
+  function deepNarrow(depth: number): Node {
+    let node = leaf("leaf");
+    for (let i = 0; i < depth; i++) {
+      node = tree("node", [node]);
+    }
+    return node;
+  }
+
+  it("handles identical wide shallow trees", () => {
+    const result = diffTrees(wideShallow(100), wideShallow(100));
+    expect(result.changes).toEqual([]);
+    expect(result.nodeCount).toBe(202);
+  });
+
+  it("handles identical deep narrow trees", () => {
+    const result = diffTrees(deepNarrow(100), deepNarrow(100));
+    expect(result.changes).toEqual([]);
+    expect(result.nodeCount).toBe(202);
+  });
+
+  it("finds no overlap between wide and deep shapes", () => {
+    const oldTree = wideShallow(100);
+    const newTree = deepNarrow(100);
+    const result = diffTrees(oldTree, newTree);
+    expect(result.fallback).toBeUndefined();
+    // Old root deleted as a unit; every new node except the root is inserted.
+    expect(ofType(result.changes, "Delete")).toHaveLength(1);
+    expect(ofType(result.changes, "Insert")).toHaveLength(100);
+    expect(result.nodeCount).toBe(202);
+  });
+});
+
+// ---------- diffTrees: label transitions to/from undefined ----------
+
+describe("diffTrees: label transitions to/from undefined", () => {
+  it("reports Renamed with 'unnamed' when a label is removed", () => {
+    const oldTree = tree("function", [leaf("identifier", "x")], "foo");
+    const newTree = tree("function", [leaf("identifier", "x")]);
+    const result = diffTrees(oldTree, newTree);
+
+    const updates = ofType(result.changes, "Update");
+    expect(result.changes).toHaveLength(1);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.node).toBe(newTree);
+    expect(updates[0]!.detail.kind).toBe("Renamed");
+    if (updates[0]!.detail.kind === "Renamed") {
+      expect(updates[0]!.detail.from).toBe("foo");
+      expect(updates[0]!.detail.to).toBe("unnamed");
+    }
+  });
+
+  it("reports Renamed from 'unnamed' when a label is added", () => {
+    const oldTree = tree("function", [leaf("identifier", "x")]);
+    const newTree = tree("function", [leaf("identifier", "x")], "bar");
+    const result = diffTrees(oldTree, newTree);
+
+    const updates = ofType(result.changes, "Update");
+    expect(result.changes).toHaveLength(1);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.detail.kind).toBe("Renamed");
+    if (updates[0]!.detail.kind === "Renamed") {
+      expect(updates[0]!.detail.from).toBe("unnamed");
+      expect(updates[0]!.detail.to).toBe("bar");
+    }
+  });
+});
+
+// ---------- diffTrees: value transitions to/from undefined ----------
+
+describe("diffTrees: value transitions to/from undefined", () => {
+  function numbered(value?: string): Node {
+    return createNode({
+      kind: "number",
+      value,
+      children: [leaf("identifier", "x")],
+      byteRange: [0, 1],
+    });
+  }
+
+  it("reports ValueChanged from undefined when a value is added", () => {
+    const newTree = numbered("2");
+    const result = diffTrees(numbered(), newTree);
+
+    const updates = ofType(result.changes, "Update");
+    expect(result.changes).toHaveLength(1);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.node).toBe(newTree);
+    expect(updates[0]!.detail.kind).toBe("ValueChanged");
+    if (updates[0]!.detail.kind === "ValueChanged") {
+      expect(updates[0]!.detail.from).toBeUndefined();
+      expect(updates[0]!.detail.to).toBe("2");
+    }
+  });
+
+  it("reports ValueChanged to undefined when a value is removed", () => {
+    const newTree = numbered();
+    const result = diffTrees(numbered("1"), newTree);
+
+    const updates = ofType(result.changes, "Update");
+    expect(result.changes).toHaveLength(1);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.detail.kind).toBe("ValueChanged");
+    if (updates[0]!.detail.kind === "ValueChanged") {
+      expect(updates[0]!.detail.from).toBe("1");
+      expect(updates[0]!.detail.to).toBeUndefined();
+    }
   });
 });
