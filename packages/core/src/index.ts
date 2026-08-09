@@ -1,43 +1,143 @@
 /**
- * Differens — semantic diffing engine
+ * Differens Core — semantic diffing engine
  *
- * Parses code into trees, matches nodes structurally, and produces
- * typed edit scripts that describe what actually changed: renamed,
- * moved, extracted, added, removed, or reformatted only.
+ * Implements a GumTree-style tree matching algorithm:
+ * 1. Parse both sides into Node trees (tier adapters do the parsing)
+ * 2. Top-down isomorphic matching by content hash
+ * 3. Bottom-up container matching by descendant overlap
+ * 4. Chawathe-style edit script generation with explicit Move actions
  *
  * @packageDocumentation
  */
 
-// ---------- Node representation ----------
+// ---------- Hashing ----------
 
+/**
+ * Fast non-cryptographic hash combining.
+ * We use FNV-1a style hashing because it's deterministic, fast, and
+ * good enough for structural deduplication (we're not preventing attacks).
+ */
+function hashCombine(seed: number, input: number): number {
+  // FNV-1a 32-bit style combine
+  let h = (seed ^ input) >>> 0;
+  h = Math.imul(h, 0x01000193);
+  return h >>> 0;
+}
+
+function hashString(seed: number, str: string): number {
+  let h = seed;
+  for (let i = 0; i < str.length; i++) {
+    h = hashCombine(h, str.charCodeAt(i));
+  }
+  return h;
+}
+
+function hashNumber(n: number): number {
+  // simple integer hash: spread bits
+  let h = (n | 0) >>> 0;
+  h = ((h >> 16) ^ h) * 0x45d9f3b;
+  h = ((h >> 16) ^ h) * 0x45d9f3b;
+  h = (h >> 16) ^ h;
+  return h >>> 0;
+}
+
+// ---------- Node ----------
+
+/** Position in source text */
+export interface Position {
+  row: number;
+  column: number;
+}
+
+/** Byte range in source text */
+export type ByteRange = [start: number, end: number];
+
+/** A node in the tree — emitted by tier adapters, consumed by the diff core */
 export interface Node {
   kind: string;
   label?: string;
   value?: string;
   children: Node[];
-  byteRange: [start: number, end: number];
-  contentHash: bigint;
-  structureHash: bigint;
+  byteRange: ByteRange;
+  height: number;
+  contentHash: number;
+  structureHash: number;
+}
+
+/** Options for building a Node tree */
+export interface BuildNodeOptions {
+  kind: string;
+  label?: string;
+  value?: string;
+  children?: Node[];
+  byteRange: ByteRange;
+}
+
+/** Create a leaf node */
+export function createNode(opts: BuildNodeOptions): Node {
+  const children = opts.children ?? [];
+  let maxChildHeight = 0;
+  for (const child of children) {
+    if (child.height > maxChildHeight) maxChildHeight = child.height;
+  }
+  const height = maxChildHeight + 1;
+
+  // Compute hashes bottom-up (Merkle-style)
+  let contentH = hashString(0, opts.kind);
+  if (opts.label !== undefined) contentH = hashString(contentH, opts.label);
+  if (opts.value !== undefined) contentH = hashString(contentH, opts.value);
+  for (const child of children) {
+    contentH = hashCombine(contentH, hashNumber(child.contentHash));
+  }
+
+  // structure_hash = hash of (kind, children's structure_hash) — ignores label/value
+  let structH = hashString(0, opts.kind);
+  for (const child of children) {
+    structH = hashCombine(structH, hashNumber(child.structureHash));
+  }
+
+  return {
+    kind: opts.kind,
+    label: opts.label,
+    value: opts.value,
+    children,
+    byteRange: opts.byteRange,
+    height,
+    contentHash: contentH >>> 0,
+    structureHash: structH >>> 0,
+  };
 }
 
 // ---------- Edit actions ----------
 
-export type EditAction =
-  | { type: "Insert"; node: Node; parent: Node; position: number }
-  | { type: "Delete"; node: Node }
-  | {
-      type: "Update";
-      node: Node;
-      detail: RenameDetail | ValueChangeDetail;
-    }
-  | {
-      type: "Move";
-      node: Node;
-      fromParent: Node;
-      toParent: Node;
-      fromPosition: number;
-      toPosition: number;
-    };
+export interface InsertAction {
+  type: "Insert";
+  node: Node;
+  parent: Node;
+  position: number;
+}
+
+export interface DeleteAction {
+  type: "Delete";
+  node: Node;
+}
+
+export interface UpdateAction {
+  type: "Update";
+  node: Node;
+  detail: RenameDetail | ValueChangeDetail;
+}
+
+export interface MoveAction {
+  type: "Move";
+  node: Node;
+  fromParent: Node;
+  toParent: Node;
+  fromPosition: number;
+  toPosition: number;
+}
+
+export type EditAction = InsertAction | DeleteAction | UpdateAction | MoveAction;
 
 export interface RenameDetail {
   kind: "Renamed";
@@ -61,16 +161,507 @@ export interface SemanticChange {
   description: string;
 }
 
-// ---------- Core API (stubs) ----------
+// ---------- Matching options ----------
+
+export interface MatchOptions {
+  /** Subtrees shorter than this are not used as anchors (default 2) */
+  minHeight: number;
+  /** Minimum ratio of matched descendants to match containers (default 0.5) */
+  bottomUpRatio: number;
+  /** Maximum file size in bytes before falling back to line diff (default 5MB) */
+  maxFileSize: number;
+  /** Maximum node count before falling back to line diff (default 50_000) */
+  maxNodes: number;
+}
+
+export const DEFAULT_OPTIONS: MatchOptions = {
+  minHeight: 2,
+  bottomUpRatio: 0.5,
+  maxFileSize: 5 * 1024 * 1024,
+  maxNodes: 50_000,
+};
+
+// ---------- Matching state ----------
+
+interface MatchState {
+  /** Map from old node ID to new node ID */
+  oldToNew: Map<Node, Node>;
+  /** Map from new node ID to old node ID */
+  newToOld: Map<Node, Node>;
+}
+
+// ---------- Top-down matching ----------
 
 /**
- * Diff two source strings and return a list of typed semantic changes.
- * This is the main entry point — every tier adapter feeds into this.
+ * Phase 1: Isomorphic subtree matching.
+ * Walk both trees top-down; when two nodes have identical content_hash
+ * and height >= minHeight, map them as anchors.
  */
-export function diff(
-  _oldSource: string,
-  _newSource: string,
-): SemanticChange[] {
-  // stub — will be implemented in M0
-  return [];
+function topDownMatch(
+  oldRoot: Node,
+  newRoot: Node,
+  state: MatchState,
+  opts: MatchOptions,
+): void {
+  type Pair = [Node, Node];
+  const stack: Pair[] = [[oldRoot, newRoot]];
+
+  while (stack.length > 0) {
+    const [oldNode, newNode] = stack.pop()!;
+
+    if (state.oldToNew.has(oldNode) || state.newToOld.has(newNode)) {
+      continue;
+    }
+
+    // Always match if same kind and content hash — perfect match regardless of height.
+    // minHeight threshold only gates using this node as an anchor
+    // for bottom-up container matching of its ancestors.
+    if (
+      oldNode.kind === newNode.kind &&
+      oldNode.contentHash === newNode.contentHash
+    ) {
+      state.oldToNew.set(oldNode, newNode);
+      state.newToOld.set(newNode, oldNode);
+
+      // Recurse into children in order
+      const minLen = Math.min(oldNode.children.length, newNode.children.length);
+      for (let i = 0; i < minLen; i++) {
+        stack.push([oldNode.children[i]!, newNode.children[i]!]);
+      }
+    } else if (oldNode.kind === newNode.kind) {
+      // Same kind but different hash — try children anyway.
+      // Only use tall nodes as anchors for container matching.
+      if (oldNode.height >= opts.minHeight) {
+        // Mark as potential anchor for bottom-up phase
+        // (implicit: these unmatched same-kind tall nodes will be grouped
+        //  by bottomUpMatch and compared by descendant overlap)
+      }
+      const minLen = Math.min(oldNode.children.length, newNode.children.length);
+      for (let i = 0; i < minLen; i++) {
+        stack.push([oldNode.children[i]!, newNode.children[i]!]);
+      }
+    }
+  }
+}
+
+// ---------- Bottom-up matching ----------
+
+/**
+ * Phase 2: Container matching.
+ * For unmatched nodes of the same kind, match them if enough descendants
+ * are already matched (above the bottomUpRatio threshold).
+ */
+function bottomUpMatch(
+  oldRoot: Node,
+  newRoot: Node,
+  state: MatchState,
+  opts: MatchOptions,
+): void {
+  const unmatchedOld = collectUnmatched(oldRoot, state.oldToNew);
+  const unmatchedNew = collectUnmatched(newRoot, state.newToOld);
+
+  // Group unmatched by kind
+  const byKindOld = groupByKind(unmatchedOld);
+  const byKindNew = groupByKind(unmatchedNew);
+
+  for (const [kind, oldNodes] of byKindOld) {
+    const newNodes = byKindNew.get(kind);
+    if (!newNodes || newNodes.length === 0) continue;
+
+    // For each pair of same-kind nodes, compute overlap ratio
+    for (const oldNode of oldNodes) {
+      if (state.oldToNew.has(oldNode)) continue;
+
+      let bestMatch: Node | null = null;
+      let bestRatio = 0;
+
+      for (const newNode of newNodes) {
+        if (state.newToOld.has(newNode)) continue;
+
+        const ratio = descendantOverlap(oldNode, newNode, state);
+        if (ratio > bestRatio) {
+          bestRatio = ratio;
+          bestMatch = newNode;
+        }
+      }
+
+      if (bestMatch && bestRatio >= opts.bottomUpRatio) {
+        state.oldToNew.set(oldNode, bestMatch);
+        state.newToOld.set(bestMatch, oldNode);
+      }
+    }
+  }
+}
+
+/** Collect all unmatched nodes via BFS */
+function collectUnmatched(
+  root: Node,
+  matched: Map<Node, Node>,
+): Node[] {
+  const result: Node[] = [];
+  const queue: Node[] = [root];
+
+  while (queue.length > 0) {
+    const node = queue.shift()!;
+    if (!matched.has(node)) {
+      result.push(node);
+    }
+    for (const child of node.children) {
+      queue.push(child);
+    }
+  }
+
+  return result;
+}
+
+function groupByKind(nodes: Node[]): Map<string, Node[]> {
+  const map = new Map<string, Node[]>();
+  for (const node of nodes) {
+    const list = map.get(node.kind);
+    if (list) list.push(node);
+    else map.set(node.kind, [node]);
+  }
+  return map;
+}
+
+/**
+ * Ratio of matched descendants between two nodes.
+ * Counts descendants that are already in the matching.
+ */
+function descendantOverlap(
+  oldNode: Node,
+  newNode: Node,
+  state: MatchState,
+): number {
+  const oldDescendants = collectDescendants(oldNode);
+  const newDescendants = collectDescendants(newNode);
+
+  // For leaf nodes with no descendants, fall back to content hash comparison
+  if (oldDescendants.length === 0 && newDescendants.length === 0) {
+    return oldNode.contentHash === newNode.contentHash ? 1.0 : 0;
+  }
+
+  let matched = 0;
+  const newSet = new Set(newDescendants);
+
+  for (const old of oldDescendants) {
+    const partner = state.oldToNew.get(old);
+    if (partner && newSet.has(partner)) {
+      matched++;
+    }
+  }
+
+  const maxLen = Math.max(oldDescendants.length, newDescendants.length);
+  return maxLen > 0 ? matched / maxLen : 0;
+}
+
+function collectDescendants(node: Node): Node[] {
+  const result: Node[] = [];
+  const stack: Node[] = [...node.children];
+
+  while (stack.length > 0) {
+    const n = stack.pop()!;
+    result.push(n);
+    for (const child of n.children) {
+      stack.push(child);
+    }
+  }
+
+  return result;
+}
+
+// ---------- Edit script generation ----------
+
+/**
+ * Phase 3: Generate edit script from the final matching.
+ * Uses a Chawathe-style algorithm: walk old tree and detect
+ * Insert, Delete, Update, and Move actions.
+ */
+function generateEditScript(
+  oldRoot: Node,
+  newRoot: Node,
+  state: MatchState,
+): EditAction[] {
+  const actions: EditAction[] = [];
+
+  // Build parent maps for O(1) parent lookups
+  const oldParents = buildParentMap(oldRoot);
+  const newParents = buildParentMap(newRoot);
+
+  // Walk old tree to find deletions, updates, and moves
+  walkAndDiff(oldRoot, newRoot, state, actions, oldParents, newParents);
+
+  return actions;
+}
+
+function buildParentMap(root: Node): Map<Node, Node> {
+  const map = new Map<Node, Node>();
+  const stack = [root];
+  while (stack.length > 0) {
+    const node = stack.pop()!;
+    for (const child of node.children) {
+      map.set(child, node);
+      stack.push(child);
+    }
+  }
+  return map;
+}
+
+function walkAndDiff(
+  oldNode: Node,
+  newRoot: Node,
+  state: MatchState,
+  actions: EditAction[],
+  oldParents: Map<Node, Node>,
+  newParents: Map<Node, Node>,
+): void {
+  const partner = state.oldToNew.get(oldNode);
+
+  if (!partner) {
+    // Node was deleted
+    actions.push({ type: "Delete", node: oldNode });
+    return;
+  }
+
+  // Check for label changes (rename detection)
+  if (oldNode.label !== partner.label) {
+    if (oldNode.label && partner.label) {
+      actions.push({
+        type: "Update",
+        node: partner,
+        detail: {
+          kind: "Renamed",
+          from: oldNode.label,
+          to: partner.label,
+        },
+      });
+    } else if (oldNode.label || partner.label) {
+      // One side has label, other doesn't — still a meaningful change
+      actions.push({
+        type: "Update",
+        node: partner,
+        detail: {
+          kind: "Renamed",
+          from: oldNode.label ?? "unnamed",
+          to: partner.label ?? "unnamed",
+        },
+      });
+    }
+  }
+
+  // Check for value changes
+  if (oldNode.value !== partner.value) {
+    actions.push({
+      type: "Update",
+      node: partner,
+      detail: {
+        kind: "ValueChanged",
+        from: oldNode.value,
+        to: partner.value,
+      },
+    });
+  }
+
+  // Check for move (same node matched to different parents)
+  const oldParent = oldParents.get(oldNode);
+  const newParent = newParents.get(partner);
+
+  if (oldParent && newParent) {
+    const oldParentPartner = state.oldToNew.get(oldParent);
+    if (oldParentPartner !== newParent) {
+      // Parent mismatch — this is a move
+      actions.push({
+        type: "Move",
+        node: partner,
+        fromParent: oldParent,
+        toParent: newParent,
+        fromPosition: oldParent.children.indexOf(oldNode),
+        toPosition: newParent.children.indexOf(partner),
+      });
+    } else {
+      // Same parent but different position — reorder
+      const oldPos = oldParent.children.indexOf(oldNode);
+      const newPos = newParent.children.indexOf(partner);
+      if (oldPos !== newPos && oldPos >= 0 && newPos >= 0) {
+        actions.push({
+          type: "Move",
+          node: partner,
+          fromParent: oldParent,
+          toParent: newParent,
+          fromPosition: oldPos,
+          toPosition: newPos,
+        });
+      }
+    }
+  }
+
+  // Recurse into children
+  for (const child of oldNode.children) {
+    walkAndDiff(child, newRoot, state, actions, oldParents, newParents);
+  }
+}
+
+/** Find the parent of a node in a tree (linear search — ok for small trees) */
+function findParent(target: Node, root: Node): Node | null {
+  if (root.children.includes(target)) return root;
+  for (const child of root.children) {
+    const result = findParent(target, child);
+    if (result) return result;
+  }
+  return null;
+}
+
+// ---------- Main diff API ----------
+
+export interface DiffResult {
+  changes: EditAction[];
+  /** Whether the pipeline fell back to a simpler mode */
+  fallback?: "bytes" | "lines" | "generic_tree";
+  /** Total nodes processed */
+  nodeCount: number;
+}
+
+/**
+ * Diff two Node trees using the GumTree-style matching algorithm.
+ *
+ * This is the main entry point for the diff core. Tier adapters parse
+ * source into Nodes, then call this function to produce typed edit actions.
+ */
+export function diffTrees(
+  oldRoot: Node,
+  newRoot: Node,
+  options: Partial<MatchOptions> = {},
+): DiffResult {
+  const opts = { ...DEFAULT_OPTIONS, ...options };
+
+  // Safety valve: skip tree diff on enormous inputs
+  const oldNodeCount = countNodes(oldRoot);
+  const newNodeCount = countNodes(newRoot);
+  if (oldNodeCount > opts.maxNodes || newNodeCount > opts.maxNodes) {
+    return {
+      changes: [],
+      fallback: "lines",
+      nodeCount: oldNodeCount + newNodeCount,
+    };
+  }
+
+  const state: MatchState = {
+    oldToNew: new Map(),
+    newToOld: new Map(),
+  };
+
+  // Phase 1: Top-down isomorphic matching
+  topDownMatch(oldRoot, newRoot, state, opts);
+
+  // Phase 2: Bottom-up container matching
+  bottomUpMatch(oldRoot, newRoot, state, opts);
+
+  // Phase 3: Edit script generation
+  const actions = generateEditScript(oldRoot, newRoot, state);
+
+  // Detect inserts (nodes in new tree not matched to any old node)
+  const allNewNodes = collectUnmatched(newRoot, state.newToOld);
+  for (const node of allNewNodes) {
+    // Skip if already referenced as target of an action
+    if (actions.some((a) => a.type === "Move" && a.node === node)) continue;
+    const parent = findParent(node, newRoot);
+    if (parent) {
+      const position = parent.children.indexOf(node);
+      actions.push({
+        type: "Insert",
+        node,
+        parent,
+        position: position >= 0 ? position : parent.children.length,
+      });
+    }
+  }
+
+  return {
+    changes: actions,
+    nodeCount: oldNodeCount + newNodeCount,
+  };
+}
+
+function countNodes(root: Node): number {
+  let count = 1;
+  for (const child of root.children) {
+    count += countNodes(child);
+  }
+  return count;
+}
+
+// ---------- Utility: short-circuit hash comparison ----------
+
+/**
+ * Quick check: are two byte streams identical?
+ * Use this before parsing to skip the full diff pipeline.
+ */
+export function fastUnchanged(
+  oldBytes: Uint8Array,
+  newBytes: Uint8Array,
+): boolean {
+  if (oldBytes.length !== newBytes.length) return false;
+  for (let i = 0; i < oldBytes.length; i++) {
+    if (oldBytes[i] !== newBytes[i]) return false;
+  }
+  return true;
+}
+
+// ---------- Utility: node tree from simple key-value ----------
+
+/**
+ * Build a simple tree from a flat key-value object.
+ * Used by T4 (config/data tier) for JSON/YAML value trees.
+ */
+export function treeFromValue(
+  value: unknown,
+  kind = "root",
+): Node {
+  if (value === null || value === undefined) {
+    return createNode({
+      kind,
+      value: String(value),
+      byteRange: [0, 1],
+    });
+  }
+
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return createNode({
+      kind: "leaf",
+      label: kind,
+      value: String(value),
+      byteRange: [0, String(value).length],
+    });
+  }
+
+  if (Array.isArray(value)) {
+    const children = value.map((item, i) =>
+      treeFromValue(item, `${kind}[${i}]`),
+    );
+    return createNode({
+      kind: "array",
+      label: kind,
+      children,
+      byteRange: [0, 1],
+    });
+  }
+
+  if (typeof value === "object") {
+    const children: Node[] = [];
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+      children.push(treeFromValue(val, key));
+    }
+    return createNode({
+      kind: "object",
+      label: kind,
+      children,
+      byteRange: [0, 1],
+    });
+  }
+
+  return createNode({
+    kind,
+    value: String(value),
+    byteRange: [0, 1],
+  });
 }
