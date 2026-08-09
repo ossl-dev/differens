@@ -11,7 +11,11 @@
     "clean": "rm -rf dist/"
   },
   "dependencies": {
-    "@differens/core": "workspace:*"
+    "@differens/core": "workspace:*",
+    "@differens/correlate": "workspace:*",
+    "@differens/git": "workspace:*",
+    "@differens/narrate": "workspace:*",
+    "@differens/tiers": "workspace:*"
   },
   "devDependencies": {
     "@differens/tsconfig": "workspace:*"
