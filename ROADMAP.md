@@ -1,0 +1,128 @@
+# Roadmap
+
+Pick an unchecked box, open an issue saying you're working on it, send a PR. One item per PR.
+
+---
+
+## Phase 1 -- Ship what we have
+
+- [x] Monorepo skeleton: Turborepo + Bun + TypeScript workspace
+- [x] Diff core: 64-bit FNV-1a hashing, top-down isomorphic matching, bottom-up container matching, Chawathe edit scripts with Move actions
+- [x] Content router: extension-based file classification (binary, raw, prose, markup, data, code)
+- [x] T0 binary adapter: hash-only with byte-size delta reporting
+- [x] T1 raw fallback: LCS line diff with 10k-line safety cap and O(n) backtrack
+- [x] T2 prose adapter: word-level diff for plain text, markdown, logs
+- [x] T3 markup adapter: HTML/XML tree parser (lenient, fault-tolerant tokenizer)
+- [x] T4 data adapter: JSON/YAML subset/TOML subset parser with key-path diff
+- [x] T5 code adapter: tree-sitter integration with semantic extractors for TypeScript/JavaScript, Python, Rust, and Go
+- [x] Narration engine: typed EditActions -> English sentences, per-language vocabulary (fn/def/func -> function)
+- [x] Output formatters: terminal (colorized with icons), JSON (with BigInt serialization), markdown
+- [x] Cross-file correlator: structure hash buckets, content hash exact matches, Jaccard similarity for modified moves
+- [x] Git integration: shell-out difftool, working tree diff, commit range diff, diff driver registration
+- [x] CLI: `differens diff`, `differens languages`, `differens install-git-driver`, `--format=json|markdown`, `--help`
+- [x] Tests: 96 tests across 6 packages, zero failures
+- [x] README, development guide, roadmap
+
+**CI / infra**
+- [ ] GitHub Actions: test matrix on Bun latest, lint, typecheck
+- [ ] Biome check in CI (format + lint gates)
+- [ ] README badges (build status, license)
+- [ ] npm/jsr publishing workflow for `@differens/core` and `@differens/cli`
+
+**Docs**
+- [ ] API reference per package
+- [ ] Quick start guide
+- [ ] Per-language extractor documentation
+- [ ] Troubleshooting page
+- [ ] "How it works" architecture deep-dive
+
+---
+
+## Phase 2 -- Breadth and hardening
+
+- [ ] Expand semantic extractor coverage: C, C++, Java, Ruby, PHP, Swift, Kotlin, C#, Scala, Lua, shell
+- [ ] L5 generic fallback: structural tree-sitter CST diff for any language with a grammar but no extractor
+- [ ] Binary tier plugin interface (image perceptual diff, EXIF diff, ELF/PE symbol diff)
+- [ ] JSON output mode in CLI (done at core level, needs CLI integration work)
+- [ ] Git diff driver auto-registration (`differens install-git-driver` writes `.gitattributes`)
+- [ ] Config file support (`.differensrc` or `differens.toml`): thresholds, AI on/off, default format
+- [ ] Non-git directory diff mode: recursive walk, cross-directory rename detection
+- [ ] Add remaining format detectors to content router: CSV/TSV, INI, ENV, GraphQL, Dockerfile
+
+**Performance**
+- [ ] Iterative tree traversal (replace recursion to prevent stack overflow on deep trees)
+- [ ] 64-bit hash collision safety: optional content verification on hash match
+- [ ] Content-addressed parse cache (keyed by blob hash)
+- [ ] `maxFileSize` option actually enforced in tier pipeline (currently only maxNodes checked)
+- [ ] Benchmark suite: typical file diffs, large file fallback, cross-file correlation at scale
+
+---
+
+## Phase 3 -- The actual differentiator
+
+- [ ] Repository-level changeset summaries: one paragraph per commit/PR ("extracted validation into validators.ts")
+- [ ] Markdown output mode optimized for PR descriptions and changelogs
+- [ ] PR/commit range mode: `differens diff main..feature` with cross-file move narration
+- [ ] File-level rename detection via git's `--find-renames` for directory and range diff modes
+- [ ] Changeset grouping: cluster related changes (all the moves from one refactor, all the renames from another)
+
+---
+
+## Phase 4 -- AI layer and polish
+
+- [ ] Optional local LLM for narrative summarization (offline, opt-in, `--ai` flag)
+- [ ] Model packaging: fetch-on-first-use with local caching, or bring-your-own-model
+- [ ] `--no-ai` default, AI strictly additive (never decides what changed, only narrates it)
+- [ ] WASM-based inference runtime (no Python dependency, works with `bun build --compile`)
+- [ ] Config file hot-reload
+- [ ] Shell completions (bash, zsh, fish)
+- [ ] Progress reporting for large changesets
+- [ ] `--verbose` / `--quiet` / `--json` consistency across all commands
+
+---
+
+## Phase 5 -- Desktop and ecosystem
+
+- [ ] Tauri desktop app: side-by-side semantic view, timeline browsing, AI explanation panel
+- [ ] T6 composite file support: Vue SFC, Svelte, Astro, MDX code fences via tree-sitter injections
+- [ ] Editor integrations: VS Code extension, potentially JetBrains
+- [ ] WASM build of `@differens/core` for in-browser diffing
+- [ ] Homebrew / npm / JSR / `bun add` distribution of the CLI
+
+---
+
+## Stretch / post-v1
+
+- [ ] 3-way semantic merge assistance (reusing the diff core, a la mergiraf)
+- [ ] Format-specific T0 plugins: image perceptual diff, audio waveform diff, PDF text-layer diff
+- [ ] Cross-format diffing (JSON against YAML, graphtage-style)
+- [ ] Structural diff for binary formats via format-specific parsers (ELF, WASM, PE)
+- [ ] GitHub Action: `ossl-dev/differens-action` for PR diff summaries
+- [ ] GitLab CI integration
+
+---
+
+## Bugs and known issues
+
+- O(n^2) bottom-up container matching at scale -- the `maxNodes` safety valve (50k) prevents worst case but large monorepo diffs may trigger it
+- Myers middle-snake code removed; raw tier uses LCS with O(n*m) memory. Fast enough for <10k lines, capped above that
+- Markup tokenizer is regex-based, not a full HTML5 parser -- tolerates everything but may misparse attribute values containing `>`
+- YAML parser handles 2-space indentation only; 4-space YAML may drop nesting. Our YAML subset is intentional, not a full parser
+- Leaf-level renames report as Delete+Insert, not Update/Renamed -- narration layer handles this by convention, but the core action is less precise than it could be
+- Deeply nested structures (>10k depth) may stack overflow -- recursion safety valve not yet in place (mitigated by practical file limits)
+- Tree-sitter grammar init is async and may race with the first `parseCode` call on cold start -- fixed by caching the init promise, but the async overhead remains
+- `diffWorkingTree` uses `git diff HEAD --name-only` which misses staged-but-uncommitted changes (intentional: working tree vs HEAD is the documented contract)
+
+---
+
+## Ideas / maybe someday
+
+- Streaming diff for very large files (process chunks, not whole file at once)
+- `differens watch` -- filesystem watcher that diffs on save
+- `differens story` -- generate a narrative commit message from the diff
+- Structural-aware `git blame` that follows moves and renames through history
+- Plugin marketplace for language extractors and binary format adapters
+- Real-time collaborative diff review (like Google Docs but for code changes)
+- Semantic code search: "find where this function signature was last changed"
+- `differens lint` -- detect suspicious structural changes (function grew 10x, too many params added)
+- `differens review` -- AI-assisted code review on top of the semantic diff
