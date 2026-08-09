@@ -1,0 +1,23 @@
+{
+  "name": "@differens/narrate",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src/",
+    "test": "bun test",
+    "clean": "rm -rf dist/"
+  },
+  "dependencies": {
+    "@differens/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@differens/tsconfig": "workspace:*"
+  }
+}
