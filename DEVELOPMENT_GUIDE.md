@@ -79,6 +79,28 @@ bun build ./apps/cli/src/index.ts --compile --outfile differens
 differens <inputs>
 ```
 
+## Releasing
+
+The CLI goes out under two names, `differens` and `@ossl/differens-cli`, from
+one build. Bump the version in `apps/cli/package.json`, then:
+
+```bash
+cd apps/cli && bun run release
+```
+
+`scripts/publish.ts` builds once and stages each publish into a temp directory,
+so the repo manifest is never rewritten mid-release and the staged one can drop
+the bundled `workspace:*` devDependencies. Pass `--dry-run` first.
+
+Two things the registry silently punishes, both already handled, both worth
+knowing before you touch that manifest:
+
+- A `bin` path written as `./dist/index.js` is stripped on publish, and only on
+  publish -- `npm pack` keeps it, so a tarball can install and run perfectly
+  while the published package ships no command at all. Write it `dist/index.js`.
+- `workspace:*` survives into the published manifest verbatim, pointing at
+  packages that are bundled into `dist` and will never exist on the registry.
+
 ## CLI usage
 
 The CLI is the diff, no subcommand:

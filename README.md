@@ -42,6 +42,11 @@ npx differens
 Node 18.17 or newer. The tree-sitter grammars ship as prebuilt binaries for the
 common platforms, so there is nothing to compile.
 
+The same build is published under the ossl scope as
+[`@ossl/differens-cli`](https://www.npmjs.com/package/@ossl/differens-cli).
+Identical package, identical `differens` command; install whichever name you
+prefer, not both.
+
 <details>
 <summary>From source, or as a standalone executable</summary>
 

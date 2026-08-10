@@ -28,7 +28,7 @@
   "author": "Mohammed Aman Khan",
   "type": "module",
   "bin": {
-    "differens": "./dist/index.js"
+    "differens": "dist/index.js"
   },
   "files": [
     "dist",
@@ -47,8 +47,7 @@
     "lint": "biome check src/",
     "test": "bun test",
     "clean": "rm -rf dist/",
-    "prepack": "cp ../../README.md ../../LICENSE .",
-    "prepublishOnly": "bun run build"
+    "release": "bun scripts/publish.ts"
   },
   "dependencies": {
     "tree-sitter": "^0.25.1",
