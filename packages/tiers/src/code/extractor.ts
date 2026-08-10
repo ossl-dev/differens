@@ -17,6 +17,13 @@ export interface LanguageExtractor {
   extractConcept(nodeType: string): string;
   /** Extract the label (name) from a node if it has one */
   extractLabel(node: Parser.SyntaxNode, source: string): string | undefined;
+  /**
+   * Node types whose label does NOT come from a plain `name` field.
+   * The converter reads the `name` field straight off its cursor, so
+   * `extractLabel` is only invoked for the types listed here -- keeping the
+   * per-node cost to a set lookup instead of a childForFieldName call.
+   */
+  readonly labelFallbackTypes?: ReadonlySet<string>;
   /** Whether child order matters for this node kind */
   isOrdered(nodeKind: string): boolean;
 }

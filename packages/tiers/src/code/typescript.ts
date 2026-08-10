@@ -85,6 +85,7 @@ const CONCEPT_MAP: Record<string, string> = {
 export class TypeScriptExtractor implements LanguageExtractor {
   readonly language = "typescript";
   readonly extensions = ["js", "mjs", "cjs", "jsx", "ts", "tsx"];
+  readonly labelFallbackTypes = new Set(["variable_declaration", "lexical_declaration"]);
 
   extractConcept(nodeType: string): string {
     return CONCEPT_MAP[nodeType] ?? nodeType;

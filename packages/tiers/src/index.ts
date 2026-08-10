@@ -9,12 +9,12 @@
  */
 
 import type { Node } from "@differens/core";
-import { createNode, diffTrees, fastUnchanged } from "@differens/core";
+import { createNode, diffTrees } from "@differens/core";
 import { diffLines } from "./raw";
 import { diffWords } from "./prose";
 import { parseMarkup, type MarkupNode } from "./markup";
 import { parseData } from "./data";
-import { parseCode, listExtractors, awaitGrammars } from "./code/index";
+import { parseCode, listExtractors, awaitGrammars, hasGrammar } from "./code/index";
 import { isBinaryExtension } from "./binary";
 
 // ---------- Tier enum ----------
@@ -116,13 +116,20 @@ export function diffWithTier(
   oldSource: string,
   newSource: string,
   oldPath: string,
-  _newPath: string,
+  newPath: string,
 ): TierDiffResult {
-  // Quick hash short-circuit
-  const oldBytes = new TextEncoder().encode(oldSource);
-  const newBytes = new TextEncoder().encode(newSource);
   const info = classifyFile(oldPath);
-  if (fastUnchanged(oldBytes, newBytes)) {
+
+  // A file that is entirely new or entirely gone is one fact, not a tree
+  // diff. Parsing it produces an Insert per top-level construct, which buries
+  // the only thing the reader needs to know.
+  if (oldSource === "" && newSource !== "") return wholeFile("Insert", newPath, newSource);
+  if (newSource === "" && oldSource !== "") return wholeFile("Delete", oldPath, oldSource);
+
+  // Short-circuit on identical sources. String comparison, not a UTF-8
+  // encode of both sides: encoding allocated two full copies of every file
+  // just to answer a question the strings already answer.
+  if (oldSource === newSource) {
     return { changes: [], nodeCount: 0, tier: info.tier };
   }
 
@@ -130,66 +137,90 @@ export function diffWithTier(
   // Handles .dat, .bin without extension lists, git blobs, etc.
   if (
     info.tier === Tier.Raw &&
-    (hasNullByte(oldBytes) || hasNullByte(newBytes) ||
+    (hasNullByte(oldSource) || hasNullByte(newSource) ||
      oldSource.includes("�") || newSource.includes("�"))
   ) {
     return diffBinary(oldSource, newSource);
   }
 
+  // A tier is used only if it both parses AND produces a usable tree diff.
+  // The core bails out to a line diff on oversized trees, and that verdict
+  // has to propagate: reporting the core's empty change list as the code
+  // tier's answer would claim a 200k-node file had no changes at all.
+  const attempt = (fn: () => TierDiffResult): TierDiffResult | undefined => {
+    try {
+      const result = fn();
+      return result.fallback ? undefined : result;
+    } catch {
+      return undefined;
+    }
+  };
+
+  let result: TierDiffResult | undefined;
   switch (info.tier) {
     case Tier.Binary:
       return diffBinary(oldSource, newSource);
-
     case Tier.Data:
-      try {
-        return diffData(oldSource, newSource);
-      } catch {
-        // Fall through to raw diff
-      }
+      result = attempt(() => diffData(oldSource, newSource));
       break;
-
     case Tier.Markup:
-      try {
-        return diffMarkup(oldSource, newSource);
-      } catch {
-        // Fall through to raw diff
-      }
+      result = attempt(() => diffMarkup(oldSource, newSource));
       break;
-
     case Tier.Prose:
-      try {
-        return diffProse(oldSource, newSource);
-      } catch {
-        // Fall through to raw diff
-      }
+      result = attempt(() => diffProse(oldSource, newSource));
       break;
-
     case Tier.Code:
-      try {
-        return diffCode(oldSource, newSource, info.extension);
-      } catch {
-        // Fall through to raw diff
-      }
-      break;
-
     case Tier.Composite:
-      try {
-        return diffCode(oldSource, newSource, info.extension);
-      } catch {
-        // Fall through
-      }
+      result = attempt(() => diffCode(oldSource, newSource, info.extension));
       break;
   }
+  if (result) return result;
 
   // Raw fallback
-  return diffRaw(oldSource, newSource);
+  const raw = diffRaw(oldSource, newSource);
+  return info.tier === Tier.Raw ? raw : { ...raw, fallback: "lines" };
 }
 
-function hasNullByte(bytes: Uint8Array): boolean {
-  // First 8KB is plenty for a sniff
-  const limit = Math.min(bytes.length, 8192);
+/** One action standing for a whole added or removed file. */
+function wholeFile(
+  type: "Insert" | "Delete",
+  path: string,
+  source: string,
+): TierDiffResult {
+  const info = classifyFile(path);
+  // The source goes in `value` so the node's contentHash covers it. The
+  // cross-file correlator compares these nodes to spot a file that was moved
+  // or renamed; keyed on anything shorter (a path, a line count) it matched
+  // unrelated files whose paths merely shared directory names.
+  // Narration shows the label, so the body never reaches the output.
+  const node = createNode({
+    kind: "file",
+    label: path,
+    value: source,
+    byteRange: [0, source.length],
+  });
+  return {
+    changes: [
+      type === "Delete"
+        ? { type: "Delete", node, context: [] }
+        : {
+            type: "Insert",
+            node,
+            parent: createNode({ kind: "tree", byteRange: [0, 0] }),
+            position: 0,
+            context: [],
+          },
+    ],
+    nodeCount: 1,
+    tier: info.tier,
+  };
+}
+
+function hasNullByte(source: string): boolean {
+  // First 8k chars is plenty for a sniff
+  const limit = Math.min(source.length, 8192);
   for (let i = 0; i < limit; i++) {
-    if (bytes[i] === 0) return true;
+    if (source.charCodeAt(i) === 0) return true;
   }
   return false;
 }
@@ -291,14 +322,14 @@ function diffMarkup(oldSource: string, newSource: string): TierDiffResult {
   const oldTree = markupToNodeTree(parseMarkup(oldSource));
   const newTree = markupToNodeTree(parseMarkup(newSource));
   const result = diffTrees(oldTree, newTree);
-  return { changes: result.changes, nodeCount: result.nodeCount, tier: Tier.Markup };
+  return { changes: result.changes, nodeCount: result.nodeCount, tier: Tier.Markup, fallback: result.fallback };
 }
 
 function diffData(oldSource: string, newSource: string): TierDiffResult {
   const oldTree = parseData(oldSource);
   const newTree = parseData(newSource);
   const result = diffTrees(oldTree, newTree);
-  return { changes: result.changes, nodeCount: result.nodeCount, tier: Tier.Data };
+  return { changes: result.changes, nodeCount: result.nodeCount, tier: Tier.Data, fallback: result.fallback };
 }
 
 function diffCode(
@@ -309,7 +340,7 @@ function diffCode(
   const oldTree = parseCode(oldSource, extension);
   const newTree = parseCode(newSource, extension);
   const result = diffTrees(oldTree, newTree);
-  return { changes: result.changes, nodeCount: result.nodeCount, tier: Tier.Code };
+  return { changes: result.changes, nodeCount: result.nodeCount, tier: Tier.Code, fallback: result.fallback };
 }
 
 // ---------- Markup node conversion ----------
@@ -345,4 +376,11 @@ export function getExtractors(): ExtractorInfo[] {
 
 /** Re-export for convenience */
 export { parseData, treeFromValue } from "./data";
-export { parseCode } from "./code/index";
+export { parseCode, hasGrammar } from "./code/index";
+
+/** Will this file actually be parsed into a tree, or only line-diffed? */
+export function isParseable(filePath: string): boolean {
+  const info = classifyFile(filePath);
+  if (info.tier === Tier.Data || info.tier === Tier.Markup) return true;
+  return info.tier === Tier.Code && hasGrammar(info.extension);
+}

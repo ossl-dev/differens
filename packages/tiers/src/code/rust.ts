@@ -86,6 +86,7 @@ const CONCEPT_MAP: Record<string, string> = {
 export class RustExtractor implements LanguageExtractor {
   readonly language = "rust";
   readonly extensions = ["rs"];
+  readonly labelFallbackTypes = new Set(["type_item"]);
 
   extractConcept(nodeType: string): string {
     return CONCEPT_MAP[nodeType] ?? nodeType;
