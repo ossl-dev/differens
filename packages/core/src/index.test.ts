@@ -331,13 +331,16 @@ describe("diffTrees: deeply nested identical structures", () => {
     const newTree = deepChain(50, "b");
     const result = diffTrees(oldTree, newTree);
 
-    // No subtree hashes match, so the old chain is deleted as a unit (root
-    // Delete absorbs its children) and the new chain is re-inserted node by node.
+    // No subtree hashes match, so the old chain is deleted as a unit and the
+    // new one is inserted as a unit. Both absorb their subtrees: the root is
+    // unmatched and has no parent to be inserted into, so its single child is
+    // the topmost insertable node.
     const deletes = ofType(result.changes, "Delete");
     const inserts = ofType(result.changes, "Insert");
     expect(deletes).toHaveLength(1);
     expect(deletes[0]!.node).toBe(oldTree);
-    expect(inserts).toHaveLength(50);
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0]!.node).toBe(newTree.children[0]!);
     expect(ofType(result.changes, "Update")).toHaveLength(0);
     expect(ofType(result.changes, "Move")).toHaveLength(0);
   });
@@ -371,16 +374,13 @@ describe("diffTrees: structural changes only", () => {
     const result = diffTrees(oldTree, newTree);
 
     // Nothing matches: the unmatched old root absorbs its subtree into one
-    // Delete, and every new node except the root is inserted.
+    // Delete, and the new function subtree is inserted as one unit.
     const deletes = ofType(result.changes, "Delete");
     const inserts = ofType(result.changes, "Insert");
     expect(deletes).toHaveLength(1);
     expect(deletes[0]!.node).toBe(oldTree);
-    expect(inserts).toHaveLength(2);
-    expect(inserts.map((i) => i.node)).toEqual([
-      newTree.children[0]!,
-      newTree.children[0]!.children[0]!,
-    ]);
+    expect(inserts).toHaveLength(1);
+    expect(inserts.map((i) => i.node)).toEqual([newTree.children[0]!]);
     expect(ofType(result.changes, "Update")).toHaveLength(0);
     expect(ofType(result.changes, "Move")).toHaveLength(0);
   });
@@ -408,15 +408,18 @@ describe("diffTrees: large child arrays", () => {
     const newTree = manyLeaves(150, 73);
     const result = diffTrees(oldTree, newTree);
 
-    const deletes = ofType(result.changes, "Delete");
-    const inserts = ofType(result.changes, "Insert");
-    expect(deletes).toHaveLength(1);
-    expect(deletes[0]!.node).toBe(oldTree.children[73]!);
-    expect(inserts).toHaveLength(1);
-    expect(inserts[0]!.node).toBe(newTree.children[73]!);
-    expect(inserts[0]!.parent).toBe(newTree);
-    expect(inserts[0]!.position).toBe(73);
-    expect(ofType(result.changes, "Update")).toHaveLength(0);
+    // Leaf recovery pairs the two leftover children of the matched root, so
+    // this reads as one relabelling rather than a deletion plus an addition.
+    expect(ofType(result.changes, "Delete")).toHaveLength(0);
+    expect(ofType(result.changes, "Insert")).toHaveLength(0);
+    const updates = ofType(result.changes, "Update");
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.node).toBe(newTree.children[73]!);
+    expect(updates[0]!.detail).toEqual({
+      kind: "Renamed",
+      from: "l73",
+      to: "l73-changed",
+    });
     expect(result.nodeCount).toBe(302);
   });
 });
@@ -570,9 +573,9 @@ describe("diffTrees: wide shallow vs deep narrow", () => {
     const newTree = deepNarrow(100);
     const result = diffTrees(oldTree, newTree);
     expect(result.fallback).toBeUndefined();
-    // Old root deleted as a unit; every new node except the root is inserted.
+    // Old root deleted as a unit, new chain inserted as a unit.
     expect(ofType(result.changes, "Delete")).toHaveLength(1);
-    expect(ofType(result.changes, "Insert")).toHaveLength(100);
+    expect(ofType(result.changes, "Insert")).toHaveLength(1);
     expect(result.nodeCount).toBe(202);
   });
 });
