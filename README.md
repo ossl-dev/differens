@@ -34,13 +34,58 @@ And when it can't parse something, it falls back gracefully. Unparseable code fa
 bun install
 bun run build
 
-# Diff two files
-bun run apps/cli/src/index.ts diff old.ts new.ts
+# Run from source
+bun run apps/cli/src/index.ts <inputs>
 
-# Coming soon:
-# differens diff                    # working tree vs HEAD (git mode)
-# differens diff main..feat         # commit range
-# differens install-git-driver      # register as git difftool
+# Or build a standalone executable
+bun build apps/cli/src/index.ts --compile --outfile differens
+```
+
+## Usage
+
+Differens is a diff tool, so the CLI is the diff. No subcommand needed.
+
+```bash
+differens                        # diff working tree vs HEAD
+differens a.ts b.ts              # diff two files
+differens old/ new/              # diff two directories
+differens main..feature          # diff a commit range
+differens 2a8178e 3a5015f        # diff two commits by id or branch name
+differens a.json b.json --format=llm
+```
+
+`diff` is kept as an explicit alias (`differens diff a.ts b.ts`).
+
+### Output formats
+
+| Flag | Use |
+|---|---|
+| (default) | Terminal, one line per change with scope: `changed value of port from 3000 to 8080 in object root` |
+| `--format=json` | Raw SemanticChange array, for tooling |
+| `--format=markdown` | Rolled-up summary, for PR descriptions |
+| `--format=llm` | Compact flat JSON designed for AI tools: file, kind, name, containment chain, before/after values. Enough context to skip reading the raw diff |
+
+LLM format example:
+
+```json
+{
+  "file": "a.json",
+  "kind": "leaf",
+  "name": "port",
+  "context": ["object root"],
+  "action": "changed",
+  "from": "3000",
+  "to": "8080"
+}
+```
+
+### Other commands
+
+```bash
+differens languages              # what's supported: semantic vs generic per language
+differens install-git-driver     # register as a git difftool
+differens --help                 # usage
+differens --version              # version number
 ```
 
 ## Project structure
@@ -71,7 +116,7 @@ differens/
 
 ## Status
 
-Milestone 0 shipped: diff core with 64-bit hashing, JSON/YAML/TOML adapters, tree-sitter code adapter with TypeScript/Python/Rust/Go extractors, git difftool integration, cross-file correlator, narration engine. 96 tests, zero failures.
+Milestone 0 shipped: diff core with 64-bit hashing, JSON/YAML/TOML adapters, tree-sitter code adapter with TypeScript/Python/Rust/Go extractors, git integration (working tree, commit ranges, commit pairs), cross-file correlator, narration engine with scope context, LLM output format. 100+ tests, zero failures.
 
 ## Prior art worth reading before contributing
 
