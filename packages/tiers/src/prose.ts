@@ -36,6 +36,14 @@ export function diffWords(oldText: string, newText: string): WordHunk[] {
   const oldTokens = tokenize(oldText);
   const newTokens = tokenize(newText);
 
+  // Cap token count: word-level LCS is O(n*m) memory. Beyond the cap,
+  // fall back to a whole-text replacement hunk. Same ceiling as raw.ts.
+  const MAX_TOKENS = 20_000;
+  if (oldTokens.length > MAX_TOKENS || newTokens.length > MAX_TOKENS) {
+    if (oldText === newText) return [];
+    return [{ type: "Update", text: newText, oldText, newText }];
+  }
+
   // LCS
   const n = oldTokens.length;
   const m = newTokens.length;

@@ -108,21 +108,22 @@ async function handleGitDiff(format: string): Promise<void> {
     return;
   }
 
-  const allFileChanges: FileChanges[] = [];
-  const allNarratives: SemanticChange[] = [];
+  // Per-file diffs are independent: run them concurrently. The diff
+  // core is CPU-bound per file, so a bounded pool keeps total memory
+  // in check while still saturating cores on large changesets.
+  const CONCURRENCY = Math.max(4, Math.min(16, navigator.hardwareConcurrency ?? 4));
 
-  for (const pair of filePairs) {
-    const result = diffWithTier(
-      pair.oldSource,
-      pair.newSource,
-      pair.oldPath,
-      pair.newPath,
-    );
-
+  const results = await mapWithConcurrency(filePairs, CONCURRENCY, (pair) => {
+    const result = diffWithTier(pair.oldSource, pair.newSource, pair.oldPath, pair.newPath);
     const changes = narrate(result.changes, { filePath: pair.oldPath });
-    allNarratives.push(...changes);
-    allFileChanges.push({ filePath: pair.oldPath, actions: result.changes });
-  }
+    return {
+      changes,
+      fileChanges: { filePath: pair.oldPath, actions: result.changes },
+    };
+  });
+
+  const allNarratives: SemanticChange[] = results.flatMap((r) => r.changes);
+  const allFileChanges: FileChanges[] = results.map((r) => r.fileChanges);
 
   // Cross-file correlation
   const crossFile = correlate(allFileChanges);
@@ -166,18 +167,15 @@ async function handleRangeDiff(range: string, format: string): Promise<void> {
     return;
   }
 
-  const allNarratives: SemanticChange[] = [];
+  const CONCURRENCY = Math.max(4, Math.min(16, navigator.hardwareConcurrency ?? 4));
+  const results = await mapWithConcurrency(filePairs, CONCURRENCY, (pair) =>
+    narrate(
+      diffWithTier(pair.oldSource, pair.newSource, pair.oldPath, pair.newPath).changes,
+      { filePath: pair.oldPath },
+    ),
+  );
 
-  for (const pair of filePairs) {
-    const result = diffWithTier(
-      pair.oldSource,
-      pair.newSource,
-      pair.oldPath,
-      pair.newPath,
-    );
-    allNarratives.push(...narrate(result.changes, { filePath: pair.oldPath }));
-  }
-
+  const allNarratives = results.flat();
   console.log(formatChanges(allNarratives, { format: format as "terminal" | "json" | "markdown" | "llm" }));
 }
 
@@ -230,6 +228,28 @@ async function handleInstallGitDriver(): Promise<void> {
 }
 
 // ---------- Helpers ----------
+
+/** Map items through an async fn with a bounded concurrency pool. */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => R | Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+
+  const worker = async (): Promise<void> => {
+    while (true) {
+      const i = next++;
+      if (i >= items.length) return;
+      results[i] = await fn(items[i]!, i);
+    }
+  };
+
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
+}
 
 function parseFormat(args: string[]): string {
   for (const arg of args) {

@@ -118,21 +118,18 @@ export async function diffCommitRange(
     const nameResult = await $`git diff --name-only ${oldRef} ${newRef}`.quiet();
     const files = nameResult.stdout.toString().trim().split("\n").filter(Boolean);
 
-    const results: GitDiffInput[] = [];
-
-    for (const filePath of files) {
+    // git show is I/O bound (subprocess + disk): fetch all blob pairs
+    // concurrently. Each file spawns 2 git processes, so cap the pool to
+    // avoid process explosion on changesets with thousands of files.
+    const CONCURRENCY = 8;
+    const results = await mapWithConcurrency(files, CONCURRENCY, async (filePath) => {
       const [oldSource, newSource] = await Promise.all([
         $`git show ${oldRef}:${filePath}`.quiet().then((r) => r.stdout.toString()).catch(() => ""),
         $`git show ${newRef}:${filePath}`.quiet().then((r) => r.stdout.toString()).catch(() => ""),
       ]);
 
-      results.push({
-        oldPath: filePath,
-        newPath: filePath,
-        oldSource,
-        newSource,
-      });
-    }
+      return { oldPath: filePath, newPath: filePath, oldSource, newSource };
+    });
 
     return results;
   } catch (err) {
@@ -140,6 +137,28 @@ export async function diffCommitRange(
       `failed to diff range ${range}: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
+}
+
+/** Map items through an async fn with a bounded concurrency pool. */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+
+  const worker = async (): Promise<void> => {
+    while (true) {
+      const i = next++;
+      if (i >= items.length) return;
+      results[i] = await fn(items[i]!, i);
+    }
+  };
+
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
 }
 
 // ---------- Diff driver registration ----------
