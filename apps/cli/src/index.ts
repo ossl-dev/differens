@@ -24,10 +24,10 @@ import {
   isGitRepo,
   readFilePair,
   resolveRef,
-} from "@ossl/differens-git";
-import { formatChanges, narrate } from "@ossl/differens-narrate";
-import type { OutputFormat } from "@ossl/differens-narrate";
-import { diffWithTier, getExtractors, initExtractors } from "@ossl/differens-tiers";
+} from "@ossl-dev/differens-git";
+import { formatChanges, narrate } from "@ossl-dev/differens-narrate";
+import type { OutputFormat } from "@ossl-dev/differens-narrate";
+import { diffWithTier, getExtractors, initExtractors } from "@ossl-dev/differens-tiers";
 import { WORKER_FLAG, runWorker, selfInvocation } from "./pool";
 import { report } from "./report";
 

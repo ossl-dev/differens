@@ -1,5 +1,5 @@
 {
-  "name": "@ossl/differens-narrate",
+  "name": "@ossl-dev/differens-narrate",
   "version": "0.1.0",
   "description": "Turns a differens edit script into sentences, markdown, JSON, or a token-frugal format for models",
   "keywords": [
@@ -35,16 +35,16 @@
     "access": "public"
   },
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target node --external '@ossl/*' --external 'tree-sitter*' && tsc --emitDeclarationOnly --declarationMap false && find dist -name '*.test.d.ts' -delete",
+    "build": "bun build src/index.ts --outdir dist --target node --external '@ossl-dev/*' --external 'tree-sitter*' && tsc --emitDeclarationOnly --declarationMap false && find dist -name '*.test.d.ts' -delete",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src/",
     "test": "bun test",
     "clean": "rm -rf dist/"
   },
   "dependencies": {
-    "@ossl/differens-core": "workspace:*"
+    "@ossl-dev/differens-core": "workspace:*"
   },
   "devDependencies": {
-    "@ossl/differens-tsconfig": "workspace:*"
+    "@ossl-dev/differens-tsconfig": "workspace:*"
   }
 }

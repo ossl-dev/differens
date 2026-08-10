@@ -9,10 +9,10 @@
 
 import { spawn } from "node:child_process";
 import { availableParallelism } from "node:os";
-import type { EditAction } from "@ossl/differens-core";
-import type { GitDiffInput as FilePair } from "@ossl/differens-git";
-import { narrate } from "@ossl/differens-narrate";
-import { diffWithTier, isParseable } from "@ossl/differens-tiers";
+import type { EditAction } from "@ossl-dev/differens-core";
+import type { GitDiffInput as FilePair } from "@ossl-dev/differens-git";
+import { narrate } from "@ossl-dev/differens-narrate";
+import { diffWithTier, isParseable } from "@ossl-dev/differens-tiers";
 
 export const WORKER_FLAG = "--diff-worker";
 

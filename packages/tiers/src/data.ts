@@ -6,8 +6,8 @@
  * Falls back to T1 on parse failure.
  */
 
-import { treeFromValue } from "@ossl/differens-core";
-import type { Node } from "@ossl/differens-core";
+import { treeFromValue } from "@ossl-dev/differens-core";
+import type { Node } from "@ossl-dev/differens-core";
 
 /**
  * Parse a data file (JSON, YAML, TOML) into a Node tree.

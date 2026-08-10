@@ -10,8 +10,8 @@
  */
 
 import { createRequire } from "node:module";
-import { createNode } from "@ossl/differens-core";
-import type { Node } from "@ossl/differens-core";
+import { createNode } from "@ossl-dev/differens-core";
+import type { Node } from "@ossl-dev/differens-core";
 import Parser from "tree-sitter";
 import type { LanguageExtractor } from "./extractor";
 import { GoExtractor } from "./go";

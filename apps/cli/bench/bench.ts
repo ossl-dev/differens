@@ -5,9 +5,9 @@
  * Run: bun run apps/cli/bench/bench.ts
  */
 
-import { diffTrees } from "@ossl/differens-core";
-import { diffWithTier } from "@ossl/differens-tiers";
-import { parseCode } from "@ossl/differens-tiers";
+import { diffTrees } from "@ossl-dev/differens-core";
+import { diffWithTier } from "@ossl-dev/differens-tiers";
+import { parseCode } from "@ossl-dev/differens-tiers";
 
 function genFile(fns: number, seed = 0): string {
   const out: string[] = [];
@@ -71,7 +71,7 @@ console.log("\n== wide sibling list (10k flat children) ==");
     for (let i = 0; i < n; i++) kids.push({ k: i === changed ? "x" : `k${i}` });
     return kids;
   };
-  const { createNode } = require("@ossl/differens-core");
+  const { createNode } = require("@ossl-dev/differens-core");
   const build = (kids: { k: string }[]) =>
     createNode({
       kind: "root",

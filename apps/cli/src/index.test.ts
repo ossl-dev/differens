@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DRIVER_FLAG } from "@ossl/differens-git";
+import { DRIVER_FLAG } from "@ossl-dev/differens-git";
 
 const entry = join(dirname(fileURLToPath(import.meta.url)), "index.ts");
 

@@ -1,5 +1,5 @@
 {
-  "name": "@ossl/differens-tiers",
+  "name": "@ossl-dev/differens-tiers",
   "version": "0.1.0",
   "description": "Content-tier adapters that parse code, config and markup into trees the differens core can match",
   "keywords": [
@@ -37,14 +37,14 @@
     "access": "public"
   },
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target node --external '@ossl/*' --external 'tree-sitter*' && tsc --emitDeclarationOnly --declarationMap false && find dist -name '*.test.d.ts' -delete",
+    "build": "bun build src/index.ts --outdir dist --target node --external '@ossl-dev/*' --external 'tree-sitter*' && tsc --emitDeclarationOnly --declarationMap false && find dist -name '*.test.d.ts' -delete",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src/",
     "test": "bun test",
     "clean": "rm -rf dist/"
   },
   "dependencies": {
-    "@ossl/differens-core": "workspace:*",
+    "@ossl-dev/differens-core": "workspace:*",
     "tree-sitter": "^0.25.1",
     "tree-sitter-go": "^0.25.0",
     "tree-sitter-javascript": "^0.25.0",
@@ -53,6 +53,6 @@
     "tree-sitter-typescript": "^0.23.2"
   },
   "devDependencies": {
-    "@ossl/differens-tsconfig": "workspace:*"
+    "@ossl-dev/differens-tsconfig": "workspace:*"
   }
 }

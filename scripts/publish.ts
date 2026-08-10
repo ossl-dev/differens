@@ -18,7 +18,7 @@
  * leave the workspace pointing at dist or carrying half-rewritten ranges.
  *
  * The CLI goes out under two names. `differens` is what people type and what
- * `npx` resolves; `@ossl/differens-cli` is its home in the ossl org. Same
+ * `npx` resolves; `@ossl-dev/differens-cli` is its home in the ossl-dev org. Same
  * artifact under both, rather than an alias package depending on the other,
  * which would put two claims on the same `differens` bin.
  *
@@ -28,7 +28,7 @@
  * Usage: bun scripts/publish.ts [npm publish flags]
  */
 
-import { execFileSync } from "node:child_process";
+import { type ExecFileSyncOptionsWithStringEncoding, execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -47,7 +47,7 @@ const TARGETS: Target[] = [
   { dir: "packages/narrate" },
   { dir: "packages/git" },
   { dir: "packages/correlate" },
-  { dir: "apps/cli", alsoAs: ["@ossl/differens-cli"] },
+  { dir: "apps/cli", alsoAs: ["@ossl-dev/differens-cli"] },
 ];
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -74,7 +74,11 @@ const read = (dir: string) =>
  */
 function alreadyPublished(name: string, version: string): boolean {
   try {
-    execFileSync("npm", ["view", `${name}@${version}`, "version"], { stdio: "pipe" });
+    // Not published is the normal case and npm says so with a 404 on stderr,
+    // which execFileSync would otherwise forward straight to the terminal.
+    execFileSync("npm", ["view", `${name}@${version}`, "version"], {
+      stdio: ["ignore", "pipe", "ignore"],
+    });
     return true;
   } catch {
     return false;
@@ -86,39 +90,58 @@ function alreadyPublished(name: string, version: string): boolean {
 const versions = new Map(TARGETS.map((t) => [read(t.dir).name, read(t.dir).version]));
 
 /**
- * Fail before building if the logged-in account cannot publish these names.
+ * Scopes the logged-in account cannot publish into.
  *
  * Publishing a scoped package you have no rights to returns 404, not 403 --
  * the registry will not confirm that a package it is hiding from you exists.
  * So the natural reading ("my package is missing") is the wrong one, and the
  * real answer, that this npm account is not in the org, is nowhere in the
- * message. Ask up front instead.
+ * message, and it only surfaces after a full build and pack. Ask up front.
  */
-function preflight(): void {
-  const me = execFileSync("npm", ["whoami"], { encoding: "utf8" }).trim();
+function blockedScopes(): Set<string> {
+  // stderr is silenced throughout: execFileSync forwards a child's stderr to
+  // the terminal by default, and `npm org ls` on an org that does not exist
+  // prints its own bare 404 -- the very message this function exists to
+  // translate, landing one line above the translation.
+  const quiet: ExecFileSyncOptionsWithStringEncoding = {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  };
+  const me = execFileSync("npm", ["whoami"], quiet).trim();
   const scopes = new Set(
-    TARGETS.flatMap(({ dir, alsoAs }) => [read(dir).name, ...(alsoAs ?? [])])
+    allNames()
       .filter((name) => name.startsWith("@"))
       .map((name) => name.slice(1, name.indexOf("/"))),
   );
 
+  const blocked = new Set<string>();
   for (const scope of scopes) {
     let role = "";
     try {
-      role = execFileSync("npm", ["org", "ls", scope, me], { encoding: "utf8" }).trim();
+      role = execFileSync("npm", ["org", "ls", scope, me], quiet).trim();
     } catch {
       // Org missing, or invisible to this account -- same outcome either way.
     }
     if (role === "") {
-      throw new Error(
-        `npm user "${me}" is not a member of the "${scope}" org, so @${scope}/* cannot be published.\n` +
-          `Add them (\`npm org set ${scope} ${me} owner\`, run by an owner of the org) or log in as an account that is a member.`,
+      blocked.add(scope);
+      console.error(
+        `\nnpm user "${me}" is not a member of the "${scope}" org, so @${scope}/* is skipped.\n` +
+          `Create the org at https://www.npmjs.com/org/create (free for public packages), or have an owner run \`npm org set ${scope} ${me} owner\`, then run this again.\n`,
       );
     }
   }
+  return blocked;
 }
 
-preflight();
+const allNames = () => TARGETS.flatMap(({ dir, alsoAs }) => [read(dir).name, ...(alsoAs ?? [])]);
+
+// A scope that cannot be published skips only its own packages. The unscoped
+// CLI is the one people actually install, and holding it back until an org
+// exists helps nobody.
+const blocked = dryRun ? new Set<string>() : blockedScopes();
+if (blocked.size > 0 && allNames().every((name) => blocked.has(name.split("/")[0]!.slice(1)))) {
+  throw new Error("every package is in a blocked scope, nothing left to publish");
+}
 execFileSync("bun", ["run", "build"], { cwd: repoRoot, stdio: "inherit" });
 
 for (const { dir, alsoAs } of TARGETS) {
@@ -126,6 +149,8 @@ for (const { dir, alsoAs } of TARGETS) {
   const isCli = Boolean(manifest.bin);
 
   for (const name of [manifest.name, ...(alsoAs ?? [])]) {
+    if (name.startsWith("@") && blocked.has(name.slice(1, name.indexOf("/")))) continue;
+
     if (!dryRun && alreadyPublished(name, manifest.version)) {
       console.log(`\n=== ${name}@${manifest.version} already published, skipping ===`);
       continue;

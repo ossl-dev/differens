@@ -82,7 +82,7 @@ differens <inputs>
 ## Releasing
 
 Seven packages go out: the five libraries, then the CLI under both
-`differens` and `@ossl/differens-cli` from one build. Bump the versions, then
+`differens` and `@ossl-dev/differens-cli` from one build. Bump the versions, then
 from the repo root:
 
 ```bash
@@ -94,9 +94,16 @@ bun run release
 ```
 
 Everything after `--` goes through to `npm publish`, so `--otp=123456` is how a
-one-time code gets in if the account has 2FA on. Publishing runs in dependency
-order, which matters: `tiers` names `core` as a real dependency, so `core` has
-to exist on the registry first.
+one-time code gets in if the account uses app-based 2FA. A passkey has no code
+to pass: npm falls back to a browser challenge, and that needs a real terminal.
+Run the release from your own shell, not from a pipe or a CI step without a
+TTY, or npm prints an auth URL and exits `EOTP` without ever waiting for it.
+
+Publishing runs in dependency order, which matters: `tiers` names `core` as a
+real dependency, so `core` has to exist on the registry first. Two things make
+a partial run survivable -- a version already on the registry is skipped rather
+than retried into an error, and a scope the account cannot publish into skips
+only its own packages, so the unscoped CLI still goes out.
 
 `scripts/publish.ts` builds once and stages each publish into a temp directory.
 The repo manifests are never rewritten, so an interrupted release cannot leave
@@ -118,7 +125,7 @@ Three things the registry punishes quietly:
   while the published package ships no command at all. Write it `dist/index.js`.
 - A library whose `dist` has no `index.d.ts` publishes happily and is untyped
   for everyone downstream. The publish script throws instead.
-- The library builds pass `--external '@ossl/*'`, so a sibling stays an import
+- The library builds pass `--external '@ossl-dev/*'`, so a sibling stays an import
   rather than being inlined. Without it each package would carry its own copy
   of the core, and two `Node` types that are structurally identical but not the
   same module stop being interchangeable.

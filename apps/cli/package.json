@@ -57,11 +57,11 @@
     "tree-sitter-typescript": "^0.23.2"
   },
   "devDependencies": {
-    "@ossl/differens-core": "workspace:*",
-    "@ossl/differens-correlate": "workspace:*",
-    "@ossl/differens-git": "workspace:*",
-    "@ossl/differens-narrate": "workspace:*",
-    "@ossl/differens-tiers": "workspace:*",
-    "@ossl/differens-tsconfig": "workspace:*"
+    "@ossl-dev/differens-core": "workspace:*",
+    "@ossl-dev/differens-correlate": "workspace:*",
+    "@ossl-dev/differens-git": "workspace:*",
+    "@ossl-dev/differens-narrate": "workspace:*",
+    "@ossl-dev/differens-tiers": "workspace:*",
+    "@ossl-dev/differens-tsconfig": "workspace:*"
   }
 }

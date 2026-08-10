@@ -12,7 +12,7 @@
  * @packageDocumentation
  */
 
-import type { EditAction, Node } from "@ossl/differens-core";
+import type { EditAction, Node } from "@ossl-dev/differens-core";
 
 export interface CrossFileMatch {
   /** The moved node */

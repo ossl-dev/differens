@@ -1,5 +1,5 @@
 {
-  "name": "@ossl/differens-correlate",
+  "name": "@ossl-dev/differens-correlate",
   "version": "0.1.0",
   "description": "Cross-file correlation for differens: finds the code that moved between two files",
   "keywords": [
@@ -34,16 +34,16 @@
     "access": "public"
   },
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target node --external '@ossl/*' --external 'tree-sitter*' && tsc --emitDeclarationOnly --declarationMap false && find dist -name '*.test.d.ts' -delete",
+    "build": "bun build src/index.ts --outdir dist --target node --external '@ossl-dev/*' --external 'tree-sitter*' && tsc --emitDeclarationOnly --declarationMap false && find dist -name '*.test.d.ts' -delete",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src/",
     "test": "bun test",
     "clean": "rm -rf dist/"
   },
   "dependencies": {
-    "@ossl/differens-core": "workspace:*"
+    "@ossl-dev/differens-core": "workspace:*"
   },
   "devDependencies": {
-    "@ossl/differens-tsconfig": "workspace:*"
+    "@ossl-dev/differens-tsconfig": "workspace:*"
   }
 }

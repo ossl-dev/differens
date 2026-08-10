@@ -43,7 +43,7 @@ Node 18.17 or newer. The tree-sitter grammars ship as prebuilt binaries for the
 common platforms, so there is nothing to compile.
 
 The same build is published under the ossl scope as
-[`@ossl/differens-cli`](https://www.npmjs.com/package/@ossl/differens-cli).
+[`@ossl-dev/differens-cli`](https://www.npmjs.com/package/@ossl-dev/differens-cli).
 Identical package, identical `differens` command; install whichever name you
 prefer, not both.
 
@@ -54,14 +54,14 @@ the tree-sitter grammars, or the narration without git.
 
 | Package | What it gives you |
 |---|---|
-| [`@ossl/differens-core`](https://www.npmjs.com/package/@ossl/differens-core) | `diffTrees`, the node model, typed edit scripts. No dependencies. |
-| [`@ossl/differens-tiers`](https://www.npmjs.com/package/@ossl/differens-tiers) | Turns source, config and markup into trees the core can match. Brings the grammars. |
-| [`@ossl/differens-narrate`](https://www.npmjs.com/package/@ossl/differens-narrate) | Edit script to sentences, markdown, JSON, or the compact model format. |
-| [`@ossl/differens-git`](https://www.npmjs.com/package/@ossl/differens-git) | Working tree, commit range and directory diffs; the diff driver. |
-| [`@ossl/differens-correlate`](https://www.npmjs.com/package/@ossl/differens-correlate) | Finds code that moved between files. |
+| [`@ossl-dev/differens-core`](https://www.npmjs.com/package/@ossl-dev/differens-core) | `diffTrees`, the node model, typed edit scripts. No dependencies. |
+| [`@ossl-dev/differens-tiers`](https://www.npmjs.com/package/@ossl-dev/differens-tiers) | Turns source, config and markup into trees the core can match. Brings the grammars. |
+| [`@ossl-dev/differens-narrate`](https://www.npmjs.com/package/@ossl-dev/differens-narrate) | Edit script to sentences, markdown, JSON, or the compact model format. |
+| [`@ossl-dev/differens-git`](https://www.npmjs.com/package/@ossl-dev/differens-git) | Working tree, commit range and directory diffs; the diff driver. |
+| [`@ossl-dev/differens-correlate`](https://www.npmjs.com/package/@ossl-dev/differens-correlate) | Finds code that moved between files. |
 
 ```ts
-import { diffTrees, treeFromValue } from "@ossl/differens-core";
+import { diffTrees, treeFromValue } from "@ossl-dev/differens-core";
 
 const before = treeFromValue({ retries: 3, host: "a.example" });
 const after = treeFromValue({ retries: 5, host: "a.example" });
@@ -75,8 +75,8 @@ Diffing files rather than values means going through the tier router, which
 picks a parser from the path:
 
 ```ts
-import { diffWithTier } from "@ossl/differens-tiers";
-import { formatChanges, narrate } from "@ossl/differens-narrate";
+import { diffWithTier } from "@ossl-dev/differens-tiers";
+import { formatChanges, narrate } from "@ossl-dev/differens-narrate";
 
 const { changes } = diffWithTier(oldSource, newSource, "src/app.ts", "src/app.ts");
 console.log(formatChanges(narrate(changes), { format: "llm" }));

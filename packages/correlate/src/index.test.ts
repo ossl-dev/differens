@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { createNode } from "@ossl/differens-core";
-import type { EditAction } from "@ossl/differens-core";
+import { createNode } from "@ossl-dev/differens-core";
+import type { EditAction } from "@ossl-dev/differens-core";
 import { correlate } from "./index";
 import type { FileChanges } from "./index";
 

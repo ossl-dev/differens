@@ -1,5 +1,5 @@
 {
-  "name": "@ossl/differens-core",
+  "name": "@ossl-dev/differens-core",
   "version": "0.1.0",
   "description": "Semantic diff core: GumTree-lineage tree matching over postorder arrays, emitting typed edit scripts",
   "keywords": [
@@ -37,13 +37,13 @@
     "access": "public"
   },
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target node --external '@ossl/*' --external 'tree-sitter*' && tsc --emitDeclarationOnly --declarationMap false && find dist -name '*.test.d.ts' -delete",
+    "build": "bun build src/index.ts --outdir dist --target node --external '@ossl-dev/*' --external 'tree-sitter*' && tsc --emitDeclarationOnly --declarationMap false && find dist -name '*.test.d.ts' -delete",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src/",
     "test": "bun test",
     "clean": "rm -rf dist/"
   },
   "devDependencies": {
-    "@ossl/differens-tsconfig": "workspace:*"
+    "@ossl-dev/differens-tsconfig": "workspace:*"
   }
 }
