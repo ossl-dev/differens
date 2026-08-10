@@ -10,7 +10,7 @@ function makeFunc(name: string): EditAction {
     label: name,
     byteRange: [0, name.length],
   });
-  return { type: "Delete", node };
+  return { type: "Delete", context: [], node };
 }
 
 function makeInsert(name: string): EditAction {
@@ -21,6 +21,7 @@ function makeInsert(name: string): EditAction {
   });
   return {
     type: "Insert",
+    context: [],
     node,
     parent: createNode({ kind: "file", byteRange: [0, 10] }),
     position: 0,
@@ -37,12 +38,13 @@ describe("correlate", () => {
     const fileChanges: FileChanges[] = [
       {
         filePath: "src/a.ts",
-        actions: [{ type: "Delete", node: nodeA }],
+        actions: [{ type: "Delete", context: [], node: nodeA }],
       },
       {
         filePath: "src/b.ts",
         actions: [{
           type: "Insert",
+          context: [],
           node: nodeB,
           parent: createNode({ kind: "file", byteRange: [0, 10] }),
           position: 0,
@@ -65,9 +67,10 @@ describe("correlate", () => {
       {
         filePath: "src/a.ts",
         actions: [
-          { type: "Delete", node: nodeA },
+          { type: "Delete", context: [], node: nodeA },
           {
             type: "Insert",
+            context: [],
             node: nodeB,
             parent: createNode({ kind: "file", byteRange: [0, 10] }),
             position: 0,
@@ -87,7 +90,7 @@ describe("correlate", () => {
     const fileChanges: FileChanges[] = [
       {
         filePath: "src/a.ts",
-        actions: [{ type: "Delete", node: nodeA }],
+        actions: [{ type: "Delete", context: [], node: nodeA }],
       },
     ];
 

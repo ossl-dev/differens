@@ -12,6 +12,8 @@
  */
 
 import { diffWithTier, getExtractors, initExtractors } from "@differens/tiers";
+import type { EditAction } from "@differens/core";
+import type { DiffJob, DiffResult } from "./worker";
 import { narrate, formatChanges, summarize } from "@differens/narrate";
 import { correlate } from "@differens/correlate";
 import type { FileChanges } from "@differens/correlate";
@@ -108,22 +110,21 @@ async function handleGitDiff(format: string): Promise<void> {
     return;
   }
 
-  // Per-file diffs are independent: run them concurrently. The diff
-  // core is CPU-bound per file, so a bounded pool keeps total memory
-  // in check while still saturating cores on large changesets.
-  const CONCURRENCY = Math.max(4, Math.min(16, navigator.hardwareConcurrency ?? 4));
+  // Per-file diffs are independent and CPU-bound: run them on a worker
+  // pool sized to the core count so matching parallelizes across cores.
+  const results = await diffWithWorkers(filePairs);
 
-  const results = await mapWithConcurrency(filePairs, CONCURRENCY, (pair) => {
-    const result = diffWithTier(pair.oldSource, pair.newSource, pair.oldPath, pair.newPath);
-    const changes = narrate(result.changes, { filePath: pair.oldPath });
-    return {
-      changes,
-      fileChanges: { filePath: pair.oldPath, actions: result.changes },
-    };
-  });
-
-  const allNarratives: SemanticChange[] = results.flatMap((r) => r.changes);
-  const allFileChanges: FileChanges[] = results.map((r) => r.fileChanges);
+  const allNarratives: SemanticChange[] = results.flatMap((r) =>
+    r.descriptions.map((description, i) => ({
+      description,
+      filePath: r.filePath,
+      action: r.actions[i]!,
+    })),
+  );
+  const allFileChanges: FileChanges[] = results.map((r) => ({
+    filePath: r.filePath,
+    actions: r.actions,
+  }));
 
   // Cross-file correlation
   const crossFile = correlate(allFileChanges);
@@ -167,15 +168,15 @@ async function handleRangeDiff(range: string, format: string): Promise<void> {
     return;
   }
 
-  const CONCURRENCY = Math.max(4, Math.min(16, navigator.hardwareConcurrency ?? 4));
-  const results = await mapWithConcurrency(filePairs, CONCURRENCY, (pair) =>
-    narrate(
-      diffWithTier(pair.oldSource, pair.newSource, pair.oldPath, pair.newPath).changes,
-      { filePath: pair.oldPath },
-    ),
-  );
+  const results = await diffWithWorkers(filePairs);
 
-  const allNarratives = results.flat();
+  const allNarratives: SemanticChange[] = results.flatMap((r) =>
+    r.descriptions.map((description, i) => ({
+      description,
+      filePath: r.filePath,
+      action: r.actions[i]!,
+    })),
+  );
   console.log(formatChanges(allNarratives, { format: format as "terminal" | "json" | "markdown" | "llm" }));
 }
 
@@ -228,6 +229,85 @@ async function handleInstallGitDriver(): Promise<void> {
 }
 
 // ---------- Helpers ----------
+
+/**
+ * Diff file pairs across a pool of CPU workers. Tree matching is
+ * single-threaded inside one isolate, so a worker per core is what
+ * actually scales directory diffs; Promise.all only helps I/O.
+ */
+async function diffWithWorkers(
+  filePairs: { oldSource: string; newSource: string; oldPath: string; newPath: string }[],
+): Promise<{ actions: EditAction[]; descriptions: string[]; filePath: string }[]> {
+  const coreCount = navigator.hardwareConcurrency ?? 4;
+  const poolSize = Math.max(2, Math.min(8, coreCount));
+
+  const workers: Worker[] = [];
+  const idle: Worker[] = [];
+  let nextId = 0;
+  const pending = new Map<number, { resolve: (r: DiffResult) => void }>();
+
+  const spawn = (): Worker => {
+    const w = new Worker(new URL("./worker.ts", import.meta.url));
+    w.onmessage = (e: MessageEvent<DiffResult>) => {
+      const p = pending.get(e.data.id);
+      if (p) {
+        pending.delete(e.data.id);
+        p.resolve(e.data);
+      }
+      idle.push(w);
+    };
+    w.onerror = (e) => {
+      // Reject all pending jobs of this worker and respawn lazily
+      for (const [id, p] of pending) {
+        p.resolve({ id, actions: [], descriptions: [], fallback: `worker error: ${e.message}`, tier: -1 });
+        pending.delete(id);
+      }
+      w.terminate();
+      workers.splice(workers.indexOf(w), 1);
+      if (pending.size > 0) spawn();
+    };
+    workers.push(w);
+    return w;
+  };
+
+  const run = (job: DiffJob): Promise<DiffResult> =>
+    new Promise((resolve) => {
+      pending.set(job.id, { resolve });
+      const w = idle.pop() ?? spawn();
+      w.postMessage(job);
+    });
+
+  try {
+    const results = await mapWithConcurrency(filePairs, poolSize * 4, (pair, i) =>
+      run({ id: nextId++, ...pair }),
+    );
+
+    const out = results.map((r, i) => ({
+      actions: r.actions,
+      descriptions: r.descriptions,
+      filePath: filePairs[i]!.oldPath,
+    }));
+
+    // Worker failure (compiled binaries may not support embedded workers):
+    // any file that came back empty while its sources differ gets diffed
+    // inline on the main thread rather than silently dropped.
+    for (let i = 0; i < out.length; i++) {
+      const pair = filePairs[i]!;
+      if (out[i]!.actions.length === 0 && pair.oldSource !== pair.newSource) {
+        const result = diffWithTier(pair.oldSource, pair.newSource, pair.oldPath, pair.newPath);
+        const changes = narrate(result.changes, { filePath: pair.oldPath });
+        out[i] = {
+          actions: result.changes,
+          descriptions: changes.map((c) => c.description),
+          filePath: pair.oldPath,
+        };
+      }
+    }
+    return out;
+  } finally {
+    for (const w of workers) w.terminate();
+  }
+}
 
 /** Map items through an async fn with a bounded concurrency pool. */
 async function mapWithConcurrency<T, R>(

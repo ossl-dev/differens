@@ -470,14 +470,14 @@ describe("diffTrees: contentHash vs structureHash", () => {
       children: [],
       byteRange: [0, 1],
       height: 1,
-      contentHash: 999n,
-      structureHash: 11n,
+      contentHash: 999,
+      structureHash: 11,
       ...overrides,
     };
   }
 
   it("matches nodes with identical contentHash even when structureHash differs", () => {
-    const result = diffTrees(fakeNode({}), fakeNode({ structureHash: 22n }));
+    const result = diffTrees(fakeNode({}), fakeNode({ structureHash: 22 }));
     expect(result.changes).toEqual([]);
   });
 
