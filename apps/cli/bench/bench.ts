@@ -1,0 +1,96 @@
+/**
+ * Diff benchmark: parse + match + narrate on synthetic files of growing size,
+ * plus a worst case (wide sibling list) and a reorder case.
+ *
+ * Run: bun run apps/cli/bench/bench.ts
+ */
+
+import { diffWithTier } from "@differens/tiers";
+import { parseCode } from "@differens/tiers";
+import { diffTrees } from "@differens/core";
+
+function genFile(fns: number, seed = 0): string {
+  const out: string[] = [];
+  for (let i = 0; i < fns; i++) {
+    out.push(`
+export function handler${i}(input: Request, ctx: Context${seed}): Result {
+  const parsed = parseBody(input.body, { strict: true, limit: ${i + seed} });
+  if (!parsed.ok) { return fail("bad request ${i}", parsed.error); }
+  const rows = ctx.db.query("select * from t${i} where id = ?", [parsed.id]);
+  return { status: 200, rows: rows.map((r) => ({ ...r, tag: "t${i}" })) };
+}`);
+  }
+  return out.join("\n");
+}
+
+function time<T>(label: string, fn: () => T): T {
+  const t0 = performance.now();
+  const r = fn();
+  const ms = performance.now() - t0;
+  console.log(`  ${label.padEnd(40)} ${ms.toFixed(1)} ms`);
+  return r;
+}
+
+console.log("\n== parse + diff, one small edit ==");
+for (const fns of [50, 200, 800]) {
+  const oldSrc = genFile(fns);
+  const newSrc = genFile(fns).replace("handler7(", "handleSeven(");
+  const nodes = parseCode(oldSrc, "ts");
+  const count = countNodes(nodes);
+  const r = time(`${fns} functions (${count} nodes)`, () =>
+    diffWithTier(oldSrc, newSrc, "a.ts", "a.ts"),
+  );
+  console.log(`  ${" ".repeat(40)} -> ${r.changes.length} changes`);
+}
+
+console.log("\n== reorder: first function moved to the end ==");
+{
+  const oldSrc = genFile(200);
+  const parts = genFile(200).split("\nexport function ");
+  const newSrc = [parts[0], ...parts.slice(2), parts[1]].join("\nexport function ");
+  const r = time("200 functions, one relocated", () =>
+    diffWithTier(oldSrc, newSrc, "a.ts", "a.ts"),
+  );
+  console.log(`  ${" ".repeat(40)} -> ${r.changes.length} changes`);
+}
+
+console.log("\n== worst case: nothing matches ==");
+{
+  const oldSrc = genFile(200, 1);
+  const newSrc = genFile(200, 2);
+  const r = time("200 functions, every line differs", () =>
+    diffWithTier(oldSrc, newSrc, "a.ts", "a.ts"),
+  );
+  console.log(`  ${" ".repeat(40)} -> ${r.changes.length} changes`);
+}
+
+console.log("\n== wide sibling list (10k flat children) ==");
+{
+  const wide = (n: number, changed = -1) => {
+    const kids = [];
+    for (let i = 0; i < n; i++) kids.push({ k: i === changed ? "x" : `k${i}` });
+    return kids;
+  };
+  const { createNode } = require("@differens/core");
+  const build = (kids: { k: string }[]) =>
+    createNode({
+      kind: "root",
+      byteRange: [0, 0],
+      children: kids.map((c) => createNode({ kind: "leaf", label: c.k, byteRange: [0, 1] })),
+    });
+  const a = build(wide(10_000));
+  const b = build(wide(10_000, 5000));
+  const r = time("10k siblings, one changed", () => diffTrees(a, b));
+  console.log(`  ${" ".repeat(40)} -> ${r.changes.length} changes`);
+}
+
+function countNodes(n: { children: unknown[] }): number {
+  let c = 0;
+  const stack = [n];
+  while (stack.length) {
+    const x = stack.pop()! as { children: { children: unknown[] }[] };
+    c++;
+    for (const k of x.children) stack.push(k);
+  }
+  return c;
+}

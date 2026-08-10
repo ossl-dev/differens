@@ -41,6 +41,11 @@ bun run apps/cli/src/index.ts <inputs>
 bun build apps/cli/src/index.ts --compile --outfile differens
 ```
 
+The tree-sitter grammars are native addons and cannot be embedded in a
+`--compile`d executable, so a standalone binary line-diffs source files unless
+it is run from a directory where the grammars are installed. Use the npm
+install or run from source for semantic diffing.
+
 ## Usage
 
 Differens is a diff tool, so the CLI is the diff. No subcommand needed.
