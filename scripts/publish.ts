@@ -64,6 +64,23 @@ type Manifest = Record<string, unknown> & {
 const read = (dir: string) =>
   JSON.parse(readFileSync(join(repoRoot, dir, "package.json"), "utf8")) as Manifest;
 
+/**
+ * Is this exact version already on the registry?
+ *
+ * Seven publishes go out in one run and a version can only be published once,
+ * so a run that dies in the middle -- an expired 2FA challenge, a dropped
+ * connection -- would otherwise be unresumable: every retry stops on the first
+ * package that already succeeded.
+ */
+function alreadyPublished(name: string, version: string): boolean {
+  try {
+    execFileSync("npm", ["view", `${name}@${version}`, "version"], { stdio: "pipe" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Every workspace package's published version, so `workspace:*` can be
 // resolved without asking the registry what exists.
 const versions = new Map(TARGETS.map((t) => [read(t.dir).name, read(t.dir).version]));
@@ -75,6 +92,11 @@ for (const { dir, alsoAs } of TARGETS) {
   const isCli = Boolean(manifest.bin);
 
   for (const name of [manifest.name, ...(alsoAs ?? [])]) {
+    if (!dryRun && alreadyPublished(name, manifest.version)) {
+      console.log(`\n=== ${name}@${manifest.version} already published, skipping ===`);
+      continue;
+    }
+
     const stage = mkdtempSync(join(tmpdir(), "differens-publish-"));
     cpSync(join(repoRoot, dir, "dist"), join(stage, "dist"), { recursive: true });
     cpSync(join(repoRoot, "README.md"), join(stage, "README.md"));
