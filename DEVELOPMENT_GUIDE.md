@@ -85,12 +85,16 @@ The CLI goes out under two names, `differens` and `@ossl/differens-cli`, from
 one build. Bump the version in `apps/cli/package.json`, then:
 
 ```bash
-cd apps/cli && bun run release
+cd apps/cli && bun run release -- --otp=123456
 ```
+
+Everything after `--` goes through to `npm publish`, which is how the one-time
+code from your authenticator gets in; a single code covers both publishes.
+Drop the flag if your token has 2FA bypass. Pass `--dry-run` first.
 
 `scripts/publish.ts` builds once and stages each publish into a temp directory,
 so the repo manifest is never rewritten mid-release and the staged one can drop
-the bundled `workspace:*` devDependencies. Pass `--dry-run` first.
+the bundled `workspace:*` devDependencies.
 
 Two things the registry silently punishes, both already handled, both worth
 knowing before you touch that manifest:

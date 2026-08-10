@@ -14,7 +14,12 @@
  * exist on npm, and shipping them leaves `npm install` inside an unpacked
  * tarball unable to resolve anything.
  *
- * Usage: bun scripts/publish.ts [--dry-run]
+ * Anything passed on the command line goes straight through to `npm publish`,
+ * so `--dry-run` works, and so does the `--otp=123456` that an account with
+ * 2FA needs. One code covers both publishes: npm keeps it valid for the few
+ * seconds between them.
+ *
+ * Usage: bun scripts/publish.ts [npm publish flags]
  */
 
 import { execFileSync } from "node:child_process";
@@ -27,7 +32,8 @@ const NAMES = ["differens", "@ossl/differens-cli"];
 
 const cliDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const repoRoot = dirname(dirname(cliDir));
-const dryRun = process.argv.includes("--dry-run");
+const npmArgs = process.argv.slice(2);
+const dryRun = npmArgs.includes("--dry-run");
 
 const manifest = JSON.parse(await Bun.file(join(cliDir, "package.json")).text()) as Record<
   string,
@@ -49,7 +55,6 @@ for (const name of NAMES) {
   const { scripts: _scripts, devDependencies: _dev, ...rest } = manifest;
   writeFileSync(join(stage, "package.json"), `${JSON.stringify({ ...rest, name }, null, 2)}\n`);
 
-  const args = ["publish", ...(dryRun ? ["--dry-run"] : [])];
   console.log(`\n=== ${name}${dryRun ? " (dry run)" : ""} ===`);
-  execFileSync("npm", args, { cwd: stage, stdio: "inherit" });
+  execFileSync("npm", ["publish", ...npmArgs], { cwd: stage, stdio: "inherit" });
 }
