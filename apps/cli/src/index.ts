@@ -11,20 +11,20 @@
  *   differens install-git-driver    register as git diff driver
  */
 
-import { diffWithTier, getExtractors, initExtractors } from "@differens/tiers";
-import { narrate, formatChanges } from "@differens/narrate";
-import type { OutputFormat } from "@differens/narrate";
 import {
-  diffWorkingTree,
   diffCommitRange,
   diffDirectories,
-  isDirectory,
-  readFilePair,
-  isGitRepo,
-  resolveRef,
+  diffWorkingTree,
   installGitDriver,
+  isDirectory,
+  isGitRepo,
+  readFilePair,
+  resolveRef,
 } from "@differens/git";
-import { runWorker, WORKER_FLAG } from "./pool";
+import { formatChanges, narrate } from "@differens/narrate";
+import type { OutputFormat } from "@differens/narrate";
+import { diffWithTier, getExtractors, initExtractors } from "@differens/tiers";
+import { WORKER_FLAG, runWorker } from "./pool";
 import { report } from "./report";
 
 async function main(): Promise<void> {
@@ -86,7 +86,11 @@ async function handleDiff(args: string[]): Promise<void> {
     // Two directories: walk both trees and diff file by file.
     const [oldIsDir, newIsDir] = await Promise.all([isDirectory(oldArg), isDirectory(newArg)]);
     if (oldIsDir && newIsDir) {
-      await report(await diffDirectories(oldArg, newArg), format, `${oldArg} and ${newArg} are identical`);
+      await report(
+        await diffDirectories(oldArg, newArg),
+        format,
+        `${oldArg} and ${newArg} are identical`,
+      );
       return;
     }
     if (oldIsDir !== newIsDir) {
@@ -131,12 +135,7 @@ async function handleFileDiff(
 ): Promise<void> {
   const pair = await readFilePair(oldPath, newPath);
 
-  const result = diffWithTier(
-    pair.oldSource,
-    pair.newSource,
-    pair.oldPath,
-    pair.newPath,
-  );
+  const result = diffWithTier(pair.oldSource, pair.newSource, pair.oldPath, pair.newPath);
 
   if (result.fallback) {
     console.error(`note: fell back to ${result.fallback} diff`);
@@ -206,4 +205,3 @@ main().catch((err) => {
   console.error("fatal:", err instanceof Error ? err.message : String(err));
   process.exit(1);
 });
-

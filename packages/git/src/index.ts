@@ -22,8 +22,18 @@ export const MAX_DIFF_BYTES = 2 * 1024 * 1024;
 
 /** Directories never worth walking when diffing two trees. */
 const SKIP_DIRS = new Set([
-  ".git", "node_modules", "dist", "build", "out", "target",
-  ".next", ".turbo", ".cache", "vendor", "__pycache__", ".venv",
+  ".git",
+  "node_modules",
+  "dist",
+  "build",
+  "out",
+  "target",
+  ".next",
+  ".turbo",
+  ".cache",
+  "vendor",
+  "__pycache__",
+  ".venv",
 ]);
 
 export interface GitDiffInput {
@@ -157,9 +167,7 @@ export async function diffWorkingTree(): Promise<GitDiffInput[]> {
  * Diff a commit range (e.g., "main..feature").
  * Shells out to git diff-tree to get changed files between two refs.
  */
-export async function diffCommitRange(
-  range: string,
-): Promise<GitDiffInput[]> {
+export async function diffCommitRange(range: string): Promise<GitDiffInput[]> {
   const parts = range.split("..");
   if (parts.length !== 2) throw new Error(`invalid range: ${range}`);
 
@@ -268,10 +276,7 @@ async function listFiles(root: string): Promise<string[]> {
  * against an empty string, which the tier pipeline reports as a whole-file
  * add or removal.
  */
-export async function diffDirectories(
-  oldDir: string,
-  newDir: string,
-): Promise<GitDiffInput[]> {
+export async function diffDirectories(oldDir: string, newDir: string): Promise<GitDiffInput[]> {
   const [oldFiles, newFiles] = await Promise.all([listFiles(oldDir), listFiles(newDir)]);
   const paths = [...new Set([...oldFiles, ...newFiles])].sort();
   const oldSet = new Set(oldFiles);
@@ -299,10 +304,7 @@ async function readCapped(path: string): Promise<string> {
 }
 
 /** Read two files for standalone (non-git) diffing */
-export async function readFilePair(
-  oldPath: string,
-  newPath: string,
-): Promise<GitDiffInput> {
+export async function readFilePair(oldPath: string, newPath: string): Promise<GitDiffInput> {
   let oldSource = "";
   let newSource = "";
 

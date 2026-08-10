@@ -104,5 +104,4 @@ export class RustExtractor implements LanguageExtractor {
 
     return undefined;
   }
-
 }

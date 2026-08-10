@@ -10,12 +10,12 @@
 
 import type { Node } from "@differens/core";
 import { createNode, diffTrees } from "@differens/core";
-import { diffLines } from "./raw";
-import { diffWords } from "./prose";
-import { parseMarkup, type MarkupNode } from "./markup";
-import { parseData } from "./data";
-import { parseCode, listExtractors, awaitGrammars, hasGrammar } from "./code/index";
 import { isBinaryExtension } from "./binary";
+import { awaitGrammars, hasGrammar, listExtractors, parseCode } from "./code/index";
+import { parseData } from "./data";
+import { type MarkupNode, parseMarkup } from "./markup";
+import { diffWords } from "./prose";
+import { diffLines } from "./raw";
 
 export enum Tier {
   Binary = 0,
@@ -71,10 +71,38 @@ export function classifyFile(filePath: string): FileInfo {
 
   // Code (tree-sitter backed)
   const codeExts = [
-    "rs", "c", "cpp", "h", "hpp", "go", "java", "kt", "py", "rb",
-    "php", "swift", "cs", "js", "mjs", "cjs", "ts", "jsx", "tsx",
-    "scala", "lua", "sh", "sql", "bash", "zsh", "fish", "css", "scss",
-    "less", "vue", "svelte", "astro",
+    "rs",
+    "c",
+    "cpp",
+    "h",
+    "hpp",
+    "go",
+    "java",
+    "kt",
+    "py",
+    "rb",
+    "php",
+    "swift",
+    "cs",
+    "js",
+    "mjs",
+    "cjs",
+    "ts",
+    "jsx",
+    "tsx",
+    "scala",
+    "lua",
+    "sh",
+    "sql",
+    "bash",
+    "zsh",
+    "fish",
+    "css",
+    "scss",
+    "less",
+    "vue",
+    "svelte",
+    "astro",
   ];
   if (codeExts.includes(ext)) {
     return { path: filePath, extension: ext, tier: Tier.Code };
@@ -120,8 +148,10 @@ export function diffWithTier(
   // Handles .dat, .bin without extension lists, git blobs, etc.
   if (
     info.tier === Tier.Raw &&
-    (hasNullByte(oldSource) || hasNullByte(newSource) ||
-     oldSource.includes("�") || newSource.includes("�"))
+    (hasNullByte(oldSource) ||
+      hasNullByte(newSource) ||
+      oldSource.includes("�") ||
+      newSource.includes("�"))
   ) {
     return diffBinary(oldSource, newSource);
   }
@@ -164,11 +194,7 @@ export function diffWithTier(
 }
 
 /** One action standing for a whole added or removed file. */
-function wholeFile(
-  type: "Insert" | "Delete",
-  path: string,
-  source: string,
-): TierDiffResult {
+function wholeFile(type: "Insert" | "Delete", path: string, source: string): TierDiffResult {
   const info = classifyFile(path);
   // The source goes in `value` so the node's contentHash covers it. The
   // cross-file correlator compares these nodes to spot a file that was moved
@@ -209,16 +235,18 @@ function hasNullByte(source: string): boolean {
 
 function diffBinary(oldSource: string, newSource: string): TierDiffResult {
   return {
-    changes: [{
-      type: "Update" as const,
-      context: [],
-      node: createNode({ kind: "binary_file", byteRange: [0, oldSource.length] }),
-      detail: {
-        kind: "ValueChanged" as const,
-        from: `${oldSource.length} bytes`,
-        to: `${newSource.length} bytes`,
+    changes: [
+      {
+        type: "Update" as const,
+        context: [],
+        node: createNode({ kind: "binary_file", byteRange: [0, oldSource.length] }),
+        detail: {
+          kind: "ValueChanged" as const,
+          from: `${oldSource.length} bytes`,
+          to: `${newSource.length} bytes`,
+        },
       },
-    }],
+    ],
     nodeCount: 0,
     tier: Tier.Binary,
   };
@@ -302,25 +330,36 @@ function diffMarkup(oldSource: string, newSource: string): TierDiffResult {
   const oldTree = markupToNodeTree(parseMarkup(oldSource));
   const newTree = markupToNodeTree(parseMarkup(newSource));
   const result = diffTrees(oldTree, newTree);
-  return { changes: result.changes, nodeCount: result.nodeCount, tier: Tier.Markup, fallback: result.fallback };
+  return {
+    changes: result.changes,
+    nodeCount: result.nodeCount,
+    tier: Tier.Markup,
+    fallback: result.fallback,
+  };
 }
 
 function diffData(oldSource: string, newSource: string): TierDiffResult {
   const oldTree = parseData(oldSource);
   const newTree = parseData(newSource);
   const result = diffTrees(oldTree, newTree);
-  return { changes: result.changes, nodeCount: result.nodeCount, tier: Tier.Data, fallback: result.fallback };
+  return {
+    changes: result.changes,
+    nodeCount: result.nodeCount,
+    tier: Tier.Data,
+    fallback: result.fallback,
+  };
 }
 
-function diffCode(
-  oldSource: string,
-  newSource: string,
-  extension: string,
-): TierDiffResult {
+function diffCode(oldSource: string, newSource: string, extension: string): TierDiffResult {
   const oldTree = parseCode(oldSource, extension);
   const newTree = parseCode(newSource, extension);
   const result = diffTrees(oldTree, newTree);
-  return { changes: result.changes, nodeCount: result.nodeCount, tier: Tier.Code, fallback: result.fallback };
+  return {
+    changes: result.changes,
+    nodeCount: result.nodeCount,
+    tier: Tier.Code,
+    fallback: result.fallback,
+  };
 }
 
 function markupToNodeTree(node: MarkupNode): Node {

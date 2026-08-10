@@ -7,10 +7,10 @@
  * parsing parallel.
  */
 
-import { diffWithTier, isParseable } from "@differens/tiers";
-import { narrate } from "@differens/narrate";
 import type { EditAction } from "@differens/core";
 import type { GitDiffInput as FilePair } from "@differens/git";
+import { narrate } from "@differens/narrate";
+import { diffWithTier, isParseable } from "@differens/tiers";
 
 export const WORKER_FLAG = "--diff-worker";
 
@@ -47,9 +47,7 @@ export function diffInline(pair: FilePair): FileDiff {
  */
 function workerArgv(): string[] {
   const compiled = Bun.main.startsWith("/$bunfs/") || Bun.main.includes("~BUN");
-  return compiled
-    ? [process.execPath, WORKER_FLAG]
-    : [process.execPath, Bun.main, WORKER_FLAG];
+  return compiled ? [process.execPath, WORKER_FLAG] : [process.execPath, Bun.main, WORKER_FLAG];
 }
 
 /**

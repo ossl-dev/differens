@@ -108,5 +108,4 @@ export class TypeScriptExtractor implements LanguageExtractor {
 
     return undefined;
   }
-
 }

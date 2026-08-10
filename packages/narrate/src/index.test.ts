@@ -1,12 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { createNode } from "@differens/core";
 import type { EditAction } from "@differens/core";
-import {
-  formatChanges,
-  narrate,
-  narrateAction,
-  summarize,
-} from "./index";
+import { formatChanges, narrate, narrateAction, summarize } from "./index";
 
 const TEST_NODE = createNode({
   kind: "Function",
@@ -52,8 +47,9 @@ describe("narrateAction", () => {
       node: createNode({ kind: "ConfigKey", label: "host", byteRange: [0, 10] }),
       detail: { kind: "ValueChanged", from: "localhost", to: "0.0.0.0" },
     };
-    expect(narrateAction(action))
-      .toBe("changed value of config key `host` from `localhost` to `0.0.0.0`");
+    expect(narrateAction(action)).toBe(
+      "changed value of config key `host` from `localhost` to `0.0.0.0`",
+    );
   });
 
   it("narrates Move", () => {
@@ -68,8 +64,7 @@ describe("narrateAction", () => {
       fromPosition: 0,
       toPosition: 2,
     };
-    expect(narrateAction(action))
-      .toBe("moved function `parseConfig` from utils.ts to config.ts");
+    expect(narrateAction(action)).toBe("moved function `parseConfig` from utils.ts to config.ts");
   });
 
   it("includes the containing scope in narration", () => {
@@ -81,8 +76,7 @@ describe("narrateAction", () => {
       ],
       node: createNode({ kind: "Variable", label: "timeout", byteRange: [0, 10] }),
     };
-    expect(narrateAction(action))
-      .toBe("removed variable `timeout` from function `connect`");
+    expect(narrateAction(action)).toBe("removed variable `timeout` from function `connect`");
   });
 
   it("uses nearest named ancestor for scope", () => {
@@ -95,8 +89,7 @@ describe("narrateAction", () => {
       node: createNode({ kind: "Function", label: "bar", byteRange: [0, 10] }),
       detail: { kind: "Renamed", from: "foo", to: "bar" },
     };
-    expect(narrateAction(action))
-      .toBe("renamed function `foo` to `bar` in class `RetryPolicy`");
+    expect(narrateAction(action)).toBe("renamed function `foo` to `bar` in class `RetryPolicy`");
   });
 });
 
@@ -125,14 +118,14 @@ describe("summarize", () => {
     const changes = narrate([
       {
         type: "Insert",
-      context: [],
+        context: [],
         node: createNode({ kind: "Function", label: "a", byteRange: [0, 1] }),
         parent: createNode({ kind: "file", byteRange: [0, 1] }),
         position: 0,
       },
       {
         type: "Delete",
-      context: [],
+        context: [],
         node: createNode({ kind: "Function", label: "b", byteRange: [0, 1] }),
       },
     ]);
@@ -174,7 +167,7 @@ describe("formatChanges", () => {
     const changes = narrate([
       {
         type: "Update",
-      context: [],
+        context: [],
         node: createNode({ kind: "Function", label: "foo", byteRange: [0, 1] }),
         detail: { kind: "Renamed", from: "foo", to: "bar" },
       },
@@ -185,16 +178,19 @@ describe("formatChanges", () => {
   });
 
   it("formats llm output with context chain", () => {
-    const changes = narrate([
-      {
-        type: "Delete",
-        context: [
-          { kind: "Function", label: "connect" },
-          { kind: "Class", label: "Client" },
-        ],
-        node: createNode({ kind: "Variable", label: "timeout", byteRange: [0, 10] }),
-      },
-    ], { filePath: "src/client.ts" });
+    const changes = narrate(
+      [
+        {
+          type: "Delete",
+          context: [
+            { kind: "Function", label: "connect" },
+            { kind: "Class", label: "Client" },
+          ],
+          node: createNode({ kind: "Variable", label: "timeout", byteRange: [0, 10] }),
+        },
+      ],
+      { filePath: "src/client.ts" },
+    );
 
     const lines = formatChanges(changes, { format: "llm" }).split("\n");
 
@@ -204,14 +200,32 @@ describe("formatChanges", () => {
   });
 
   it("rolls unnamed changes up into a count instead of a line each", () => {
-    const changes = narrate([
-      { type: "Insert", context: [], node: createNode({ kind: "Comment", byteRange: [0, 1] }),
-        parent: createNode({ kind: "file", byteRange: [0, 1] }), position: 0 },
-      { type: "Insert", context: [], node: createNode({ kind: "Comment", byteRange: [0, 1] }),
-        parent: createNode({ kind: "file", byteRange: [0, 1] }), position: 1 },
-      { type: "Insert", context: [], node: createNode({ kind: "Function", label: "go", byteRange: [0, 1], line: 7 }),
-        parent: createNode({ kind: "file", byteRange: [0, 1] }), position: 2 },
-    ], { filePath: "a.ts" });
+    const changes = narrate(
+      [
+        {
+          type: "Insert",
+          context: [],
+          node: createNode({ kind: "Comment", byteRange: [0, 1] }),
+          parent: createNode({ kind: "file", byteRange: [0, 1] }),
+          position: 0,
+        },
+        {
+          type: "Insert",
+          context: [],
+          node: createNode({ kind: "Comment", byteRange: [0, 1] }),
+          parent: createNode({ kind: "file", byteRange: [0, 1] }),
+          position: 1,
+        },
+        {
+          type: "Insert",
+          context: [],
+          node: createNode({ kind: "Function", label: "go", byteRange: [0, 1], line: 7 }),
+          parent: createNode({ kind: "file", byteRange: [0, 1] }),
+          position: 2,
+        },
+      ],
+      { filePath: "a.ts" },
+    );
 
     const lines = formatChanges(changes, { format: "llm" }).split("\n");
     expect(lines[2]).toBe("+ function go :7");

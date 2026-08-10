@@ -21,8 +21,7 @@ const WORD_RE = /\S+|\s+/g;
 
 function tokenize(text: string): string[] {
   const tokens: string[] = [];
-  let match: RegExpExecArray | null;
-  while ((match = WORD_RE.exec(text)) !== null) {
+  for (let match = WORD_RE.exec(text); match !== null; match = WORD_RE.exec(text)) {
     tokens.push(match[0]);
   }
   return tokens;

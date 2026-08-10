@@ -80,10 +80,7 @@ describe("diffTrees: identical", () => {
   it("produces no changes for identical nested trees", () => {
     const makeTree = () =>
       tree("program", [
-        tree("function", [
-          leaf("identifier", "foo"),
-          leaf("return", undefined, "1"),
-        ]),
+        tree("function", [leaf("identifier", "foo"), leaf("return", undefined, "1")]),
       ]);
 
     const result = diffTrees(makeTree(), makeTree());
@@ -129,13 +126,8 @@ describe("diffTrees: rename", () => {
 
 describe("diffTrees: add/remove", () => {
   it("detects inserted child", () => {
-    const oldTree = tree("program", [
-      leaf("function", "a"),
-    ]);
-    const newTree = tree("program", [
-      leaf("function", "a"),
-      leaf("function", "b"),
-    ]);
+    const oldTree = tree("program", [leaf("function", "a")]);
+    const newTree = tree("program", [leaf("function", "a"), leaf("function", "b")]);
 
     const result = diffTrees(oldTree, newTree);
     const inserts = result.changes.filter((a) => a.type === "Insert");
@@ -143,13 +135,8 @@ describe("diffTrees: add/remove", () => {
   });
 
   it("detects deleted child", () => {
-    const oldTree = tree("program", [
-      leaf("function", "a"),
-      leaf("function", "b"),
-    ]);
-    const newTree = tree("program", [
-      leaf("function", "a"),
-    ]);
+    const oldTree = tree("program", [leaf("function", "a"), leaf("function", "b")]);
+    const newTree = tree("program", [leaf("function", "a")]);
 
     const result = diffTrees(oldTree, newTree);
     const deletes = result.changes.filter((a) => a.type === "Delete");
@@ -243,9 +230,7 @@ function ofType<T extends EditAction["type"]>(
   changes: EditAction[],
   type: T,
 ): Extract<EditAction, { type: T }>[] {
-  return changes.filter(
-    (a): a is Extract<EditAction, { type: T }> => a.type === type,
-  );
+  return changes.filter((a): a is Extract<EditAction, { type: T }> => a.type === type);
 }
 
 // ---------- diffTrees: empty trees ----------
@@ -338,12 +323,8 @@ describe("diffTrees: structural changes only", () => {
   });
 
   it("deletes the root and re-inserts the new tree when every label differs", () => {
-    const oldTree = tree("program", [
-      tree("function", [leaf("identifier", "foo")]),
-    ]);
-    const newTree = tree("program", [
-      tree("function", [leaf("identifier", "bar")]),
-    ]);
+    const oldTree = tree("program", [tree("function", [leaf("identifier", "foo")])]);
+    const newTree = tree("program", [tree("function", [leaf("identifier", "bar")])]);
     const result = diffTrees(oldTree, newTree);
 
     // Nothing matches: the unmatched old root absorbs its subtree into one
@@ -403,24 +384,10 @@ describe("diffTrees: move detection", () => {
   it("emits a single Move when a node moves from one parent to another", () => {
     const oldFoo = leaf("leaf", "foo");
     const newFoo = leaf("leaf", "foo");
-    const oldA = tree("container", [
-      leaf("leaf", "keep1"),
-      leaf("leaf", "keep2"),
-      oldFoo,
-    ]);
-    const newA = tree("container", [
-      leaf("leaf", "keep1"),
-      leaf("leaf", "keep2"),
-    ]);
-    const oldB = tree("container", [
-      leaf("leaf", "keep3"),
-      leaf("leaf", "keep4"),
-    ]);
-    const newB = tree("container", [
-      leaf("leaf", "keep3"),
-      leaf("leaf", "keep4"),
-      newFoo,
-    ]);
+    const oldA = tree("container", [leaf("leaf", "keep1"), leaf("leaf", "keep2"), oldFoo]);
+    const newA = tree("container", [leaf("leaf", "keep1"), leaf("leaf", "keep2")]);
+    const oldB = tree("container", [leaf("leaf", "keep3"), leaf("leaf", "keep4")]);
+    const newB = tree("container", [leaf("leaf", "keep3"), leaf("leaf", "keep4"), newFoo]);
     const oldRoot = tree("program", [oldA, oldB]);
     const newRoot = tree("program", [newA, newB]);
 
@@ -459,10 +426,7 @@ describe("diffTrees: contentHash vs structureHash", () => {
 
   it("matches same-kind same-label leaves as a value change, not Delete+Insert", () => {
     const oldTree = tree("wrapper", [leaf("keeper", "k"), fakeNode({ value: "old" })]);
-    const newTree = tree("wrapper", [
-      leaf("keeper", "k"),
-      fakeNode({ value: "new" }),
-    ]);
+    const newTree = tree("wrapper", [leaf("keeper", "k"), fakeNode({ value: "new" })]);
     const result = diffTrees(oldTree, newTree);
 
     expect(ofType(result.changes, "Delete")).toHaveLength(0);
@@ -474,10 +438,7 @@ describe("diffTrees: contentHash vs structureHash", () => {
 
   it("does not match nodes with identical contentHash but different kind", () => {
     const oldTree = tree("wrapper", [leaf("keeper", "k"), fakeNode({})]);
-    const newTree = tree("wrapper", [
-      leaf("keeper", "k"),
-      fakeNode({ kind: "other" }),
-    ]);
+    const newTree = tree("wrapper", [leaf("keeper", "k"), fakeNode({ kind: "other" })]);
     const result = diffTrees(oldTree, newTree);
 
     expect(ofType(result.changes, "Delete")).toHaveLength(1);
@@ -497,10 +458,7 @@ describe("diffTrees: contentHash vs structureHash", () => {
 describe("diffTrees: same object reference", () => {
   it("is a no-op when oldRoot and newRoot are the same object", () => {
     const root = tree("program", [
-      tree("function", [
-        leaf("identifier", "foo"),
-        leaf("number", undefined, "1"),
-      ]),
+      tree("function", [leaf("identifier", "foo"), leaf("number", undefined, "1")]),
       leaf("identifier", "bar"),
     ]);
     const result = diffTrees(root, root);

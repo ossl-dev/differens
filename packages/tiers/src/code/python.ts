@@ -88,5 +88,4 @@ export class PythonExtractor implements LanguageExtractor {
 
     return undefined;
   }
-
 }

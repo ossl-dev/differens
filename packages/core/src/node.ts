@@ -86,8 +86,14 @@ export function createNode(opts: BuildNodeOptions): Node {
   // so a child change flips B while a value change flips A.
   let hA = hashStr(FNV_SEED_A, opts.kind);
   let hB = hashStr(FNV_SEED_B, opts.kind);
-  if (opts.label !== undefined) { hA = hashStr(hA, opts.label); hB = hashStr(hB, opts.label); }
-  if (opts.value !== undefined) { hA = hashStr(hA, opts.value); hB = hashStr(hB, opts.value); }
+  if (opts.label !== undefined) {
+    hA = hashStr(hA, opts.label);
+    hB = hashStr(hB, opts.label);
+  }
+  if (opts.value !== undefined) {
+    hA = hashStr(hA, opts.value);
+    hB = hashStr(hB, opts.value);
+  }
   for (let i = 0; i < children.length; i++) {
     const h = children[i]!.contentHash;
     hA = mixWord(hA, foldHi(h), FNV_PRIME);
@@ -109,17 +115,23 @@ export function createNode(opts: BuildNodeOptions): Node {
   }
   const structureHash = fold(sA, sB);
 
-  return { kind: opts.kind, label: opts.label, value: opts.value, children,
-           byteRange: opts.byteRange, line: opts.line, height, contentHash, structureHash };
+  return {
+    kind: opts.kind,
+    label: opts.label,
+    value: opts.value,
+    children,
+    byteRange: opts.byteRange,
+    line: opts.line,
+    height,
+    contentHash,
+    structureHash,
+  };
 }
 /**
  * Build a simple tree from a flat key-value object.
  * Used by T4 (config/data tier) for JSON/YAML value trees.
  */
-export function treeFromValue(
-  value: unknown,
-  kind = "root",
-): Node {
+export function treeFromValue(value: unknown, kind = "root"): Node {
   if (value === null || value === undefined) {
     return createNode({
       kind,
@@ -138,9 +150,7 @@ export function treeFromValue(
   }
 
   if (Array.isArray(value)) {
-    const children = value.map((item, i) =>
-      treeFromValue(item, `${kind}[${i}]`),
-    );
+    const children = value.map((item, i) => treeFromValue(item, `${kind}[${i}]`));
     return createNode({
       kind: "array",
       label: kind,

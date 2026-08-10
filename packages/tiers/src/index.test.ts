@@ -1,11 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import { classifyFile, Tier, parseData, diffWithTier } from "./index";
+import type { Node } from "@differens/core";
+import { Tier, classifyFile, diffWithTier, parseData } from "./index";
 // parseMarkup / diffLines / diffWords are not re-exported from the
 // package index, so they are imported from their adapter modules.
 import { parseMarkup } from "./markup";
-import { diffLines } from "./raw";
 import { diffWords } from "./prose";
-import type { Node } from "@differens/core";
+import { diffLines } from "./raw";
 
 describe("classifyFile", () => {
   it("classifies JSON as Data tier", () => {
@@ -138,7 +138,7 @@ describe("parseData YAML edge cases", () => {
 describe("parseData TOML edge cases", () => {
   it("parses dotted section headers like [database.pool]", () => {
     const node = parseData(
-      ['[database]', 'host = "localhost"', "", "[database.pool]", "max = 10", "min = 2"].join("\n"),
+      ["[database]", 'host = "localhost"', "", "[database.pool]", "max = 10", "min = 2"].join("\n"),
     );
     expect(node.kind).toBe("object");
     expect(findNode(node, "host")?.value).toBe("localhost");
@@ -306,12 +306,7 @@ describe("diffWithTier fallback behavior", () => {
   it("diffs code files without a grammar at line level instead of crashing", () => {
     // "java" is a Code-tier extension with no registered tree-sitter
     // grammar, so parseCode degrades to a line-based file node.
-    const result = diffWithTier(
-      "public class A {}",
-      "public class B {}",
-      "Main.java",
-      "Main.java",
-    );
+    const result = diffWithTier("public class A {}", "public class B {}", "Main.java", "Main.java");
     expect(result.tier).toBe(Tier.Code);
     expect(result.changes.length).toBeGreaterThan(0);
   });

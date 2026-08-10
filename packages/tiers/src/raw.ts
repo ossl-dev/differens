@@ -47,7 +47,10 @@ export function diffLines(oldText: string, newText: string): HunkDiff[] {
   return mergeHunks(diffs);
 }
 
-function lcsDiff(a: string[], b: string[]): { type: "Insert" | "Delete" | "Equal"; text: string }[] {
+function lcsDiff(
+  a: string[],
+  b: string[],
+): { type: "Insert" | "Delete" | "Equal"; text: string }[] {
   const n = a.length;
   const m = b.length;
 
@@ -71,7 +74,8 @@ function lcsDiff(a: string[], b: string[]): { type: "Insert" | "Delete" | "Equal
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
       temp.push({ type: "Equal", text: a[i - 1]! });
-      i--; j--;
+      i--;
+      j--;
     } else if (j > 0 && (i === 0 || dp[i]![j - 1]! >= dp[i - 1]![j]!)) {
       temp.push({ type: "Insert", text: b[j - 1]! });
       j--;
@@ -84,9 +88,7 @@ function lcsDiff(a: string[], b: string[]): { type: "Insert" | "Delete" | "Equal
   return temp.reverse();
 }
 
-function mergeHunks(
-  diffs: { type: "Insert" | "Delete" | "Equal"; text: string }[],
-): HunkDiff[] {
+function mergeHunks(diffs: { type: "Insert" | "Delete" | "Equal"; text: string }[]): HunkDiff[] {
   const hunks: HunkDiff[] = [];
   let idx = 0;
   while (idx < diffs.length) {

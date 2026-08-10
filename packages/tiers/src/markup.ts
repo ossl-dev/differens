@@ -82,8 +82,20 @@ export function parseMarkup(source: string): MarkupNode {
 
       // Void elements (self-closing in HTML)
       const voidElements = new Set([
-        "area", "base", "br", "col", "embed", "hr", "img", "input",
-        "link", "meta", "param", "source", "track", "wbr",
+        "area",
+        "base",
+        "br",
+        "col",
+        "embed",
+        "hr",
+        "img",
+        "input",
+        "link",
+        "meta",
+        "param",
+        "source",
+        "track",
+        "wbr",
       ]);
 
       if (voidElements.has(tag.toLowerCase())) {
@@ -132,8 +144,7 @@ export function parseMarkup(source: string): MarkupNode {
 function parseAttrs(attrStr: string): MarkupAttrs {
   const attrs: MarkupAttrs = {};
   const re = /([a-zA-Z][a-zA-Z0-9-]*)(?:="([^"]*)")?/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(attrStr)) !== null) {
+  for (let m = re.exec(attrStr); m !== null; m = re.exec(attrStr)) {
     attrs[m[1]!] = m[2];
   }
   return attrs;

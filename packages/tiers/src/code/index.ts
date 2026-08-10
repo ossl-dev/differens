@@ -10,14 +10,14 @@
  */
 
 import { createRequire } from "node:module";
-import Parser from "tree-sitter";
 import { createNode } from "@differens/core";
 import type { Node } from "@differens/core";
+import Parser from "tree-sitter";
 import type { LanguageExtractor } from "./extractor";
-import { TypeScriptExtractor } from "./typescript";
+import { GoExtractor } from "./go";
 import { PythonExtractor } from "./python";
 import { RustExtractor } from "./rust";
-import { GoExtractor } from "./go";
+import { TypeScriptExtractor } from "./typescript";
 
 /**
  * Grammars load synchronously and on demand.
@@ -40,12 +40,38 @@ interface LanguageSpec {
 }
 
 const LANGUAGES: Record<string, LanguageSpec> = {
-  js: { name: "javascript", module: "tree-sitter-javascript", extractor: () => new TypeScriptExtractor() },
-  mjs: { name: "javascript", module: "tree-sitter-javascript", extractor: () => new TypeScriptExtractor() },
-  cjs: { name: "javascript", module: "tree-sitter-javascript", extractor: () => new TypeScriptExtractor() },
-  jsx: { name: "javascript", module: "tree-sitter-javascript", extractor: () => new TypeScriptExtractor() },
-  ts: { name: "typescript", module: "tree-sitter-typescript", pick: "typescript", extractor: () => new TypeScriptExtractor() },
-  tsx: { name: "typescript", module: "tree-sitter-typescript", pick: "tsx", extractor: () => new TypeScriptExtractor() },
+  js: {
+    name: "javascript",
+    module: "tree-sitter-javascript",
+    extractor: () => new TypeScriptExtractor(),
+  },
+  mjs: {
+    name: "javascript",
+    module: "tree-sitter-javascript",
+    extractor: () => new TypeScriptExtractor(),
+  },
+  cjs: {
+    name: "javascript",
+    module: "tree-sitter-javascript",
+    extractor: () => new TypeScriptExtractor(),
+  },
+  jsx: {
+    name: "javascript",
+    module: "tree-sitter-javascript",
+    extractor: () => new TypeScriptExtractor(),
+  },
+  ts: {
+    name: "typescript",
+    module: "tree-sitter-typescript",
+    pick: "typescript",
+    extractor: () => new TypeScriptExtractor(),
+  },
+  tsx: {
+    name: "typescript",
+    module: "tree-sitter-typescript",
+    pick: "tsx",
+    extractor: () => new TypeScriptExtractor(),
+  },
   py: { name: "python", module: "tree-sitter-python", extractor: () => new PythonExtractor() },
   rs: { name: "rust", module: "tree-sitter-rust", extractor: () => new RustExtractor() },
   go: { name: "go", module: "tree-sitter-go", extractor: () => new GoExtractor() },
@@ -75,14 +101,16 @@ function loadLanguage(extension: string): LoadedLanguage | null {
   try {
     const mod = requireGrammar(spec.module);
     const root = (mod?.default ?? mod) as Record<string, unknown>;
-    const grammar = (spec.pick ? root[spec.pick] : root.language ?? root) as Parser.Language;
+    const grammar = (spec.pick ? root[spec.pick] : (root.language ?? root)) as Parser.Language;
     const parser = new Parser();
     parser.setLanguage(grammar);
     entry = { grammar, name: spec.name, extractor: spec.extractor?.(), parser };
   } catch (err) {
     // Missing or unbuildable native grammar: the caller falls back to a line
     // diff, which is the whole point of the tier ladder.
-    warnOnce(`differens: ${spec.name} falls back to a line diff (${err instanceof Error ? err.message : err})`);
+    warnOnce(
+      `differens: ${spec.name} falls back to a line diff (${err instanceof Error ? err.message : err})`,
+    );
     entry = null;
   }
 
@@ -131,11 +159,7 @@ function warnOnce(message: string): void {
  * It is also iterative, so deeply nested real files (long method chains, big
  * nested literals) cannot overflow the stack mid-parse.
  */
-function cstToNode(
-  tree: Parser.Tree,
-  source: string,
-  extractor?: LanguageExtractor,
-): Node {
+function cstToNode(tree: Parser.Tree, source: string, extractor?: LanguageExtractor): Node {
   interface Frame {
     type: string;
     start: number;

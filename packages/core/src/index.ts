@@ -7,9 +7,9 @@
 
 import type { EditAction, MatchOptions } from "./actions";
 import { DEFAULT_OPTIONS } from "./actions";
-import type { Node } from "./node";
-import { bottomUpMatch, indexTree, Matching, recoverLeaves, topDownMatch } from "./match";
 import { generateEditScript } from "./edit-script";
+import { Matching, bottomUpMatch, indexTree, recoverLeaves, topDownMatch } from "./match";
+import type { Node } from "./node";
 
 export * from "./node";
 export * from "./actions";

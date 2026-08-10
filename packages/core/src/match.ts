@@ -10,8 +10,8 @@
  * differencing" (ASE 2014, the GumTree paper).
  */
 
-import type { Node } from "./node";
 import type { MatchOptions } from "./actions";
+import type { Node } from "./node";
 
 /**
  * Flat postorder view of a tree. Children always have a lower id than their
@@ -66,7 +66,8 @@ export function indexTree(root: Node): TreeIndex {
   // Children precede parents in postorder, so one ascending pass sums sizes.
   for (let i = 0; i < n; i++) {
     const p = parent[i]!;
-    if (p >= 0) size[p]! += size[i]!;
+    const own = size[i]!;
+    if (p >= 0) size[p]! += own;
   }
 
   return { nodes: order, parent, pos, size, n, maxHeight };
@@ -137,7 +138,7 @@ export function topDownMatch(
         if (!candidates) continue;
 
         let best = -1;
-        let bestScore = -Infinity;
+        let bestScore = Number.NEGATIVE_INFINITY;
         let ambiguous = false;
         for (const j of candidates) {
           if (m.newToOld[j]! >= 0) continue;
@@ -192,13 +193,7 @@ function pushChildren(idx: TreeIndex, i: number, buckets: number[][]): void {
 }
 
 /** Prefer the candidate whose parent already matched, then the closest position. */
-function affinity(
-  oldIdx: TreeIndex,
-  newIdx: TreeIndex,
-  m: Matching,
-  i: number,
-  j: number,
-): number {
+function affinity(oldIdx: TreeIndex, newIdx: TreeIndex, m: Matching, i: number, j: number): number {
   const pi = oldIdx.parent[i]!;
   const pj = newIdx.parent[j]!;
   let score = 0;
@@ -210,12 +205,7 @@ function affinity(
 }
 
 /** Same shape and same kinds throughout: the check behind an equal hash. */
-function isomorphic(
-  oldIdx: TreeIndex,
-  newIdx: TreeIndex,
-  i: number,
-  j: number,
-): boolean {
+function isomorphic(oldIdx: TreeIndex, newIdx: TreeIndex, i: number, j: number): boolean {
   const size = oldIdx.size[i]!;
   if (newIdx.size[j] !== size) return false;
   const oi = lo(oldIdx, i);
@@ -377,9 +367,10 @@ export function recoverLeaves(oldIdx: TreeIndex, newIdx: TreeIndex, m: Matching)
     );
     for (let x = a.length - 1; x >= 0; x--) {
       for (let y = b.length - 1; y >= 0; y--) {
-        table[x]![y] = oldIdx.nodes[a[x]!]!.kind === newIdx.nodes[b[y]!]!.kind
-          ? table[x + 1]![y + 1]! + 1
-          : Math.max(table[x + 1]![y]!, table[x]![y + 1]!);
+        table[x]![y] =
+          oldIdx.nodes[a[x]!]!.kind === newIdx.nodes[b[y]!]!.kind
+            ? table[x + 1]![y + 1]! + 1
+            : Math.max(table[x + 1]![y]!, table[x]![y + 1]!);
       }
     }
     let x = 0;

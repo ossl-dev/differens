@@ -86,5 +86,4 @@ export class GoExtractor implements LanguageExtractor {
 
     return undefined;
   }
-
 }

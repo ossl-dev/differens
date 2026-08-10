@@ -42,13 +42,15 @@ describe("correlate", () => {
       },
       {
         filePath: "src/b.ts",
-        actions: [{
-          type: "Insert",
-          context: [],
-          node: nodeB,
-          parent: createNode({ kind: "file", byteRange: [0, 10] }),
-          position: 0,
-        }],
+        actions: [
+          {
+            type: "Insert",
+            context: [],
+            node: nodeB,
+            parent: createNode({ kind: "file", byteRange: [0, 10] }),
+            position: 0,
+          },
+        ],
       },
     ];
 
@@ -84,25 +86,16 @@ describe("correlate", () => {
     expect(result.moves.filter((m) => m.fromFile !== m.toFile)).toHaveLength(0);
   });
 
-  it("leaves unmatched as genuine deletes/inserts", () => {
+  it("reports no move for a deletion with nothing to pair against", () => {
     const nodeA = createNode({ kind: "Function", label: "foo", byteRange: [0, 10] });
 
-    const fileChanges: FileChanges[] = [
-      {
-        filePath: "src/a.ts",
-        actions: [{ type: "Delete", context: [], node: nodeA }],
-      },
-    ];
-
-    const result = correlate(fileChanges);
+    const result = correlate([
+      { filePath: "src/a.ts", actions: [{ type: "Delete", context: [], node: nodeA }] },
+    ]);
     expect(result.moves).toHaveLength(0);
-    expect(result.genuineDeletes).toHaveLength(1);
   });
 
   it("handles empty changeset", () => {
-    const result = correlate([]);
-    expect(result.moves).toHaveLength(0);
-    expect(result.genuineDeletes).toHaveLength(0);
-    expect(result.genuineInserts).toHaveLength(0);
+    expect(correlate([]).moves).toHaveLength(0);
   });
 });

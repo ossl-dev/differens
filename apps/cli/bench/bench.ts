@@ -5,9 +5,9 @@
  * Run: bun run apps/cli/bench/bench.ts
  */
 
+import { diffTrees } from "@differens/core";
 import { diffWithTier } from "@differens/tiers";
 import { parseCode } from "@differens/tiers";
-import { diffTrees } from "@differens/core";
 
 function genFile(fns: number, seed = 0): string {
   const out: string[] = [];

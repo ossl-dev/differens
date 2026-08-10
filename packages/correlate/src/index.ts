@@ -5,10 +5,9 @@
  * with inserted nodes in another to detect cross-file moves.
  *
  * Algorithm:
- * 1. Bucket all deleted/inserted top-level nodes by structure_hash
- * 2. Exact content_hash matches → unambiguous Move
+ * 1. Bucket all deleted/inserted named nodes by structure_hash
+ * 2. Exact content_hash or value matches → unambiguous Move
  * 3. Similarity scoring for partial matches → Move+Update
- * 4. Remainder → genuine Delete or Insert
  *
  * @packageDocumentation
  */
@@ -30,8 +29,6 @@ export interface CrossFileMatch {
 
 export interface CrossFileResult {
   moves: CrossFileMatch[];
-  genuineDeletes: EditAction[];
-  genuineInserts: EditAction[];
 }
 
 export interface FileChanges {
@@ -95,8 +92,8 @@ export function correlate(
   }
 
   const moves: CrossFileMatch[] = [];
-  const matchedDeletions = new Set<typeof deletions[0]>();
-  const matchedInsertions = new Set<typeof insertions[0]>();
+  const matchedDeletions = new Set<(typeof deletions)[0]>();
+  const matchedInsertions = new Set<(typeof insertions)[0]>();
 
   // For each structure bucket, try to match deletions with insertions
   for (const [structHash, delGroup] of delByStructure) {
@@ -116,8 +113,7 @@ export function correlate(
         // when not one byte of the content changed.
         const exact =
           del.action.node.contentHash === ins.action.node.contentHash ||
-          (del.action.node.value !== undefined &&
-            del.action.node.value === ins.action.node.value);
+          (del.action.node.value !== undefined && del.action.node.value === ins.action.node.value);
         if (exact) {
           moves.push({
             node: ins.action.node,
@@ -134,7 +130,7 @@ export function correlate(
 
       // No exact match  --  try similarity scoring
       if (!matchedDeletions.has(del)) {
-        let bestIns: typeof insertions[0] | null = null;
+        let bestIns: (typeof insertions)[0] | null = null;
         let bestScore = 0;
 
         for (const ins of insGroup) {
@@ -163,16 +159,9 @@ export function correlate(
     }
   }
 
-  // Remainder = genuine deletes and inserts
-  const genuineDeletes = deletions
-    .filter((d) => !matchedDeletions.has(d))
-    .map((d) => d.action);
-
-  const genuineInserts = insertions
-    .filter((i) => !matchedInsertions.has(i))
-    .map((i) => i.action);
-
-  return { moves, genuineDeletes, genuineInserts };
+  // Whatever stayed unmatched is a real delete or insert, and the per-file
+  // diff already reported it as one.
+  return { moves };
 }
 
 /**

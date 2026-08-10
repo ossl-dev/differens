@@ -3,7 +3,7 @@
  */
 
 import type { EditAction, NodeContext } from "./actions";
-import { lo, type Matching, type TreeIndex } from "./match";
+import { type Matching, type TreeIndex, lo } from "./match";
 
 export function generateEditScript(
   oldIdx: TreeIndex,

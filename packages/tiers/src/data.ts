@@ -60,11 +60,7 @@ function parseYaml(source: string): unknown {
   return parseYamlLines(lines, 0, 0)[0];
 }
 
-function parseYamlLines(
-  lines: string[],
-  startIdx: number,
-  baseIndent: number,
-): [unknown, number] {
+function parseYamlLines(lines: string[], startIdx: number, baseIndent: number): [unknown, number] {
   const result: Record<string, unknown> = {};
 
   let i = startIdx;
@@ -80,7 +76,10 @@ function parseYamlLines(
     }
 
     const trimmed = line.trim();
-    if (!trimmed) { i++; continue; }
+    if (!trimmed) {
+      i++;
+      continue;
+    }
 
     // Sequence item
     if (trimmed.startsWith("- ")) {
@@ -89,7 +88,10 @@ function parseYamlLines(
         const l = lines[i]!;
         const ind = l.search(/\S/);
         if (ind < baseIndent) break;
-        if (!l.trim().startsWith("- ")) { i++; continue; }
+        if (!l.trim().startsWith("- ")) {
+          i++;
+          continue;
+        }
         const val = l.trim().slice(2).trim();
         if (val === "") {
           // Nested object under sequence item
@@ -106,7 +108,10 @@ function parseYamlLines(
 
     // Key-value mapping
     const colonIdx = trimmed.indexOf(":");
-    if (colonIdx === -1) { i++; continue; }
+    if (colonIdx === -1) {
+      i++;
+      continue;
+    }
 
     const key = trimmed.slice(0, colonIdx).trim();
     const valStr = trimmed.slice(colonIdx + 1).trim();
@@ -140,7 +145,7 @@ function parseYamlValue(val: string): unknown {
   if (val === "null" || val === "~" || val === "") return null;
   // Number
   const num = Number(val);
-  if (!isNaN(num) && val.trim() !== "") return num;
+  if (!Number.isNaN(num) && val.trim() !== "") return num;
   // Quoted string
   if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
     return val.slice(1, -1);
@@ -201,10 +206,11 @@ function parseTomlValue(val: string): unknown {
     }
   }
   // Integer
-  if (/^-?\d+$/.test(val)) return parseInt(val, 10);
+  if (/^-?\d+$/.test(val)) return Number.parseInt(val, 10);
   // Float
   const num = Number(val);
-  if (!isNaN(num)) return num;
+  // Number("") is 0, not NaN, so an empty value would parse as the number zero.
+  if (!Number.isNaN(num) && val.trim() !== "") return num;
   // Bare string
   return val;
 }
