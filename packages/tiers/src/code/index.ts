@@ -147,9 +147,9 @@ export function parseCode(source: string, extension: string): Node {
   return cstToNode(tree.rootNode, source, extractor);
 }
 
-/** Initialize grammars synchronously for the current extension (lazy load) */
-export function initGrammar(extension: string): void {
-  ensureInitialized().catch(() => {});
+/** Await grammar loading; needed before listing extractors */
+export function awaitGrammars(): Promise<void> {
+  return ensureInitialized();
 }
 
 /** List all available extractors */

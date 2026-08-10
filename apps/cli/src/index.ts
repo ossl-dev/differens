@@ -10,7 +10,7 @@
  *   differens install-git-driver    register as git diff driver
  */
 
-import { diffWithTier, getExtractors } from "@differens/tiers";
+import { diffWithTier, getExtractors, initExtractors } from "@differens/tiers";
 import { narrate, formatChanges, summarize } from "@differens/narrate";
 import { correlate } from "@differens/correlate";
 import type { FileChanges } from "@differens/correlate";
@@ -41,7 +41,7 @@ async function main(): Promise<void> {
       await handleDiff(rest);
       break;
     case "languages":
-      handleLanguages();
+      await handleLanguages();
       break;
     case "install-git-driver":
       await handleInstallGitDriver();
@@ -202,14 +202,15 @@ async function handleFileDiff(
 
 // ---------- Languages ----------
 
-function handleLanguages(): void {
+async function handleLanguages(): Promise<void> {
+  await initExtractors();
   const extractors = getExtractors();
   console.log("supported languages:\n");
   for (const ext of extractors) {
     const level = ext.level === "L6" ? "semantic" : "generic";
-    console.log(`  ${ext.language} (${level}, ${ext.level})  --  ${ext.extensions.join(", ")}`);
+    console.log(`  ${ext.language} (${level}, ${ext.level}): ${ext.extensions.join(", ")}`);
   }
-  console.log("\nall other text files: raw (L1  --  line diff)");
+  console.log("\nall other text files: raw (L1 line diff)");
   console.log("binary files: hash only (L0)");
 }
 
@@ -240,7 +241,7 @@ function parseFormat(args: string[]): string {
 }
 
 function printUsage(): void {
-  console.log(`differens  --  semantic diffing engine
+  console.log(`differens, a semantic diffing engine
 
 usage:
   differens diff                      diff working tree vs HEAD

@@ -216,6 +216,18 @@ function topDownMatch(
       for (let i = 0; i < minLen; i++) {
         stack.push([oldNode.children[i]!, newNode.children[i]!]);
       }
+    } else if (
+      // Leaf with same kind and same name: value changed, keep the node
+      // matched so narration reports "changed value of X" instead of
+      // a Delete+Insert pair.
+      oldNode.kind === newNode.kind &&
+      oldNode.children.length === 0 &&
+      newNode.children.length === 0 &&
+      oldNode.label !== undefined &&
+      oldNode.label === newNode.label
+    ) {
+      state.oldToNew.set(oldNode, newNode);
+      state.newToOld.set(newNode, oldNode);
     } else if (oldNode.kind === newNode.kind) {
       const minLen = Math.min(oldNode.children.length, newNode.children.length);
       for (let i = 0; i < minLen; i++) {
@@ -332,8 +344,10 @@ function descendantOverlap(
     }
   }
 
-  const maxLen = Math.max(oldDescendants.length, newDescendants.length);
-  return maxLen > 0 ? matched / maxLen : 0;
+  // Denominator is the smaller descendant set: a container that grew
+  // (new key added to a config object) still matches its old self.
+  const denom = Math.min(oldDescendants.length, newDescendants.length);
+  return denom > 0 ? matched / denom : 0;
 }
 
 function collectDescendants(node: Node): Node[] {

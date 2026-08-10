@@ -14,7 +14,7 @@ import { diffLines } from "./raw";
 import { diffWords } from "./prose";
 import { parseMarkup, type MarkupNode } from "./markup";
 import { parseData } from "./data";
-import { parseCode, listExtractors } from "./code/index";
+import { parseCode, listExtractors, awaitGrammars } from "./code/index";
 import { isBinaryExtension } from "./binary";
 
 // ---------- Tier enum ----------
@@ -57,9 +57,15 @@ export function classifyFile(filePath: string): FileInfo {
     return { path: filePath, extension: ext, tier: Tier.Markup };
   }
 
-  // Prose / plain text
+  // Markdown and doc formats: line diff, not word diff.
+  // Lines are structure in these files; word-level churn floods the output.
+  if (["md", "mdx", "rst", "adoc", "org"].includes(ext)) {
+    return { path: filePath, extension: ext, tier: Tier.Raw };
+  }
+
+  // Free prose: word diff
   if (
-    ["txt", "md", "mdx", "rst", "adoc", "org", "log"].includes(ext) ||
+    ["txt", "log"].includes(ext) ||
     path.endsWith("license") ||
     path.endsWith("readme") ||
     path.endsWith("changelog") ||
@@ -120,6 +126,16 @@ export function diffWithTier(
     return { changes: [], nodeCount: 0, tier: info.tier };
   }
 
+  // Binary sniff: NUL bytes or failed UTF-8 decode (replacement chars).
+  // Handles .dat, .bin without extension lists, git blobs, etc.
+  if (
+    info.tier === Tier.Raw &&
+    (hasNullByte(oldBytes) || hasNullByte(newBytes) ||
+     oldSource.includes("�") || newSource.includes("�"))
+  ) {
+    return diffBinary(oldSource, newSource);
+  }
+
   switch (info.tier) {
     case Tier.Binary:
       return diffBinary(oldSource, newSource);
@@ -169,6 +185,15 @@ export function diffWithTier(
   return diffRaw(oldSource, newSource);
 }
 
+function hasNullByte(bytes: Uint8Array): boolean {
+  // First 8KB is plenty for a sniff
+  const limit = Math.min(bytes.length, 8192);
+  for (let i = 0; i < limit; i++) {
+    if (bytes[i] === 0) return true;
+  }
+  return false;
+}
+
 // ---------- Tier implementations ----------
 
 function diffBinary(oldSource: string, newSource: string): TierDiffResult {
@@ -194,7 +219,6 @@ function diffRaw(oldSource: string, newSource: string): TierDiffResult {
     changes: diffs.map((d, i) => {
       const node = createNode({
         kind: "line",
-        label: `line-${i}`,
         value: d.text,
         byteRange: [0, d.text.length],
       });
@@ -232,7 +256,6 @@ function diffProse(oldSource: string, newSource: string): TierDiffResult {
     changes: wordDiffs.map((d, i) => {
       const node = createNode({
         kind: "word",
-        label: `word-${i}`,
         value: d.text,
         byteRange: [0, d.text.length],
       });
@@ -308,6 +331,11 @@ export interface ExtractorInfo {
   language: string;
   level: "L6" | "L5";
   extensions: string[];
+}
+
+/** Await grammar loading before listing extractors */
+export function initExtractors(): Promise<void> {
+  return awaitGrammars();
 }
 
 /** List all available language extractors */

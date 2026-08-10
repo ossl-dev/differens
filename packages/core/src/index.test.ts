@@ -481,24 +481,19 @@ describe("diffTrees: contentHash vs structureHash", () => {
     expect(result.changes).toEqual([]);
   });
 
-  it("does not match nodes with different contentHash even when structureHash is equal", () => {
-    // Wrap under a matched parent so the unmatched node has a parent to
-    // attach the Insert/Delete actions to.
-    const oldTree = tree("wrapper", [leaf("keeper", "k"), fakeNode({})]);
+  it("matches same-kind same-label leaves as a value change, not Delete+Insert", () => {
+    const oldTree = tree("wrapper", [leaf("keeper", "k"), fakeNode({ value: "old" })]);
     const newTree = tree("wrapper", [
       leaf("keeper", "k"),
-      fakeNode({ contentHash: 888n }),
+      fakeNode({ value: "new" }),
     ]);
     const result = diffTrees(oldTree, newTree);
 
-    const deletes = ofType(result.changes, "Delete");
-    const inserts = ofType(result.changes, "Insert");
-    expect(deletes).toHaveLength(1);
-    expect(deletes[0]!.node).toBe(oldTree.children[1]!);
-    expect(inserts).toHaveLength(1);
-    expect(inserts[0]!.node).toBe(newTree.children[1]!);
-    expect(inserts[0]!.parent).toBe(newTree);
-    expect(inserts[0]!.position).toBe(1);
+    expect(ofType(result.changes, "Delete")).toHaveLength(0);
+    expect(ofType(result.changes, "Insert")).toHaveLength(0);
+    const updates = ofType(result.changes, "Update");
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.detail.kind).toBe("ValueChanged");
   });
 
   it("does not match nodes with identical contentHash but different kind", () => {
@@ -514,7 +509,7 @@ describe("diffTrees: contentHash vs structureHash", () => {
   });
 
   it("emits only a Delete for an unmatched root (roots have no parent to insert under)", () => {
-    const result = diffTrees(fakeNode({}), fakeNode({ contentHash: 888n }));
+    const result = diffTrees(fakeNode({}), fakeNode({ kind: "other" }));
     expect(result.changes).toHaveLength(1);
     expect(ofType(result.changes, "Delete")).toHaveLength(1);
     expect(ofType(result.changes, "Insert")).toHaveLength(0);

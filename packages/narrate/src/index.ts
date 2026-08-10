@@ -86,14 +86,16 @@ export function narrateAction(
         return `renamed ${kind} \`${action.detail.from}\` to \`${action.detail.to}\`${scopePhrase}`;
       }
       if (action.detail.kind === "ValueChanged") {
+        // Prefer the value as the name for anonymous leaves (word, line, literal)
+        const what = name !== "unnamed" ? name : (action.detail.to ?? action.detail.from ?? "unnamed");
         if (action.detail.from !== undefined && action.detail.to !== undefined) {
-          return `changed value of ${kind} \`${name}\` from \`${action.detail.from}\` to \`${action.detail.to}\`${scopePhrase}`;
+          return `changed value of ${kind} \`${what}\` from \`${action.detail.from}\` to \`${action.detail.to}\`${scopePhrase}`;
         }
         if (action.detail.from !== undefined) {
-          return `removed value of ${kind} \`${name}\`${scopePhrase}`;
+          return `removed value of ${kind} \`${what}\`${scopePhrase}`;
         }
         if (action.detail.to !== undefined) {
-          return `set value of ${kind} \`${name}\` to \`${action.detail.to}\`${scopePhrase}`;
+          return `set value of ${kind} \`${what}\` to \`${action.detail.to}\`${scopePhrase}`;
         }
       }
       return `modified ${kind} \`${name}\`${scopePhrase}`;
@@ -199,7 +201,7 @@ function formatForLlm(changes: SemanticChange[]): string {
     const base = {
       file: c.filePath ?? null,
       kind: a.node.kind,
-      name: a.node.label ?? null,
+      name: a.node.label ?? a.node.value ?? null,
       context: a.context.map((ctx) =>
         ctx.label ? `${ctx.kind} ${ctx.label}` : ctx.kind,
       ),
