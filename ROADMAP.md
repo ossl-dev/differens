@@ -27,7 +27,7 @@ Pick an unchecked box, open an issue saying you're working on it, send a PR. One
 - [ ] GitHub Actions: test matrix on Bun latest, lint, typecheck
 - [ ] Biome check in CI (format + lint gates)
 - [ ] README badges (build status, license)
-- [ ] npm/jsr publishing workflow for `@differens/core` and `@differens/cli`
+- [x] npm publishing: all six packages plus the CLI under `differens` and `@ossl-dev/differens-cli`
 
 **Docs**
 - [ ] API reference per package
@@ -86,7 +86,7 @@ Pick an unchecked box, open an issue saying you're working on it, send a PR. One
 - [ ] Tauri desktop app: side-by-side semantic view, timeline browsing, AI explanation panel
 - [ ] T6 composite file support: Vue SFC, Svelte, Astro, MDX code fences via tree-sitter injections
 - [ ] Editor integrations: VS Code extension, potentially JetBrains
-- [ ] WASM build of `@differens/core` for in-browser diffing
+- [ ] WASM build of `@ossl-dev/differens-core` for in-browser diffing
 - [ ] Homebrew / npm / JSR / `bun add` distribution of the CLI
 
 ---

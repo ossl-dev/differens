@@ -29,7 +29,8 @@
  */
 
 import { type ExecFileSyncOptionsWithStringEncoding, execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { isBuiltin } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -135,6 +136,42 @@ function blockedScopes(): Set<string> {
 
 const allNames = () => TARGETS.flatMap(({ dir, alsoAs }) => [read(dir).name, ...(alsoAs ?? [])]);
 
+/**
+ * Every bare import in the staged dist must be something a consumer can
+ * actually resolve.
+ *
+ * A workspace hides this. Package renames leave the old scope symlinked under
+ * each package's own node_modules, and bun does not clean them, so a stale
+ * specifier keeps resolving locally long after the package it names has ceased
+ * to exist. Type-only imports hide it further: they vanish from the JS, so the
+ * build and the tests stay green while the emitted .d.ts still names the dead
+ * package, and every consumer of the published types gets an unresolvable
+ * import.
+ */
+function checkSpecifiers(name: string, dist: string, dependencies: Record<string, string>): void {
+  const bad = new Set<string>();
+
+  for (const file of readdirSync(dist, { recursive: true, withFileTypes: true })) {
+    if (!file.isFile() || !/\.(js|d\.ts)$/.test(file.name)) continue;
+    const source = readFileSync(join(file.parentPath, file.name), "utf8");
+
+    for (const [, spec] of source.matchAll(/(?:from|require\()\s*["']([^"']+)["']/g)) {
+      if (!spec || spec.startsWith(".") || spec.startsWith("node:")) continue;
+      // "@scope/pkg/sub" and "pkg/sub" both reduce to the installable name.
+      const parts = spec.split("/");
+      const pkg = spec.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0]!;
+      if (pkg && !(pkg in dependencies) && !isBuiltin(pkg)) bad.add(pkg);
+    }
+  }
+
+  if (bad.size > 0) {
+    throw new Error(
+      `${name}: dist imports ${[...bad].map((p) => `"${p}"`).join(", ")}, which ${bad.size > 1 ? "are" : "is"} not in its dependencies.\n` +
+        "A consumer cannot resolve that. Either declare it or stop importing it.",
+    );
+  }
+}
+
 // A scope that cannot be published skips only its own packages. The unscoped
 // CLI is the one people actually install, and holding it back until an org
 // exists helps nobody.
@@ -158,8 +195,17 @@ for (const { dir, alsoAs } of TARGETS) {
 
     const stage = mkdtempSync(join(tmpdir(), "differens-publish-"));
     cpSync(join(repoRoot, dir, "dist"), join(stage, "dist"), { recursive: true });
-    cpSync(join(repoRoot, "README.md"), join(stage, "README.md"));
     cpSync(join(repoRoot, "LICENSE"), join(stage, "LICENSE"));
+
+    // A package's own README if it wrote one, the repo's otherwise. Without
+    // this every library's npm page was the CLI's documentation, which tells a
+    // reader nothing about the thing they are looking at. The CLI has no README
+    // of its own on purpose: the repo's front page is already about it.
+    const ownReadme = join(repoRoot, dir, "README.md");
+    cpSync(
+      existsSync(ownReadme) ? ownReadme : join(repoRoot, "README.md"),
+      join(stage, "README.md"),
+    );
 
     // Workspace-relative and useless to a consumer; devDependencies are the
     // sibling packages, which resolve from the registry once published.
@@ -196,6 +242,7 @@ for (const { dir, alsoAs } of TARGETS) {
     if (!isCli && !existsSync(join(stage, "dist", "index.d.ts"))) {
       throw new Error(`${name}: no dist/index.d.ts -- a library with no types is not publishable`);
     }
+    checkSpecifiers(name, join(stage, "dist"), dependencies);
 
     console.log(`\n=== ${name}@${manifest.version}${dryRun ? " (dry run)" : ""} ===`);
     execFileSync("npm", ["publish", ...npmArgs], { cwd: stage, stdio: "inherit" });

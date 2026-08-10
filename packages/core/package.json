@@ -1,6 +1,6 @@
 {
   "name": "@ossl-dev/differens-core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Semantic diff core: GumTree-lineage tree matching over postorder arrays, emitting typed edit scripts",
   "keywords": [
     "diff",

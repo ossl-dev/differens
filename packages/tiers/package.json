@@ -1,6 +1,6 @@
 {
   "name": "@ossl-dev/differens-tiers",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Content-tier adapters that parse code, config and markup into trees the differens core can match",
   "keywords": [
     "diff",

@@ -1,6 +1,6 @@
 {
   "name": "@ossl-dev/differens-narrate",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Turns a differens edit script into sentences, markdown, JSON, or a token-frugal format for models",
   "keywords": [
     "diff",

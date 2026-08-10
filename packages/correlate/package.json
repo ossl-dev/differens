@@ -1,6 +1,6 @@
 {
   "name": "@ossl-dev/differens-correlate",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Cross-file correlation for differens: finds the code that moved between two files",
   "keywords": [
     "diff",
