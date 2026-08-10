@@ -7,6 +7,8 @@
  * parsing parallel.
  */
 
+import { spawn } from "node:child_process";
+import { availableParallelism } from "node:os";
 import type { EditAction } from "@differens/core";
 import type { GitDiffInput as FilePair } from "@differens/git";
 import { narrate } from "@differens/narrate";
@@ -41,13 +43,39 @@ export function diffInline(pair: FilePair): FileDiff {
 /**
  * Argv that re-invokes this CLI in worker mode.
  *
- * A compiled single-file executable IS the CLI, so it re-execs itself; from
- * source, bun needs the entry script passed along. `Bun.main` sits under the
- * virtual /$bunfs/ root when compiled, which is how the two are told apart.
+ * A compiled single-file executable IS the CLI, so it re-execs itself; run as
+ * a script, the runtime needs the entry passed along. A compiled bun binary
+ * reports its entry under the virtual /$bunfs/ root, which is how the two are
+ * told apart.
  */
-function workerArgv(): string[] {
-  const compiled = Bun.main.startsWith("/$bunfs/") || Bun.main.includes("~BUN");
-  return compiled ? [process.execPath, WORKER_FLAG] : [process.execPath, Bun.main, WORKER_FLAG];
+function workerArgv(): [string, string[]] {
+  const entry = process.argv[1] ?? "";
+  const compiled = entry.startsWith("/$bunfs/") || entry.includes("~BUN");
+  return [process.execPath, compiled ? [WORKER_FLAG] : [entry, WORKER_FLAG]];
+}
+
+/** Run a worker child over `chunk`, resolving with what it wrote to stdout. */
+function runChild(chunk: WorkerJob[]): Promise<WorkerReply[]> {
+  return new Promise((resolve, reject) => {
+    const [cmd, args] = workerArgv();
+    const child = spawn(cmd, args, {
+      // Children share stderr, so let one voice speak for the pool.
+      env: { ...process.env, DIFFERENS_QUIET: "1" },
+      stdio: ["pipe", "pipe", "inherit"],
+    });
+    const chunks: Buffer[] = [];
+    child.stdout!.on("data", (buf: Buffer) => chunks.push(buf));
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code !== 0) return reject(new Error(`diff worker exited ${code}`));
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString()) as WorkerReply[]);
+      } catch (err) {
+        reject(err);
+      }
+    });
+    child.stdin!.end(JSON.stringify(chunk));
+  });
 }
 
 /**
@@ -73,7 +101,7 @@ export async function diffWithWorkers(filePairs: FilePair[]): Promise<FileDiff[]
   const parseable = filePairs.filter((p) => isParseable(p.oldPath)).length;
 
   if (parseable >= WORKER_THRESHOLD) {
-    const poolSize = Math.max(2, Math.min(8, navigator.hardwareConcurrency ?? 4));
+    const poolSize = Math.max(2, Math.min(8, availableParallelism()));
     const chunks: WorkerJob[][] = Array.from({ length: poolSize }, () => []);
     for (let i = 0; i < filePairs.length; i++) {
       chunks[i % poolSize]!.push({ index: i, pair: filePairs[i]! });
@@ -81,15 +109,7 @@ export async function diffWithWorkers(filePairs: FilePair[]): Promise<FileDiff[]
 
     const runs = chunks.map(async (chunk) => {
       if (chunk.length === 0) return;
-      const child = Bun.spawn(workerArgv(), {
-        stdin: new Blob([JSON.stringify(chunk)]),
-        stdout: "pipe",
-        stderr: "inherit",
-        // Children share stderr, so let one voice speak for the pool.
-        env: { ...process.env, DIFFERENS_QUIET: "1" },
-      });
-      const replies = (await new Response(child.stdout).json()) as WorkerReply[];
-      for (const reply of replies) {
+      for (const reply of await runChild(chunk)) {
         results[reply.index] = {
           actions: reply.actions,
           descriptions: reply.descriptions,
@@ -122,7 +142,9 @@ type WorkerReply = FileDiff & { index: number };
 
 /** Worker mode: read a slice of jobs from stdin, write the diffs to stdout. */
 export async function runWorker(): Promise<void> {
-  const jobs = (await Bun.stdin.json()) as WorkerJob[];
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+  const jobs = JSON.parse(Buffer.concat(chunks).toString()) as WorkerJob[];
   const replies: WorkerReply[] = jobs.map(({ index, pair }) => ({
     index,
     ...diffInline(pair),

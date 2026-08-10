@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * Differens CLI
  *
@@ -11,6 +11,7 @@
  *   differens install-git-driver    register as git diff driver
  */
 
+import { createRequire } from "node:module";
 import {
   diffCommitRange,
   diffDirectories,
@@ -26,6 +27,19 @@ import type { OutputFormat } from "@differens/narrate";
 import { diffWithTier, getExtractors, initExtractors } from "@differens/tiers";
 import { WORKER_FLAG, runWorker } from "./pool";
 import { report } from "./report";
+
+/**
+ * Read from package.json rather than a literal, so `--version` cannot drift
+ * from what was published. `../package.json` resolves the same from source,
+ * from dist/ and from an installed node_modules copy.
+ */
+function version(): string {
+  try {
+    return (createRequire(import.meta.url)("../package.json") as { version: string }).version;
+  } catch {
+    return "unknown";
+  }
+}
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -61,7 +75,7 @@ async function main(): Promise<void> {
       break;
     case "--version":
     case "-v":
-      console.log("differens v0.1.0");
+      console.log(`differens v${version()}`);
       break;
     default:
       // Anything else is treated as diff inputs:

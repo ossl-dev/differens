@@ -9,9 +9,9 @@
  * @packageDocumentation
  */
 
-import { readdir } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
-import { $ } from "bun";
 
 /**
  * Files above this are not worth parsing into a tree: they are generated
@@ -47,11 +47,36 @@ export interface GitDiffInput {
   newSource: string;
 }
 
+/**
+ * Run git and collect stdout as bytes.
+ *
+ * Bytes, not a string: `cat-file --batch` frames its records by byte length,
+ * so decoding before the framing is parsed would shift every offset the
+ * moment a file contains a multi-byte character. Rejects on a non-zero exit,
+ * which is how the callers below tell "no such ref" from an empty result.
+ */
+function git(args: string[], input?: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("git", args, {
+      stdio: [input === undefined ? "ignore" : "pipe", "pipe", "ignore"],
+    });
+    const chunks: Buffer[] = [];
+    child.stdout!.on("data", (chunk: Buffer) => chunks.push(chunk));
+    child.on("error", reject);
+    child.on("close", (code) =>
+      code === 0
+        ? resolve(Buffer.concat(chunks))
+        : reject(new Error(`git ${args[0]} exited ${code}`)),
+    );
+    if (input !== undefined) child.stdin?.end(input);
+  });
+}
+
 /** Check if we're in a git repository */
 export async function isGitRepo(): Promise<boolean> {
   try {
-    const result = await $`git rev-parse --git-dir`.quiet();
-    return result.exitCode === 0;
+    await git(["rev-parse", "--git-dir"]);
+    return true;
   } catch {
     return false;
   }
@@ -60,8 +85,7 @@ export async function isGitRepo(): Promise<boolean> {
 /** Resolve a ref to a commit SHA, or null if it is not a valid git ref */
 export async function resolveRef(ref: string): Promise<string | null> {
   try {
-    const result = await $`git rev-parse --verify ${ref}`.quiet();
-    return result.exitCode === 0 ? result.stdout.toString().trim() : null;
+    return (await git(["rev-parse", "--verify", ref])).toString().trim();
   } catch {
     return null;
   }
@@ -70,8 +94,7 @@ export async function resolveRef(ref: string): Promise<string | null> {
 /** Get list of changed files in working tree vs HEAD */
 export async function getChangedFiles(): Promise<string[]> {
   try {
-    const result = await $`git diff HEAD --name-only`.quiet();
-    const stdout = result.stdout.toString();
+    const stdout = (await git(["diff", "HEAD", "--name-only"])).toString();
     return stdout.trim().split("\n").filter(Boolean);
   } catch {
     return [];
@@ -81,8 +104,7 @@ export async function getChangedFiles(): Promise<string[]> {
 /** Get file content at HEAD (or empty string if new file) */
 export async function getHeadContent(filePath: string): Promise<string> {
   try {
-    const result = await $`git show HEAD:${filePath}`.quiet();
-    return result.stdout.toString();
+    return (await git(["show", `HEAD:${filePath}`])).toString();
   } catch {
     return ""; // New file  --  no content in HEAD
   }
@@ -91,7 +113,7 @@ export async function getHeadContent(filePath: string): Promise<string> {
 /** Get working tree file content */
 export async function getWorkingTreeContent(filePath: string): Promise<string> {
   try {
-    return await Bun.file(filePath).text();
+    return await readFile(filePath, "utf8");
   } catch {
     return "";
   }
@@ -108,14 +130,7 @@ export async function getWorkingTreeContent(filePath: string): Promise<string> {
 async function readBlobs(specs: string[]): Promise<string[]> {
   if (specs.length === 0) return [];
 
-  const proc = Bun.spawn(["git", "cat-file", "--batch"], {
-    stdin: new Blob([`${specs.join("\n")}\n`]),
-    stdout: "pipe",
-    stderr: "ignore",
-  });
-  const out = new Uint8Array(await new Response(proc.stdout).arrayBuffer());
-  await proc.exited;
-
+  const out = await git(["cat-file", "--batch"], `${specs.join("\n")}\n`);
   const decoder = new TextDecoder();
   const results: string[] = [];
   let pos = 0;
@@ -176,8 +191,8 @@ export async function diffCommitRange(range: string): Promise<GitDiffInput[]> {
   try {
     // -z keeps paths with spaces, quotes or non-ASCII bytes intact; the
     // default output quotes and escapes them, which then fails to resolve.
-    const nameResult = await $`git diff --name-only -z ${oldRef} ${newRef}`.quiet();
-    const files = nameResult.stdout.toString().split("\0").filter(Boolean);
+    const nameResult = await git(["diff", "--name-only", "-z", oldRef, newRef]);
+    const files = nameResult.toString().split("\0").filter(Boolean);
     if (files.length === 0) return [];
 
     const [oldSources, newSources] = await Promise.all([
@@ -236,13 +251,13 @@ export async function installGitDriver(): Promise<void> {
   }
 
   try {
-    await $`git config diff.differens.textconv bun differens diff --textconv`.quiet();
+    await git(["config", "diff.differens.textconv", "differens diff --textconv"]);
   } catch {
     // Already configured  --  that's fine
   }
 
   try {
-    await $`git config diff.differens.cachetextconv true`.quiet();
+    await git(["config", "diff.differens.cachetextconv", "true"]);
   } catch {
     // Already configured
   }
@@ -251,7 +266,7 @@ export async function installGitDriver(): Promise<void> {
 /** Is this path a directory? Used to route `differens old/ new/`. */
 export async function isDirectory(path: string): Promise<boolean> {
   try {
-    return (await Bun.file(path).stat()).isDirectory();
+    return (await stat(path)).isDirectory();
   } catch {
     return false;
   }
@@ -296,8 +311,8 @@ export async function diffDirectories(oldDir: string, newDir: string): Promise<G
 
 async function readCapped(path: string): Promise<string> {
   try {
-    const file = Bun.file(path);
-    return file.size > MAX_DIFF_BYTES ? "" : await file.text();
+    const { size } = await stat(path);
+    return size > MAX_DIFF_BYTES ? "" : await readFile(path, "utf8");
   } catch {
     return "";
   }
@@ -309,13 +324,13 @@ export async function readFilePair(oldPath: string, newPath: string): Promise<Gi
   let newSource = "";
 
   try {
-    oldSource = await Bun.file(oldPath).text();
+    oldSource = await readFile(oldPath, "utf8");
   } catch {
     throw new Error(`cannot read file: ${oldPath}`);
   }
 
   try {
-    newSource = await Bun.file(newPath).text();
+    newSource = await readFile(newPath, "utf8");
   } catch {
     throw new Error(`cannot read file: ${newPath}`);
   }
