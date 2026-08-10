@@ -13,19 +13,22 @@
 
 import { createRequire } from "node:module";
 import {
+  DRIVER_FLAG,
   diffCommitRange,
   diffDirectories,
+  diffDriverCommand,
   diffWorkingTree,
+  generateGitAttributes,
   installGitDriver,
   isDirectory,
   isGitRepo,
   readFilePair,
   resolveRef,
-} from "@differens/git";
-import { formatChanges, narrate } from "@differens/narrate";
-import type { OutputFormat } from "@differens/narrate";
-import { diffWithTier, getExtractors, initExtractors } from "@differens/tiers";
-import { WORKER_FLAG, runWorker } from "./pool";
+} from "@ossl/differens-git";
+import { formatChanges, narrate } from "@ossl/differens-narrate";
+import type { OutputFormat } from "@ossl/differens-narrate";
+import { diffWithTier, getExtractors, initExtractors } from "@ossl/differens-tiers";
+import { WORKER_FLAG, runWorker, selfInvocation } from "./pool";
 import { report } from "./report";
 
 /**
@@ -47,6 +50,12 @@ async function main(): Promise<void> {
   // Internal: this process was spawned by a parent CLI to diff a slice of files.
   if (args[0] === WORKER_FLAG) {
     await runWorker();
+    return;
+  }
+
+  // Internal: git invoked us as a registered diff driver.
+  if (args[0] === DRIVER_FLAG) {
+    await handleGitDriver(args.slice(1));
     return;
   }
 
@@ -159,6 +168,30 @@ async function handleFileDiff(
   console.log(formatChanges(changes, { format }));
 }
 
+/**
+ * Diff one file on git's behalf.
+ *
+ * Git calls a diff driver with `path old-file old-hex old-mode new-file
+ * new-hex new-mode`, where the two files are temporaries it wrote the blobs
+ * to. Those temporaries carry generated names, so the tier has to be picked
+ * from `path` -- classifying by the temp name would find no extension and
+ * line-diff every file the driver was ever registered for.
+ */
+async function handleGitDriver(argv: string[]): Promise<void> {
+  const [path, oldFile, , , newFile] = argv;
+  if (!path || !oldFile || !newFile) {
+    console.error(`usage: differens ${DRIVER_FLAG} <path> <old-file> <old-hex> <old-mode> ...`);
+    console.error("git supplies these; it is not meant to be run by hand");
+    process.exit(1);
+  }
+
+  // A side that does not exist is /dev/null, which reads as the empty string
+  // and lands on the whole-file add or removal path.
+  const pair = await readFilePair(oldFile, newFile);
+  const result = diffWithTier(pair.oldSource, pair.newSource, path, path);
+  console.log(formatChanges(narrate(result.changes, { filePath: path }), { format: "terminal" }));
+}
+
 async function handleLanguages(): Promise<void> {
   await initExtractors();
   const extractors = getExtractors();
@@ -172,13 +205,17 @@ async function handleLanguages(): Promise<void> {
 }
 
 async function handleInstallGitDriver(): Promise<void> {
-  await installGitDriver();
+  const [runtime, args] = selfInvocation(DRIVER_FLAG);
+  await installGitDriver(diffDriverCommand(runtime, args));
+
   console.log("git diff driver installed.");
   console.log("add to .gitattributes:");
-  console.log("  *.ts diff=differens");
-  console.log("  *.tsx diff=differens");
-  console.log("  *.js diff=differens");
-  console.log("  ...");
+  for (const line of generateGitAttributes(["ts", "tsx", "js", "jsx", "py", "rs", "go"]).split(
+    "\n",
+  )) {
+    console.log(`  ${line}`);
+  }
+  console.log("\nthen `git diff` narrates those files instead of printing hunks.");
 }
 
 function parseFormat(args: string[]): string {

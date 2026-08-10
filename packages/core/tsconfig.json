@@ -1,5 +1,5 @@
 {
-  "extends": "@differens/tsconfig/tsconfig.json",
+  "extends": "@ossl/differens-tsconfig/tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src"

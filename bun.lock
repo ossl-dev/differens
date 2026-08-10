@@ -15,7 +15,7 @@
       "name": "differens",
       "version": "0.1.0",
       "bin": {
-        "differens": "./dist/index.js",
+        "differens": "dist/index.js",
       },
       "dependencies": {
         "tree-sitter": "^0.25.1",
@@ -26,56 +26,56 @@
         "tree-sitter-typescript": "^0.23.2",
       },
       "devDependencies": {
-        "@differens/core": "workspace:*",
-        "@differens/correlate": "workspace:*",
-        "@differens/git": "workspace:*",
-        "@differens/narrate": "workspace:*",
-        "@differens/tiers": "workspace:*",
-        "@differens/tsconfig": "workspace:*",
+        "@ossl/differens-core": "workspace:*",
+        "@ossl/differens-correlate": "workspace:*",
+        "@ossl/differens-git": "workspace:*",
+        "@ossl/differens-narrate": "workspace:*",
+        "@ossl/differens-tiers": "workspace:*",
+        "@ossl/differens-tsconfig": "workspace:*",
       },
     },
     "packages/core": {
-      "name": "@differens/core",
+      "name": "@ossl/differens-core",
       "version": "0.1.0",
       "devDependencies": {
-        "@differens/tsconfig": "workspace:*",
+        "@ossl/differens-tsconfig": "workspace:*",
       },
     },
     "packages/correlate": {
-      "name": "@differens/correlate",
+      "name": "@ossl/differens-correlate",
       "version": "0.1.0",
       "dependencies": {
-        "@differens/core": "workspace:*",
+        "@ossl/differens-core": "workspace:*",
       },
       "devDependencies": {
-        "@differens/tsconfig": "workspace:*",
+        "@ossl/differens-tsconfig": "workspace:*",
       },
     },
     "packages/git": {
-      "name": "@differens/git",
+      "name": "@ossl/differens-git",
       "version": "0.1.0",
       "dependencies": {
-        "@differens/core": "workspace:*",
+        "@ossl/differens-core": "workspace:*",
       },
       "devDependencies": {
-        "@differens/tsconfig": "workspace:*",
+        "@ossl/differens-tsconfig": "workspace:*",
       },
     },
     "packages/narrate": {
-      "name": "@differens/narrate",
+      "name": "@ossl/differens-narrate",
       "version": "0.1.0",
       "dependencies": {
-        "@differens/core": "workspace:*",
+        "@ossl/differens-core": "workspace:*",
       },
       "devDependencies": {
-        "@differens/tsconfig": "workspace:*",
+        "@ossl/differens-tsconfig": "workspace:*",
       },
     },
     "packages/tiers": {
-      "name": "@differens/tiers",
+      "name": "@ossl/differens-tiers",
       "version": "0.1.0",
       "dependencies": {
-        "@differens/core": "workspace:*",
+        "@ossl/differens-core": "workspace:*",
         "tree-sitter": "^0.25.1",
         "tree-sitter-go": "^0.25.0",
         "tree-sitter-javascript": "^0.25.0",
@@ -84,11 +84,11 @@
         "tree-sitter-typescript": "^0.23.2",
       },
       "devDependencies": {
-        "@differens/tsconfig": "workspace:*",
+        "@ossl/differens-tsconfig": "workspace:*",
       },
     },
     "packages/tsconfig": {
-      "name": "@differens/tsconfig",
+      "name": "@ossl/differens-tsconfig",
       "version": "0.1.0",
     },
   },
@@ -111,17 +111,17 @@
 
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@1.9.4", "", { "os": "win32", "cpu": "x64" }, "sha512-8Y5wMhVIPaWe6jw2H+KlEm4wP/f7EW3810ZLmDlrEEy5KvBsb9ECEfu/kMWD484ijfQ8+nIi0giMgu9g1UAuuA=="],
 
-    "@differens/core": ["@differens/core@workspace:packages/core"],
+    "@ossl/differens-core": ["@ossl/differens-core@workspace:packages/core"],
 
-    "@differens/correlate": ["@differens/correlate@workspace:packages/correlate"],
+    "@ossl/differens-correlate": ["@ossl/differens-correlate@workspace:packages/correlate"],
 
-    "@differens/git": ["@differens/git@workspace:packages/git"],
+    "@ossl/differens-git": ["@ossl/differens-git@workspace:packages/git"],
 
-    "@differens/narrate": ["@differens/narrate@workspace:packages/narrate"],
+    "@ossl/differens-narrate": ["@ossl/differens-narrate@workspace:packages/narrate"],
 
-    "@differens/tiers": ["@differens/tiers@workspace:packages/tiers"],
+    "@ossl/differens-tiers": ["@ossl/differens-tiers@workspace:packages/tiers"],
 
-    "@differens/tsconfig": ["@differens/tsconfig@workspace:packages/tsconfig"],
+    "@ossl/differens-tsconfig": ["@ossl/differens-tsconfig@workspace:packages/tsconfig"],
 
     "@turbo/darwin-64": ["@turbo/darwin-64@2.10.9", "", { "os": "darwin", "cpu": "x64" }, "sha512-Jh+pTGXLNz8+1tkUU13TI/f+ZOI+OvC4YbHi1H+57iSpLt5DR3xgptd+4sA07RdjdRR/RX/01uQQu2OkbzIefA=="],
 

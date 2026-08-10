@@ -1,23 +1,49 @@
 {
-  "name": "@differens/correlate",
+  "name": "@ossl/differens-correlate",
   "version": "0.1.0",
-  "private": true,
+  "description": "Cross-file correlation for differens: finds the code that moved between two files",
+  "keywords": [
+    "diff",
+    "semantic-diff",
+    "code-motion",
+    "refactoring"
+  ],
+  "homepage": "https://github.com/ossl-dev/differens#readme",
+  "bugs": {
+    "url": "https://github.com/ossl-dev/differens/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ossl-dev/differens.git",
+    "directory": "packages/correlate"
+  },
+  "license": "MIT",
+  "author": "Mohammed Aman Khan",
   "type": "module",
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
   },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist",
+    "build": "bun build src/index.ts --outdir dist --target node --external '@ossl/*' --external 'tree-sitter*' && tsc --emitDeclarationOnly --declarationMap false && find dist -name '*.test.d.ts' -delete",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src/",
     "test": "bun test",
     "clean": "rm -rf dist/"
   },
   "dependencies": {
-    "@differens/core": "workspace:*"
+    "@ossl/differens-core": "workspace:*"
   },
   "devDependencies": {
-    "@differens/tsconfig": "workspace:*"
+    "@ossl/differens-tsconfig": "workspace:*"
   }
 }

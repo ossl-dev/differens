@@ -46,8 +46,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check src/",
     "test": "bun test",
-    "clean": "rm -rf dist/",
-    "release": "bun scripts/publish.ts"
+    "clean": "rm -rf dist/"
   },
   "dependencies": {
     "tree-sitter": "^0.25.1",
@@ -58,11 +57,11 @@
     "tree-sitter-typescript": "^0.23.2"
   },
   "devDependencies": {
-    "@differens/core": "workspace:*",
-    "@differens/correlate": "workspace:*",
-    "@differens/git": "workspace:*",
-    "@differens/narrate": "workspace:*",
-    "@differens/tiers": "workspace:*",
-    "@differens/tsconfig": "workspace:*"
+    "@ossl/differens-core": "workspace:*",
+    "@ossl/differens-correlate": "workspace:*",
+    "@ossl/differens-git": "workspace:*",
+    "@ossl/differens-narrate": "workspace:*",
+    "@ossl/differens-tiers": "workspace:*",
+    "@ossl/differens-tsconfig": "workspace:*"
   }
 }

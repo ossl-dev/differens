@@ -9,10 +9,10 @@
 
 import { spawn } from "node:child_process";
 import { availableParallelism } from "node:os";
-import type { EditAction } from "@differens/core";
-import type { GitDiffInput as FilePair } from "@differens/git";
-import { narrate } from "@differens/narrate";
-import { diffWithTier, isParseable } from "@differens/tiers";
+import type { EditAction } from "@ossl/differens-core";
+import type { GitDiffInput as FilePair } from "@ossl/differens-git";
+import { narrate } from "@ossl/differens-narrate";
+import { diffWithTier, isParseable } from "@ossl/differens-tiers";
 
 export const WORKER_FLAG = "--diff-worker";
 
@@ -41,23 +41,27 @@ export function diffInline(pair: FilePair): FileDiff {
 }
 
 /**
- * Argv that re-invokes this CLI in worker mode.
+ * Command line that re-invokes this CLI with `flag`.
  *
  * A compiled single-file executable IS the CLI, so it re-execs itself; run as
  * a script, the runtime needs the entry passed along. A compiled bun binary
  * reports its entry under the virtual /$bunfs/ root, which is how the two are
  * told apart.
+ *
+ * The worker pool spawns this directly. The git diff driver renders it into a
+ * shell command string for `git config` instead, which is why the runtime and
+ * its arguments come back separated rather than pre-joined.
  */
-function workerArgv(): [string, string[]] {
+export function selfInvocation(flag: string): [string, string[]] {
   const entry = process.argv[1] ?? "";
   const compiled = entry.startsWith("/$bunfs/") || entry.includes("~BUN");
-  return [process.execPath, compiled ? [WORKER_FLAG] : [entry, WORKER_FLAG]];
+  return [process.execPath, compiled ? [flag] : [entry, flag]];
 }
 
 /** Run a worker child over `chunk`, resolving with what it wrote to stdout. */
 function runChild(chunk: WorkerJob[]): Promise<WorkerReply[]> {
   return new Promise((resolve, reject) => {
-    const [cmd, args] = workerArgv();
+    const [cmd, args] = selfInvocation(WORKER_FLAG);
     const child = spawn(cmd, args, {
       // Children share stderr, so let one voice speak for the pool.
       env: { ...process.env, DIFFERENS_QUIET: "1" },

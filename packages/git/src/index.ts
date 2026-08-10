@@ -241,25 +241,54 @@ export function generateGitAttributes(extensions: string[]): string {
 }
 
 /**
+ * The flag git appends its seven driver arguments to.
+ *
+ * `path old-file old-hex old-mode new-file new-hex new-mode`, the same shape
+ * GIT_EXTERNAL_DIFF uses.
+ */
+export const DRIVER_FLAG = "--git-diff-driver";
+
+/** Quote one argument for the shell git runs the driver command through. */
+function shellQuote(arg: string): string {
+  return /^[\w@%+=:,./-]+$/.test(arg) ? arg : `'${arg.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
+ * Render a runtime and its arguments into the command string `git config`
+ * wants. Git hands this to a shell, so a runtime living under a path with a
+ * space in it has to survive the round trip.
+ */
+export function diffDriverCommand(runtime: string, args: string[]): string {
+  return [runtime, ...args].map(shellQuote).join(" ");
+}
+
+/**
  * Install the differens git diff driver.
  * Adds config to the local git repo's .git/config.
+ *
+ * This registers `diff.differens.command`, which git invokes with both sides
+ * at once. It used to register a `textconv` instead, pointing at a
+ * `--textconv` mode the CLI never implemented: textconv converts one file to
+ * text and lets git line-diff the results, which is the opposite of what a
+ * semantic diff engine does, and there is no single-file rendering of a source
+ * file that would make it work.
  */
-export async function installGitDriver(): Promise<void> {
+export async function installGitDriver(command: string): Promise<void> {
   const inRepo = await isGitRepo();
   if (!inRepo) {
     throw new Error("not in a git repository  --  run this from inside a git repo");
   }
 
-  try {
-    await git(["config", "diff.differens.textconv", "differens diff --textconv"]);
-  } catch {
-    // Already configured  --  that's fine
-  }
+  await git(["config", "diff.differens.command", command]);
 
-  try {
-    await git(["config", "diff.differens.cachetextconv", "true"]);
-  } catch {
-    // Already configured
+  // Clear what older versions wrote. Left in place it is dead config naming a
+  // mode that does not exist, and `git config --get-all` would show both.
+  for (const key of ["diff.differens.textconv", "diff.differens.cachetextconv"]) {
+    try {
+      await git(["config", "--unset-all", key]);
+    } catch {
+      // Not set  --  nothing to clear.
+    }
   }
 }
 

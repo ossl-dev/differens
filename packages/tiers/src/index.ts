@@ -3,13 +3,13 @@
  *
  * The content router picks a tier based on file extension and magic bytes,
  * then delegates to the appropriate adapter. Each adapter produces a Node
- * tree that feeds into @differens/core's matching algorithm.
+ * tree that feeds into @ossl/differens-core's matching algorithm.
  *
  * @packageDocumentation
  */
 
-import type { Node } from "@differens/core";
-import { createNode, diffTrees } from "@differens/core";
+import type { Node } from "@ossl/differens-core";
+import { createNode, diffTrees } from "@ossl/differens-core";
 import { isBinaryExtension } from "./binary";
 import { awaitGrammars, hasGrammar, listExtractors, parseCode } from "./code/index";
 import { parseData } from "./data";
@@ -113,7 +113,7 @@ export function classifyFile(filePath: string): FileInfo {
 }
 
 export interface TierDiffResult {
-  changes: import("@differens/core").EditAction[];
+  changes: import("@ossl/differens-core").EditAction[];
   fallback?: string;
   nodeCount: number;
   tier: Tier;

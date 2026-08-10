@@ -2,7 +2,7 @@
  * Differens core: semantic diff of two node trees.
  *
  * parse -> match (GumTree lineage) -> edit script with a minimal Move set.
- * Adapters in @differens/tiers turn source into Nodes and call diffTrees.
+ * Adapters in @ossl/differens-tiers turn source into Nodes and call diffTrees.
  */
 
 import type { EditAction, MatchOptions } from "./actions";

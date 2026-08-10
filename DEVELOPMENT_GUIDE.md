@@ -81,29 +81,47 @@ differens <inputs>
 
 ## Releasing
 
-The CLI goes out under two names, `differens` and `@ossl/differens-cli`, from
-one build. Bump the version in `apps/cli/package.json`, then:
+Seven packages go out: the five libraries, then the CLI under both
+`differens` and `@ossl/differens-cli` from one build. Bump the versions, then
+from the repo root:
 
 ```bash
-cd apps/cli && bun run release -- --otp=123456
+bun run release -- --dry-run
 ```
 
-Everything after `--` goes through to `npm publish`, which is how the one-time
-code from your authenticator gets in; a single code covers both publishes.
-Drop the flag if your token has 2FA bypass. Pass `--dry-run` first.
+```bash
+bun run release
+```
 
-`scripts/publish.ts` builds once and stages each publish into a temp directory,
-so the repo manifest is never rewritten mid-release and the staged one can drop
-the bundled `workspace:*` devDependencies.
+Everything after `--` goes through to `npm publish`, so `--otp=123456` is how a
+one-time code gets in if the account has 2FA on. Publishing runs in dependency
+order, which matters: `tiers` names `core` as a real dependency, so `core` has
+to exist on the registry first.
 
-Two things the registry silently punishes, both already handled, both worth
-knowing before you touch that manifest:
+`scripts/publish.ts` builds once and stages each publish into a temp directory.
+The repo manifests are never rewritten, so an interrupted release cannot leave
+the workspace in a half-published shape. The staged manifest is where the
+differences live:
 
-- A `bin` path written as `./dist/index.js` is stripped on publish, and only on
-  publish -- `npm pack` keeps it, so a tarball can install and run perfectly
+- **`main` and `exports` are repointed at `dist`.** In the workspace they name
+  `src/index.ts`, so editing a package is felt by its dependents with no build
+  step. Consumers need built JS and the declarations beside it.
+- **`workspace:*` becomes a caret range** on the version being published in the
+  same run. The protocol means nothing to the registry, and left as written it
+  names packages that cannot be resolved.
+- **devDependencies and scripts are dropped.** Both are workspace-relative.
+
+Three things the registry punishes quietly:
+
+- A `bin` path written as `./dist/index.js` is stripped on publish, and *only*
+  on publish -- `npm pack` keeps it, so a tarball can install and run perfectly
   while the published package ships no command at all. Write it `dist/index.js`.
-- `workspace:*` survives into the published manifest verbatim, pointing at
-  packages that are bundled into `dist` and will never exist on the registry.
+- A library whose `dist` has no `index.d.ts` publishes happily and is untyped
+  for everyone downstream. The publish script throws instead.
+- The library builds pass `--external '@ossl/*'`, so a sibling stays an import
+  rather than being inlined. Without it each package would carry its own copy
+  of the core, and two `Node` types that are structurally identical but not the
+  same module stop being interchangeable.
 
 ## CLI usage
 

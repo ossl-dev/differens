@@ -2,12 +2,12 @@
  * Turning a set of file diffs into whatever the caller asked to read.
  */
 
-import type { SemanticChange } from "@differens/core";
-import { correlate } from "@differens/correlate";
-import type { FileChanges } from "@differens/correlate";
-import type { GitDiffInput as FilePair } from "@differens/git";
-import { formatChanges, humanizeKind, summarize } from "@differens/narrate";
-import type { OutputFormat } from "@differens/narrate";
+import type { SemanticChange } from "@ossl/differens-core";
+import { correlate } from "@ossl/differens-correlate";
+import type { FileChanges } from "@ossl/differens-correlate";
+import type { GitDiffInput as FilePair } from "@ossl/differens-git";
+import { formatChanges, humanizeKind, summarize } from "@ossl/differens-narrate";
+import type { OutputFormat } from "@ossl/differens-narrate";
 import { diffWithWorkers } from "./pool";
 
 /**

@@ -47,6 +47,43 @@ The same build is published under the ossl scope as
 Identical package, identical `differens` command; install whichever name you
 prefer, not both.
 
+## Use it as a library
+
+The engine is published in pieces, so you can take the matching core without
+the tree-sitter grammars, or the narration without git.
+
+| Package | What it gives you |
+|---|---|
+| [`@ossl/differens-core`](https://www.npmjs.com/package/@ossl/differens-core) | `diffTrees`, the node model, typed edit scripts. No dependencies. |
+| [`@ossl/differens-tiers`](https://www.npmjs.com/package/@ossl/differens-tiers) | Turns source, config and markup into trees the core can match. Brings the grammars. |
+| [`@ossl/differens-narrate`](https://www.npmjs.com/package/@ossl/differens-narrate) | Edit script to sentences, markdown, JSON, or the compact model format. |
+| [`@ossl/differens-git`](https://www.npmjs.com/package/@ossl/differens-git) | Working tree, commit range and directory diffs; the diff driver. |
+| [`@ossl/differens-correlate`](https://www.npmjs.com/package/@ossl/differens-correlate) | Finds code that moved between files. |
+
+```ts
+import { diffTrees, treeFromValue } from "@ossl/differens-core";
+
+const before = treeFromValue({ retries: 3, host: "a.example" });
+const after = treeFromValue({ retries: 5, host: "a.example" });
+
+diffTrees(before, after).changes;
+// [{ type: "Update", node: { kind: "leaf", label: "retries", ... },
+//    detail: { kind: "ValueChanged", from: "3", to: "5" } }]
+```
+
+Diffing files rather than values means going through the tier router, which
+picks a parser from the path:
+
+```ts
+import { diffWithTier } from "@ossl/differens-tiers";
+import { formatChanges, narrate } from "@ossl/differens-narrate";
+
+const { changes } = diffWithTier(oldSource, newSource, "src/app.ts", "src/app.ts");
+console.log(formatChanges(narrate(changes), { format: "llm" }));
+```
+
+ESM only, types included.
+
 <details>
 <summary>From source, or as a standalone executable</summary>
 
@@ -131,7 +168,7 @@ differens/
 │   ├── tiers/        # format adapters: markup, data, code, prose, composite
 │   ├── correlate/    # cross-file move and rename detection
 │   ├── narrate/      # template engine: edit script -> English, output formats
-│   ├── git/          # git integration: difftool, diff driver, directory walk
+│   ├── git/          # git integration: diff driver, ranges, directory walk
 │   └── tsconfig/     # shared TypeScript config
 └── apps/
     └── cli/          # the differens command line tool

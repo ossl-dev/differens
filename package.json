@@ -15,7 +15,8 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "clean": "turbo run clean",
-    "format": "bunx biome format --write ."
+    "format": "bunx biome format --write .",
+    "release": "bun scripts/publish.ts"
   },
   "workspaces": [
     "apps/*",

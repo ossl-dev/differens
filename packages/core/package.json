@@ -1,20 +1,49 @@
 {
-  "name": "@differens/core",
+  "name": "@ossl/differens-core",
   "version": "0.1.0",
-  "private": true,
+  "description": "Semantic diff core: GumTree-lineage tree matching over postorder arrays, emitting typed edit scripts",
+  "keywords": [
+    "diff",
+    "semantic-diff",
+    "ast",
+    "ast-diff",
+    "gumtree",
+    "tree-diff",
+    "edit-script"
+  ],
+  "homepage": "https://github.com/ossl-dev/differens#readme",
+  "bugs": {
+    "url": "https://github.com/ossl-dev/differens/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ossl-dev/differens.git",
+    "directory": "packages/core"
+  },
+  "license": "MIT",
+  "author": "Mohammed Aman Khan",
   "type": "module",
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
   },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist",
+    "build": "bun build src/index.ts --outdir dist --target node --external '@ossl/*' --external 'tree-sitter*' && tsc --emitDeclarationOnly --declarationMap false && find dist -name '*.test.d.ts' -delete",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src/",
     "test": "bun test",
     "clean": "rm -rf dist/"
   },
   "devDependencies": {
-    "@differens/tsconfig": "workspace:*"
+    "@ossl/differens-tsconfig": "workspace:*"
   }
 }

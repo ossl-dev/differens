@@ -1,23 +1,50 @@
 {
-  "name": "@differens/git",
+  "name": "@ossl/differens-git",
   "version": "0.1.0",
-  "private": true,
+  "description": "Git integration for differens: working tree, commit range and directory diffs, and the diff driver",
+  "keywords": [
+    "diff",
+    "git",
+    "difftool",
+    "diff-driver",
+    "semantic-diff"
+  ],
+  "homepage": "https://github.com/ossl-dev/differens#readme",
+  "bugs": {
+    "url": "https://github.com/ossl-dev/differens/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ossl-dev/differens.git",
+    "directory": "packages/git"
+  },
+  "license": "MIT",
+  "author": "Mohammed Aman Khan",
   "type": "module",
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
   },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target node",
+    "build": "bun build src/index.ts --outdir dist --target node --external '@ossl/*' --external 'tree-sitter*' && tsc --emitDeclarationOnly --declarationMap false && find dist -name '*.test.d.ts' -delete",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src/",
     "test": "bun test",
     "clean": "rm -rf dist/"
   },
   "dependencies": {
-    "@differens/core": "workspace:*"
+    "@ossl/differens-core": "workspace:*"
   },
   "devDependencies": {
-    "@differens/tsconfig": "workspace:*"
+    "@ossl/differens-tsconfig": "workspace:*"
   }
 }

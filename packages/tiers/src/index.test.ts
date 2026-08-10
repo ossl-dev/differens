@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { Node } from "@differens/core";
+import type { Node } from "@ossl/differens-core";
 import { Tier, classifyFile, diffWithTier, parseData } from "./index";
 // parseMarkup / diffLines / diffWords are not re-exported from the
 // package index, so they are imported from their adapter modules.
