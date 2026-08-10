@@ -71,6 +71,11 @@ export function correlate(
 
   for (const fc of fileChanges) {
     for (const action of fc.actions) {
+      // Only named things are worth correlating. An anonymous fragment that
+      // happens to be structurally identical in two files is not a move any
+      // reader recognises -- "template_substitution moved from a.ts to b.ts"
+      // is noise -- and a cross-file move is always reported by name.
+      if (action.node.label === undefined) continue;
       if (action.type === "Delete") {
         deletions.push({ action, file: fc.filePath });
       } else if (action.type === "Insert") {
@@ -114,7 +119,14 @@ export function correlate(
         if (matchedInsertions.has(ins)) continue;
         if (del.file === ins.file) continue; // skip same-file
 
-        if (del.action.node.contentHash === ins.action.node.contentHash) {
+        // Identical value counts as exact too: a renamed file carries its
+        // path in the label, so its contentHash differs on both sides even
+        // when not one byte of the content changed.
+        const exact =
+          del.action.node.contentHash === ins.action.node.contentHash ||
+          (del.action.node.value !== undefined &&
+            del.action.node.value === ins.action.node.value);
+        if (exact) {
           moves.push({
             node: ins.action.node,
             fromFile: del.file,
