@@ -196,15 +196,25 @@ describe("formatChanges", () => {
       },
     ], { filePath: "src/client.ts" });
 
-    const output = formatChanges(changes, { format: "llm" });
-    const parsed = JSON.parse(output);
-    expect(parsed).toHaveLength(1);
-    expect(parsed[0]).toMatchObject({
-      file: "src/client.ts",
-      kind: "Variable",
-      name: "timeout",
-      action: "removed",
-      context: ["Function connect", "Class Client"],
-    });
+    const lines = formatChanges(changes, { format: "llm" }).split("\n");
+
+    expect(lines[0]).toBe("differens/1 1 files 1 changes 1 named");
+    expect(lines[1]).toBe("# src/client.ts");
+    expect(lines[2]).toBe("- variable timeout < function connect");
+  });
+
+  it("rolls unnamed changes up into a count instead of a line each", () => {
+    const changes = narrate([
+      { type: "Insert", context: [], node: createNode({ kind: "Comment", byteRange: [0, 1] }),
+        parent: createNode({ kind: "file", byteRange: [0, 1] }), position: 0 },
+      { type: "Insert", context: [], node: createNode({ kind: "Comment", byteRange: [0, 1] }),
+        parent: createNode({ kind: "file", byteRange: [0, 1] }), position: 1 },
+      { type: "Insert", context: [], node: createNode({ kind: "Function", label: "go", byteRange: [0, 1], line: 7 }),
+        parent: createNode({ kind: "file", byteRange: [0, 1] }), position: 2 },
+    ], { filePath: "a.ts" });
+
+    const lines = formatChanges(changes, { format: "llm" }).split("\n");
+    expect(lines[2]).toBe("+ function go :7");
+    expect(lines[3]).toBe("* 2 comments");
   });
 });

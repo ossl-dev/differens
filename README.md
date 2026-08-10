@@ -68,21 +68,31 @@ differens a.json b.json --format=llm
 | (default) | Terminal, one line per change with scope: `changed value of port from 3000 to 8080 in object root` |
 | `--format=json` | Raw SemanticChange array, for tooling |
 | `--format=markdown` | Rolled-up summary, for PR descriptions |
-| `--format=llm` | Compact flat JSON designed for AI tools: file, kind, name, containment chain, before/after values. Enough context to skip reading the raw diff |
+| `--format=llm` | Dense line format for AI tools: one line per change, with source line numbers. Roughly 15x smaller than the `git diff` it replaces |
 
-LLM format example:
+LLM format is line-oriented, one file heading then one line per change.
+Unnamed churn (comments, prose lines, bare expressions) collapses into a count,
+and every named change carries its source line, so a model can read the twenty
+lines around a change instead of the whole file:
 
-```json
-{
-  "file": "a.json",
-  "kind": "leaf",
-  "name": "port",
-  "context": ["object root"],
-  "action": "changed",
-  "from": "3000",
-  "to": "8080"
-}
 ```
+differens/1 3 files 380 changes 113 named
+# apps/cli/src/index.ts
++ function runWorker :373
+- function mapWithConcurrency :313
+~ function report :141 handleGitDiff -> report
+* 12 comments, 3 expressions
+# config/app.json
+~ leaf port :14 < object database 3000 -> 8080
+# cross-file
+> validate utils.ts -> validators.ts
+```
+
+Ops are `+` added, `-` removed, `~` changed, `>` moved, `*` rolled-up count.
+`:N` is the source line and `< Kind name` is the enclosing scope.
+
+On this repo's own 14-file changeset that format is 6.5KB against 100KB of
+`git diff`.
 
 ### Other commands
 

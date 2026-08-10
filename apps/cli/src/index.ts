@@ -183,6 +183,22 @@ async function report(
     return;
   }
 
+  if (format === "llm") {
+    // Machine format: one self-contained document, no prose tail. It used to
+    // fall through and get a human summary appended, which left the JSON it
+    // emitted at the time unparseable.
+    const lines = [formatChanges(allNarratives, { format })];
+    if (crossFile.moves.length > 0) {
+      lines.push("# cross-file");
+      for (const move of crossFile.moves) {
+        const name = move.node.label ?? move.node.kind;
+        lines.push(`> ${name} ${move.fromFile} -> ${move.toFile}${move.modified ? " edited" : ""}`);
+      }
+    }
+    console.log(lines.join("\n"));
+    return;
+  }
+
   console.log(formatChanges(allNarratives, { format }));
 
   // Cross-file moves separately

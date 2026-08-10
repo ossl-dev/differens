@@ -75,6 +75,9 @@ export interface Node {
   value?: string;
   children: Node[];
   byteRange: ByteRange;
+  /** 1-based source line, when the adapter knows it. Lets a reader jump
+   *  straight to the change instead of scanning the file for it. */
+  line?: number;
   height: number;
   contentHash: number;
   structureHash: number;
@@ -87,6 +90,7 @@ export interface BuildNodeOptions {
   value?: string;
   children?: Node[];
   byteRange: ByteRange;
+  line?: number;
 }
 
 export function createNode(opts: BuildNodeOptions): Node {
@@ -126,7 +130,7 @@ export function createNode(opts: BuildNodeOptions): Node {
   const structureHash = fold(sA, sB);
 
   return { kind: opts.kind, label: opts.label, value: opts.value, children,
-           byteRange: opts.byteRange, height, contentHash, structureHash };
+           byteRange: opts.byteRange, line: opts.line, height, contentHash, structureHash };
 }
 
 // ---------- Edit actions ----------

@@ -144,6 +144,7 @@ function cstToNode(
     type: string;
     start: number;
     end: number;
+    line: number;
     depth: number;
     label?: string;
     kids: Node[];
@@ -170,6 +171,7 @@ function cstToNode(
       type,
       start: cursor.startIndex,
       end: cursor.endIndex,
+      line: cursor.startPosition.row + 1,
       depth: cursor.currentDepth,
       kids: [],
       needsFallback: extractor?.labelFallbackTypes?.has(type) ?? false,
@@ -190,6 +192,7 @@ function cstToNode(
       value: frame.kids.length === 0 ? source.slice(frame.start, frame.end) : undefined,
       children: frame.kids,
       byteRange: [frame.start, frame.end],
+      line: frame.line,
     });
     if (stack.length > 0) stack[stack.length - 1]!.kids.push(node);
     else result = node;
