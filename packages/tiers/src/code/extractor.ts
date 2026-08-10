@@ -24,6 +24,4 @@ export interface LanguageExtractor {
    * per-node cost to a set lookup instead of a childForFieldName call.
    */
   readonly labelFallbackTypes?: ReadonlySet<string>;
-  /** Whether child order matters for this node kind */
-  isOrdered(nodeKind: string): boolean;
 }

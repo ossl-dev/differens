@@ -15,8 +15,6 @@
 
 import type { EditAction, Node } from "@differens/core";
 
-// ---------- Types ----------
-
 export interface CrossFileMatch {
   /** The moved node */
   node: Node;
@@ -36,14 +34,10 @@ export interface CrossFileResult {
   genuineInserts: EditAction[];
 }
 
-// ---------- Per-file changeset ----------
-
 export interface FileChanges {
   filePath: string;
   actions: EditAction[];
 }
-
-// ---------- Options ----------
 
 export interface CorrelateOptions {
   /** Minimum similarity to consider as a move (default 0.6) */
@@ -53,8 +47,6 @@ export interface CorrelateOptions {
 const DEFAULT_CORRELATE_OPTIONS: CorrelateOptions = {
   renameSimilarityThreshold: 0.6,
 };
-
-// ---------- Main API ----------
 
 /**
  * Find cross-file moves across a set of per-file diffs.
@@ -182,8 +174,6 @@ export function correlate(
 
   return { moves, genuineDeletes, genuineInserts };
 }
-
-// ---------- Similarity ----------
 
 /**
  * Compute token-level Jaccard similarity between two nodes.

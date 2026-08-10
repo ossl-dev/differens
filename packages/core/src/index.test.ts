@@ -1,10 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import {
-  createNode,
-  diffTrees,
-  fastUnchanged,
-  treeFromValue,
-} from "./index";
+import { createNode, diffTrees, treeFromValue } from "./index";
 import type { EditAction, Node } from "./index";
 
 // ---------- Helpers ----------
@@ -26,28 +21,6 @@ function tree(kind: string, children: Node[], label?: string): Node {
     byteRange: [0, 100],
   });
 }
-
-// ---------- fastUnchanged ----------
-
-describe("fastUnchanged", () => {
-  it("returns true for identical buffers", () => {
-    const a = new Uint8Array([1, 2, 3]);
-    const b = new Uint8Array([1, 2, 3]);
-    expect(fastUnchanged(a, b)).toBe(true);
-  });
-
-  it("returns false for different content", () => {
-    const a = new Uint8Array([1, 2, 3]);
-    const b = new Uint8Array([1, 2, 4]);
-    expect(fastUnchanged(a, b)).toBe(false);
-  });
-
-  it("returns false for different lengths", () => {
-    const a = new Uint8Array([1, 2]);
-    const b = new Uint8Array([1, 2, 3]);
-    expect(fastUnchanged(a, b)).toBe(false);
-  });
-});
 
 // ---------- createNode / hashing ----------
 

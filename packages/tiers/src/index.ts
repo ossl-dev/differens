@@ -17,8 +17,6 @@ import { parseData } from "./data";
 import { parseCode, listExtractors, awaitGrammars, hasGrammar } from "./code/index";
 import { isBinaryExtension } from "./binary";
 
-// ---------- Tier enum ----------
-
 export enum Tier {
   Binary = 0,
   Raw = 1,
@@ -26,10 +24,7 @@ export enum Tier {
   Markup = 3,
   Data = 4,
   Code = 5,
-  Composite = 6,
 }
-
-// ---------- File classification ----------
 
 export interface FileInfo {
   path: string;
@@ -88,18 +83,6 @@ export function classifyFile(filePath: string): FileInfo {
   // Default: raw diff
   return { path: filePath, extension: ext, tier: Tier.Raw };
 }
-
-// ---------- Diff options ----------
-
-export interface TierDiffOptions {
-  oldSource: string;
-  newSource: string;
-  oldPath: string;
-  newPath: string;
-  language?: string;
-}
-
-// ---------- Main diff pipeline ----------
 
 export interface TierDiffResult {
   changes: import("@differens/core").EditAction[];
@@ -170,7 +153,6 @@ export function diffWithTier(
       result = attempt(() => diffProse(oldSource, newSource));
       break;
     case Tier.Code:
-    case Tier.Composite:
       result = attempt(() => diffCode(oldSource, newSource, info.extension));
       break;
   }
@@ -224,8 +206,6 @@ function hasNullByte(source: string): boolean {
   }
   return false;
 }
-
-// ---------- Tier implementations ----------
 
 function diffBinary(oldSource: string, newSource: string): TierDiffResult {
   return {
@@ -343,8 +323,6 @@ function diffCode(
   return { changes: result.changes, nodeCount: result.nodeCount, tier: Tier.Code, fallback: result.fallback };
 }
 
-// ---------- Markup node conversion ----------
-
 function markupToNodeTree(node: MarkupNode): Node {
   const children = node.children.map(markupToNodeTree);
   return createNode({
@@ -355,8 +333,6 @@ function markupToNodeTree(node: MarkupNode): Node {
     byteRange: [0, 0],
   });
 }
-
-// ---------- Public introspection API ----------
 
 export interface ExtractorInfo {
   language: string;

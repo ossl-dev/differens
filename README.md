@@ -11,9 +11,9 @@ Differens parses your code into trees, matches nodes between them, and tells you
 1. **Parse** both sides into a structured tree using tree-sitter
 2. **Match** nodes between trees with a top-down/bottom-up algorithm (GumTree lineage)
 3. **Emit** a typed edit script: Insert, Delete, Update, Move
-4. **Narrate** the edit script into readable output (templates by default, optional local LLM for summaries)
+4. **Narrate** the edit script into readable output
 
-The core is deterministic. Same inputs produce the same output every time. The optional AI layer adds narrative polish on top of the already-computed result -- turn it off and you lose nothing but prose style.
+The core is deterministic. Same inputs produce the same output every time. No model runs anywhere in the pipeline.
 
 ## What it handles
 
@@ -111,19 +111,15 @@ differens/
 │   ├── core/         # tree representation, matching algorithm, edit scripts
 │   ├── tiers/        # format adapters: markup, data, code, prose, composite
 │   ├── correlate/    # cross-file move and rename detection
-│   ├── narrate/      # template engine: edit script -> English
-│   ├── ai/           # optional local LLM for summaries (offline, opt-in)
-│   ├── git/          # git integration: difftool, diff driver
+│   ├── narrate/      # template engine: edit script -> English, output formats
+│   ├── git/          # git integration: difftool, diff driver, directory walk
 │   └── tsconfig/     # shared TypeScript config
-├── apps/
-│   ├── cli/          # the differens command line tool
-│   └── desktop/      # Tauri desktop app (post-v1)
-└── docs/
+└── apps/
+    └── cli/          # the differens command line tool
 ```
 
 ## Design principles
 
-- **Algorithm first, AI optional.** Turning AI off removes only narrative polish, never a feature.
 - **Deterministic core.** Same inputs, same output, every time. CI-safe by design.
 - **Graceful degradation.** Every tier falls back to the one below it. No hard failures.
 - **Git-aware, not git-dependent.** Everything works standalone; git is a convenience layer on top.
@@ -131,7 +127,12 @@ differens/
 
 ## Status
 
-Milestone 0 shipped: diff core with 64-bit hashing, JSON/YAML/TOML adapters, tree-sitter code adapter with TypeScript/Python/Rust/Go extractors, git integration (working tree, commit ranges, commit pairs), cross-file correlator, narration engine with scope context, LLM output format. 100+ tests, zero failures.
+Milestone 0 shipped: GumTree-lineage matching core (53-bit Merkle hashing, postorder
+index, Dice bottom-up, LIS-minimised moves), JSON/YAML/TOML adapters, tree-sitter code
+adapter with TypeScript/Python/Rust/Go extractors, git integration (working tree, commit
+ranges, commit pairs, batched blob reads), directory diffing, a cross-file correlator, and
+the narration engine with terminal/markdown/json/llm output. Per-file diffs run on a
+process pool. ~100 tests, zero failures.
 
 ## Prior art worth reading before contributing
 

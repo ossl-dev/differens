@@ -19,8 +19,6 @@ import { PythonExtractor } from "./python";
 import { RustExtractor } from "./rust";
 import { GoExtractor } from "./go";
 
-// ---------- Language registry ----------
-
 /**
  * Grammars load synchronously and on demand.
  *
@@ -121,8 +119,6 @@ function warnOnce(message: string): void {
   console.error(message);
 }
 
-// ---------- CST to Node conversion ----------
-
 /**
  * Convert a tree-sitter CST into our generic Node tree.
  *
@@ -221,8 +217,6 @@ function cstToNode(
 
   return result!;
 }
-
-// ---------- Public API ----------
 
 /** Does this extension have a working tree-sitter grammar? */
 export function hasGrammar(extension: string): boolean {

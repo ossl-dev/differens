@@ -87,9 +87,4 @@ export class GoExtractor implements LanguageExtractor {
     return undefined;
   }
 
-  isOrdered(nodeKind: string): boolean {
-    if (nodeKind === "Import") return false;
-    if (nodeKind === "Constant" || nodeKind === "Variable") return false;
-    return true;
-  }
 }

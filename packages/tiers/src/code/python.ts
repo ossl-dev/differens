@@ -89,8 +89,4 @@ export class PythonExtractor implements LanguageExtractor {
     return undefined;
   }
 
-  isOrdered(nodeKind: string): boolean {
-    if (nodeKind === "Import" || nodeKind === "Decorator") return false;
-    return true;
-  }
 }

@@ -13,8 +13,6 @@ import { readdir } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import { $ } from "bun";
 
-// ---------- Types ----------
-
 /**
  * Files above this are not worth parsing into a tree: they are generated
  * bundles, lockfiles or vendored blobs, and the tier ladder line-diffs them
@@ -38,8 +36,6 @@ export interface GitDiffInput {
   /** New file content */
   newSource: string;
 }
-
-// ---------- Git operations ----------
 
 /** Check if we're in a git repository */
 export async function isGitRepo(): Promise<boolean> {
@@ -216,8 +212,6 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-// ---------- Diff driver registration ----------
-
 /** Generate .gitattributes entry for the diff driver */
 export function generateGitAttributes(extensions: string[]): string {
   return extensions.map((ext) => `*.${ext} diff=differens`).join("\n");
@@ -245,8 +239,6 @@ export async function installGitDriver(): Promise<void> {
     // Already configured
   }
 }
-
-// ---------- Non-git mode ----------
 
 /** Is this path a directory? Used to route `differens old/ new/`. */
 export async function isDirectory(path: string): Promise<boolean> {

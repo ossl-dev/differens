@@ -109,10 +109,4 @@ export class TypeScriptExtractor implements LanguageExtractor {
     return undefined;
   }
 
-  isOrdered(nodeKind: string): boolean {
-    // Import and export order usually doesn't matter semantically
-    if (nodeKind === "Import" || nodeKind === "Export") return false;
-    // Most structural elements are ordered
-    return true;
-  }
 }

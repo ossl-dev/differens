@@ -10,19 +10,40 @@ export interface HunkDiff {
   newText?: string;
 }
 
-const MAX_LINES = 10_000;
+/** Bounds the LCS table at 2000x2000 Uint16 = 8MB after common lines are trimmed. */
+const MAX_LINES = 2_000;
 
 export function diffLines(oldText: string, newText: string): HunkDiff[] {
+  if (oldText === newText) return [];
+
   const oldLines = oldText.split("\n");
   const newLines = newText.split("\n");
 
-  if (oldLines.length > MAX_LINES || newLines.length > MAX_LINES) {
-    // ponytail: cap at 10k lines — beyond this, fall back to whole-file hash
-    if (oldText === newText) return [];
+  // Identical head and tail are the overwhelming majority of any real edit and
+  // contribute nothing to the LCS, so trim them before building the table.
+  // Without this, two 10k-line files differing by one line still allocated the
+  // full 10k x 10k table: 200MB.
+  let head = 0;
+  const shortest = Math.min(oldLines.length, newLines.length);
+  while (head < shortest && oldLines[head] === newLines[head]) head++;
+
+  let tail = 0;
+  while (
+    tail < shortest - head &&
+    oldLines[oldLines.length - 1 - tail] === newLines[newLines.length - 1 - tail]
+  ) {
+    tail++;
+  }
+
+  const oldMiddle = oldLines.slice(head, oldLines.length - tail);
+  const newMiddle = newLines.slice(head, newLines.length - tail);
+
+  // The table is O(n*m); past this the diff is not worth its memory.
+  if (oldMiddle.length > MAX_LINES || newMiddle.length > MAX_LINES) {
     return [{ type: "Update", text: newText, oldText, newText }];
   }
 
-  const diffs = lcsDiff(oldLines, newLines);
+  const diffs = lcsDiff(oldMiddle, newMiddle);
   return mergeHunks(diffs);
 }
 

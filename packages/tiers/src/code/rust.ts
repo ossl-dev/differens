@@ -105,8 +105,4 @@ export class RustExtractor implements LanguageExtractor {
     return undefined;
   }
 
-  isOrdered(nodeKind: string): boolean {
-    if (nodeKind === "Import" || nodeKind === "Attribute") return false;
-    return true;
-  }
 }

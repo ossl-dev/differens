@@ -329,3 +329,20 @@ describe("diffWithTier fallback behavior", () => {
     expect(result.changes.length).toBeGreaterThan(0);
   });
 });
+
+describe("diffLines on large inputs", () => {
+  const lines = (n: number, changed = -1) =>
+    Array.from({ length: n }, (_, i) => (i === changed ? "CHANGED" : `line ${i}`)).join("\n");
+
+  it("isolates one changed line in a 50k-line file", () => {
+    // The LCS table is O(n*m). Without trimming the identical head and tail
+    // this allocated 200MB, so the tier gave up and reported the whole file.
+    const diffs = diffLines(lines(50_000), lines(50_000, 25_000));
+    expect(diffs).toHaveLength(1);
+    expect(diffs[0]!.newText).toBe("CHANGED");
+  });
+
+  it("reports nothing for two identical large files", () => {
+    expect(diffLines(lines(50_000), lines(50_000))).toEqual([]);
+  });
+});

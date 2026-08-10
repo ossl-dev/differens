@@ -11,12 +11,9 @@
  *   differens install-git-driver    register as git diff driver
  */
 
-import { diffWithTier, getExtractors, initExtractors, isParseable } from "@differens/tiers";
-import type { EditAction } from "@differens/core";
-import { narrate, formatChanges, summarize } from "@differens/narrate";
+import { diffWithTier, getExtractors, initExtractors } from "@differens/tiers";
+import { narrate, formatChanges } from "@differens/narrate";
 import type { OutputFormat } from "@differens/narrate";
-import { correlate } from "@differens/correlate";
-import type { FileChanges } from "@differens/correlate";
 import {
   diffWorkingTree,
   diffCommitRange,
@@ -27,10 +24,8 @@ import {
   resolveRef,
   installGitDriver,
 } from "@differens/git";
-import type { GitDiffInput as FilePair } from "@differens/git";
-import type { SemanticChange } from "@differens/core";
-
-// ---------- CLI ----------
+import { runWorker, WORKER_FLAG } from "./pool";
+import { report } from "./report";
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -74,8 +69,6 @@ async function main(): Promise<void> {
       await handleDiff(args);
   }
 }
-
-// ---------- Diff handler ----------
 
 async function handleDiff(args: string[]): Promise<void> {
   // Strip format flags before dispatch
@@ -131,96 +124,6 @@ async function handleRangeDiff(range: string, format: OutputFormat): Promise<voi
   await report(await diffCommitRange(range), format, `nothing changed in range: ${range}`);
 }
 
-/**
- * Diff a set of file pairs and print the result.
- *
- * Shared by working-tree, commit-range and directory mode: they only differ
- * in how the pairs are collected, and cross-file move detection is worth
- * having in all three.
- */
-async function report(
-  filePairs: FilePair[],
-  format: OutputFormat,
-  emptyMessage: string,
-): Promise<void> {
-  if (filePairs.length === 0) {
-    console.log(emptyMessage);
-    return;
-  }
-
-  // Per-file diffs are independent and CPU-bound: run them on a worker
-  // pool sized to the core count so matching parallelizes across cores.
-  const results = await diffWithWorkers(filePairs);
-
-  const allNarratives: SemanticChange[] = results.flatMap((r) =>
-    r.descriptions.map((description, i) => ({
-      description,
-      filePath: r.filePath,
-      action: r.actions[i]!,
-    })),
-  );
-  const allFileChanges: FileChanges[] = results.map((r) => ({
-    filePath: r.filePath,
-    actions: r.actions,
-  }));
-
-  // Cross-file correlation
-  const crossFile = correlate(allFileChanges);
-
-  if (format === "json") {
-    // JSON: one document with everything
-    const output = {
-      perFile: allNarratives,
-      crossFileMoves: crossFile.moves.map((m) => ({
-        kind: m.node.kind,
-        name: m.node.label ?? "unnamed",
-        fromFile: m.fromFile,
-        toFile: m.toFile,
-        modified: m.modified,
-      })),
-    };
-    console.log(JSON.stringify(output, null, 2));
-    return;
-  }
-
-  if (format === "llm") {
-    // Machine format: one self-contained document, no prose tail. It used to
-    // fall through and get a human summary appended, which left the JSON it
-    // emitted at the time unparseable.
-    const lines = [formatChanges(allNarratives, { format })];
-    if (crossFile.moves.length > 0) {
-      lines.push("# cross-file");
-      for (const move of crossFile.moves) {
-        const name = move.node.label ?? move.node.kind;
-        lines.push(`> ${name} ${move.fromFile} -> ${move.toFile}${move.modified ? " edited" : ""}`);
-      }
-    }
-    console.log(lines.join("\n"));
-    return;
-  }
-
-  console.log(formatChanges(allNarratives, { format }));
-
-  // Cross-file moves separately
-  if (crossFile.moves.length > 0) {
-    console.log("\n  cross-file moves:");
-    for (const move of crossFile.moves) {
-      if (move.node.kind === "file") {
-        // A whole file matched on both sides: that is a rename, not a move
-        // of something out of one file and into another.
-        const verb = move.modified ? "renamed and edited" : "renamed";
-        console.log(`  → ${verb} file ${move.fromFile} to ${move.toFile}`);
-        continue;
-      }
-      const kind = move.node.kind.toLowerCase().replace(/([a-z])([A-Z])/g, "$1 $2");
-      const name = move.node.label ? ` \`${move.node.label}\`` : "";
-      console.log(`  → ${kind}${name} from ${move.fromFile} to ${move.toFile}`);
-    }
-  }
-
-  console.log(`\n${summarize(allNarratives)}`);
-}
-
 async function handleFileDiff(
   oldPath: string,
   newPath: string,
@@ -243,8 +146,6 @@ async function handleFileDiff(
   console.log(formatChanges(changes, { format }));
 }
 
-// ---------- Languages ----------
-
 async function handleLanguages(): Promise<void> {
   await initExtractors();
   const extractors = getExtractors();
@@ -257,8 +158,6 @@ async function handleLanguages(): Promise<void> {
   console.log("binary files: hash only (L0)");
 }
 
-// ---------- Install git driver ----------
-
 async function handleInstallGitDriver(): Promise<void> {
   await installGitDriver();
   console.log("git diff driver installed.");
@@ -267,132 +166,6 @@ async function handleInstallGitDriver(): Promise<void> {
   console.log("  *.tsx diff=differens");
   console.log("  *.js diff=differens");
   console.log("  ...");
-}
-
-// ---------- Helpers ----------
-
-interface FileDiff {
-  actions: EditAction[];
-  descriptions: string[];
-  filePath: string;
-}
-
-/**
- * Starting a child costs a process spawn plus a native grammar load. Below
- * this many files the pool loses to just doing the work here.
- */
-const WORKER_THRESHOLD = 24;
-
-/** Report an added file under the path it actually exists at. */
-function reportedPath(pair: FilePair): string {
-  return pair.oldSource === "" && pair.newSource !== "" ? pair.newPath : pair.oldPath;
-}
-
-function diffInline(pair: FilePair): FileDiff {
-  const result = diffWithTier(pair.oldSource, pair.newSource, pair.oldPath, pair.newPath);
-  const filePath = reportedPath(pair);
-  const changes = narrate(result.changes, { filePath });
-  return {
-    actions: changes.map((c) => c.action),
-    descriptions: changes.map((c) => c.description),
-    filePath,
-  };
-}
-
-/**
- * Argv that re-invokes this CLI in worker mode.
- *
- * A compiled single-file executable IS the CLI, so it re-execs itself; from
- * source, bun needs the entry script passed along. `Bun.main` sits under the
- * virtual /$bunfs/ root when compiled, which is how the two are told apart.
- */
-function workerArgv(): string[] {
-  const compiled = Bun.main.startsWith("/$bunfs/") || Bun.main.includes("~BUN");
-  return compiled
-    ? [process.execPath, WORKER_FLAG]
-    : [process.execPath, Bun.main, WORKER_FLAG];
-}
-
-const WORKER_FLAG = "--diff-worker";
-
-/**
- * Diff file pairs across a pool of CPU child processes.
- *
- * Processes, not worker threads: the tree-sitter grammars are non
- * context-aware NAPI addons and abort the runtime ("NAPI FATAL ERROR:
- * napi_create_object") the moment one is loaded in a second thread of the
- * same process -- even a single worker. A thread pool here only appeared to
- * work while a grammar-loading race was quietly downgrading every worker to a
- * line diff. Separate address spaces are what makes parsing parallel.
- *
- * Files are dealt round-robin so a run of large files spreads across the pool
- * instead of landing in one chunk.
- */
-async function diffWithWorkers(filePairs: FilePair[]): Promise<FileDiff[]> {
-  const results = new Array<FileDiff | undefined>(filePairs.length);
-
-  // Only parsing is expensive enough to be worth a process pool. A changeset
-  // of files that will only ever be line-diffed (no grammar available, plain
-  // text, a compiled binary that cannot load native addons) finishes sooner
-  // here than it takes to start the children.
-  const parseable = filePairs.filter((p) => isParseable(p.oldPath)).length;
-
-  if (parseable >= WORKER_THRESHOLD) {
-    const poolSize = Math.max(2, Math.min(8, navigator.hardwareConcurrency ?? 4));
-    const chunks: WorkerJob[][] = Array.from({ length: poolSize }, () => []);
-    for (let i = 0; i < filePairs.length; i++) {
-      chunks[i % poolSize]!.push({ index: i, pair: filePairs[i]! });
-    }
-
-    const runs = chunks.map(async (chunk) => {
-      if (chunk.length === 0) return;
-      const child = Bun.spawn(workerArgv(), {
-        stdin: new Blob([JSON.stringify(chunk)]),
-        stdout: "pipe",
-        stderr: "inherit",
-        // Children share stderr, so let one voice speak for the pool.
-        env: { ...process.env, DIFFERENS_QUIET: "1" },
-      });
-      const replies = (await new Response(child.stdout).json()) as WorkerReply[];
-      for (const reply of replies) {
-        results[reply.index] = {
-          actions: reply.actions,
-          descriptions: reply.descriptions,
-          filePath: reply.filePath,
-        };
-      }
-    });
-
-    // A child that dies leaves its slice empty; the inline pass below covers
-    // it rather than dropping those files from the report.
-    for (const outcome of await Promise.allSettled(runs)) {
-      if (outcome.status === "rejected") {
-        console.error("note: a diff worker failed, finishing on the main thread");
-      }
-    }
-  }
-
-  for (let i = 0; i < filePairs.length; i++) {
-    results[i] ??= diffInline(filePairs[i]!);
-  }
-  return results as FileDiff[];
-}
-
-interface WorkerJob {
-  index: number;
-  pair: FilePair;
-}
-
-type WorkerReply = FileDiff & { index: number };
-
-/** Worker mode: read a slice of jobs from stdin, write the diffs to stdout. */
-async function runWorker(): Promise<void> {
-  const jobs = (await Bun.stdin.json()) as WorkerJob[];
-  const replies: WorkerReply[] = jobs.map(({ index, pair }) => ({
-    index,
-    ...diffInline(pair),
-  }));
-  console.log(JSON.stringify(replies));
 }
 
 function parseFormat(args: string[]): string {
@@ -429,9 +202,8 @@ examples:
   differens diff --format=json`);
 }
 
-// ---------- Entry ----------
-
 main().catch((err) => {
   console.error("fatal:", err instanceof Error ? err.message : String(err));
   process.exit(1);
 });
+
