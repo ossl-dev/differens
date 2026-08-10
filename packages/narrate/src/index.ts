@@ -45,7 +45,23 @@ export interface NarrationOptions {
 }
 
 /**
+ * Nearest ancestor that has a name, e.g. { kind: "Class", label: "RetryPolicy" }.
+ * Lets narration say "removed function X from class Y".
+ */
+function nearestNamedAncestor(action: EditAction): { kind: string; label: string } | undefined {
+  for (const ctx of action.context) {
+    if (ctx.label && ctx.label !== "unnamed") {
+      return { kind: humanizeKind(ctx.kind), label: ctx.label };
+    }
+  }
+  return undefined;
+}
+
+/**
  * Convert a single EditAction to a human-readable description.
+ * Includes the containing scope when one exists:
+ * "removed function `parse` from class `Config`",
+ * "changed value of variable `port` in function `listen`".
  */
 export function narrateAction(
   action: EditAction,
@@ -53,34 +69,40 @@ export function narrateAction(
 ): string {
   const kind = humanizeKind(action.node.kind, opts.language);
   const name = action.node.label ?? "unnamed";
+  const scope = nearestNamedAncestor(action);
+  const scopePhrase = scope ? ` in ${scope.kind} \`${scope.label}\`` : "";
 
   switch (action.type) {
     case "Insert":
-      return `added ${kind} \`${name}\``;
+      return `added ${kind} \`${name}\`${scopePhrase}`;
 
     case "Delete":
-      return `removed ${kind} \`${name}\``;
+      return scope
+        ? `removed ${kind} \`${name}\` from ${scope.kind} \`${scope.label}\``
+        : `removed ${kind} \`${name}\``;
 
     case "Update":
       if (action.detail.kind === "Renamed") {
-        return `renamed ${kind} \`${action.detail.from}\` to \`${action.detail.to}\``;
+        return `renamed ${kind} \`${action.detail.from}\` to \`${action.detail.to}\`${scopePhrase}`;
       }
       if (action.detail.kind === "ValueChanged") {
-        if (action.detail.from && action.detail.to) {
-          return `changed ${kind} \`${name}\` from \`${action.detail.from}\` to \`${action.detail.to}\``;
+        if (action.detail.from !== undefined && action.detail.to !== undefined) {
+          return `changed value of ${kind} \`${name}\` from \`${action.detail.from}\` to \`${action.detail.to}\`${scopePhrase}`;
         }
-        return `changed ${kind} \`${name}\``;
+        if (action.detail.from !== undefined) {
+          return `removed value of ${kind} \`${name}\`${scopePhrase}`;
+        }
+        if (action.detail.to !== undefined) {
+          return `set value of ${kind} \`${name}\` to \`${action.detail.to}\`${scopePhrase}`;
+        }
       }
-      return `modified ${kind} \`${name}\``;
+      return `modified ${kind} \`${name}\`${scopePhrase}`;
 
     case "Move":
       if (action.fromParent.label && action.toParent.label) {
         return `moved ${kind} \`${name}\` from ${action.fromParent.label} to ${action.toParent.label}`;
       }
-      return `moved ${kind} \`${name}\` to position ${action.toPosition + 1}`;
-
-    default:
-      return `changed ${kind} \`${name}\``;
+      return `moved ${kind} \`${name}\` to position ${action.toPosition + 1}${scopePhrase}`;
   }
 }
 
@@ -129,7 +151,7 @@ export function summarize(
 
 // ---------- Output formatters ----------
 
-export type OutputFormat = "terminal" | "json" | "markdown";
+export type OutputFormat = "terminal" | "json" | "markdown" | "llm";
 
 export interface FormatterOptions {
   format: OutputFormat;
@@ -148,6 +170,9 @@ export function formatChanges(
       return JSON.stringify(changes, (_key, val) =>
         typeof val === "bigint" ? val.toString() : val, 2);
 
+    case "llm":
+      return formatForLlm(changes);
+
     case "markdown": {
       if (changes.length === 0) return "_no logical changes_";
       const header = opts.filePath ? `## ${opts.filePath}\n\n` : "## Changes\n\n";
@@ -161,6 +186,49 @@ export function formatChanges(
       return changes.map((c) => `  ${iconForAction(c.action)} ${c.description}`).join("\n");
     }
   }
+}
+
+/**
+ * Compact JSON designed for LLM consumption: one object per change,
+ * flat fields, no BigInt, no nested action objects. Includes the
+ * containment chain so a model gets full context without the raw diff.
+ */
+function formatForLlm(changes: SemanticChange[]): string {
+  const items = changes.map((c) => {
+    const a = c.action;
+    const base = {
+      file: c.filePath ?? null,
+      kind: a.node.kind,
+      name: a.node.label ?? null,
+      context: a.context.map((ctx) =>
+        ctx.label ? `${ctx.kind} ${ctx.label}` : ctx.kind,
+      ),
+    };
+    switch (a.type) {
+      case "Insert":
+        return { ...base, action: "added", parent: a.parent.kind };
+      case "Delete":
+        return { ...base, action: "removed" };
+      case "Update":
+        if (a.detail.kind === "Renamed") {
+          return { ...base, action: "renamed", from: a.detail.from, to: a.detail.to };
+        }
+        return {
+          ...base,
+          action: a.detail.from === undefined ? "set" : a.detail.to === undefined ? "unset" : "changed",
+          from: a.detail.from ?? null,
+          to: a.detail.to ?? null,
+        };
+      case "Move":
+        return {
+          ...base,
+          action: "moved",
+          fromParent: a.fromParent.label ?? a.fromParent.kind,
+          toParent: a.toParent.label ?? a.toParent.kind,
+        };
+    }
+  });
+  return JSON.stringify(items, null, 2);
 }
 
 function iconForAction(action: EditAction): string {

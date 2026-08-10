@@ -36,6 +36,16 @@ export async function isGitRepo(): Promise<boolean> {
   }
 }
 
+/** Resolve a ref to a commit SHA, or null if it is not a valid git ref */
+export async function resolveRef(ref: string): Promise<string | null> {
+  try {
+    const result = await $`git rev-parse --verify ${ref}`.quiet();
+    return result.exitCode === 0 ? result.stdout.toString().trim() : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Get list of changed files in working tree vs HEAD */
 export async function getChangedFiles(): Promise<string[]> {
   try {

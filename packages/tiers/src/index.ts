@@ -175,6 +175,7 @@ function diffBinary(oldSource: string, newSource: string): TierDiffResult {
   return {
     changes: [{
       type: "Update" as const,
+      context: [],
       node: createNode({ kind: "binary_file", byteRange: [0, oldSource.length] }),
       detail: {
         kind: "ValueChanged" as const,
@@ -200,6 +201,7 @@ function diffRaw(oldSource: string, newSource: string): TierDiffResult {
       if (d.type === "Insert") {
         return {
           type: "Insert" as const,
+          context: [],
           node,
           parent: createNode({ kind: "file", byteRange: [0, 0] }),
           position: i,
@@ -208,6 +210,7 @@ function diffRaw(oldSource: string, newSource: string): TierDiffResult {
       if (d.type === "Update") {
         return {
           type: "Update" as const,
+          context: [],
           node,
           detail: {
             kind: "ValueChanged" as const,
@@ -216,7 +219,7 @@ function diffRaw(oldSource: string, newSource: string): TierDiffResult {
           },
         };
       }
-      return { type: "Delete" as const, node };
+      return { type: "Delete" as const, context: [], node };
     }),
     nodeCount: diffs.length,
     tier: Tier.Raw,
@@ -236,6 +239,7 @@ function diffProse(oldSource: string, newSource: string): TierDiffResult {
       if (d.type === "Insert") {
         return {
           type: "Insert" as const,
+          context: [],
           node,
           parent: createNode({ kind: "paragraph", byteRange: [0, 0] }),
           position: i,
@@ -244,6 +248,7 @@ function diffProse(oldSource: string, newSource: string): TierDiffResult {
       if (d.type === "Update") {
         return {
           type: "Update" as const,
+          context: [],
           node,
           detail: {
             kind: "ValueChanged" as const,
@@ -252,7 +257,7 @@ function diffProse(oldSource: string, newSource: string): TierDiffResult {
           },
         };
       }
-      return { type: "Delete" as const, node };
+      return { type: "Delete" as const, context: [], node };
     }),
     nodeCount: wordDiffs.length,
     tier: Tier.Prose,

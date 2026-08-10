@@ -18,6 +18,7 @@ describe("narrateAction", () => {
   it("narrates Insert", () => {
     const action: EditAction = {
       type: "Insert",
+      context: [],
       node: TEST_NODE,
       parent: createNode({ kind: "file", byteRange: [0, 100] }),
       position: 0,
@@ -28,6 +29,7 @@ describe("narrateAction", () => {
   it("narrates Delete", () => {
     const action: EditAction = {
       type: "Delete",
+      context: [],
       node: createNode({ kind: "Class", label: "RetryPolicy", byteRange: [0, 30] }),
     };
     expect(narrateAction(action)).toBe("removed class `RetryPolicy`");
@@ -36,6 +38,7 @@ describe("narrateAction", () => {
   it("narrates Rename update", () => {
     const action: EditAction = {
       type: "Update",
+      context: [],
       node: createNode({ kind: "Function", label: "bar", byteRange: [0, 10] }),
       detail: { kind: "Renamed", from: "foo", to: "bar" },
     };
@@ -45,11 +48,12 @@ describe("narrateAction", () => {
   it("narrates ValueChanged update", () => {
     const action: EditAction = {
       type: "Update",
+      context: [],
       node: createNode({ kind: "ConfigKey", label: "host", byteRange: [0, 10] }),
       detail: { kind: "ValueChanged", from: "localhost", to: "0.0.0.0" },
     };
     expect(narrateAction(action))
-      .toBe("changed config key `host` from `localhost` to `0.0.0.0`");
+      .toBe("changed value of config key `host` from `localhost` to `0.0.0.0`");
   });
 
   it("narrates Move", () => {
@@ -57,6 +61,7 @@ describe("narrateAction", () => {
     const toParent = createNode({ kind: "file", label: "config.ts", byteRange: [0, 10] });
     const action: EditAction = {
       type: "Move",
+      context: [],
       node: TEST_NODE,
       fromParent,
       toParent,
@@ -66,12 +71,40 @@ describe("narrateAction", () => {
     expect(narrateAction(action))
       .toBe("moved function `parseConfig` from utils.ts to config.ts");
   });
+
+  it("includes the containing scope in narration", () => {
+    const action: EditAction = {
+      type: "Delete",
+      context: [
+        { kind: "Function", label: "connect" },
+        { kind: "Class", label: "Client" },
+      ],
+      node: createNode({ kind: "Variable", label: "timeout", byteRange: [0, 10] }),
+    };
+    expect(narrateAction(action))
+      .toBe("removed variable `timeout` from function `connect`");
+  });
+
+  it("uses nearest named ancestor for scope", () => {
+    const action: EditAction = {
+      type: "Update",
+      context: [
+        { kind: "Block", label: undefined },
+        { kind: "Class", label: "RetryPolicy" },
+      ],
+      node: createNode({ kind: "Function", label: "bar", byteRange: [0, 10] }),
+      detail: { kind: "Renamed", from: "foo", to: "bar" },
+    };
+    expect(narrateAction(action))
+      .toBe("renamed function `foo` to `bar` in class `RetryPolicy`");
+  });
 });
 
 describe("narrate", () => {
   it("converts actions to SemanticChange array", () => {
     const action: EditAction = {
       type: "Insert",
+      context: [],
       node: TEST_NODE,
       parent: createNode({ kind: "file", byteRange: [0, 10] }),
       position: 0,
@@ -92,12 +125,14 @@ describe("summarize", () => {
     const changes = narrate([
       {
         type: "Insert",
+      context: [],
         node: createNode({ kind: "Function", label: "a", byteRange: [0, 1] }),
         parent: createNode({ kind: "file", byteRange: [0, 1] }),
         position: 0,
       },
       {
         type: "Delete",
+      context: [],
         node: createNode({ kind: "Function", label: "b", byteRange: [0, 1] }),
       },
     ]);
@@ -111,6 +146,7 @@ describe("formatChanges", () => {
   it("formats terminal output", () => {
     const action: EditAction = {
       type: "Insert",
+      context: [],
       node: TEST_NODE,
       parent: createNode({ kind: "file", byteRange: [0, 10] }),
       position: 0,
@@ -124,6 +160,7 @@ describe("formatChanges", () => {
   it("formats JSON output", () => {
     const action: EditAction = {
       type: "Delete",
+      context: [],
       node: createNode({ kind: "Class", label: "Old", byteRange: [0, 5] }),
     };
     const changes = narrate([action]);
@@ -137,6 +174,7 @@ describe("formatChanges", () => {
     const changes = narrate([
       {
         type: "Update",
+      context: [],
         node: createNode({ kind: "Function", label: "foo", byteRange: [0, 1] }),
         detail: { kind: "Renamed", from: "foo", to: "bar" },
       },
@@ -144,5 +182,29 @@ describe("formatChanges", () => {
     const output = formatChanges(changes, { format: "markdown", filePath: "src/app.ts" });
     expect(output).toContain("## src/app.ts");
     expect(output).toContain("- renamed");
+  });
+
+  it("formats llm output with context chain", () => {
+    const changes = narrate([
+      {
+        type: "Delete",
+        context: [
+          { kind: "Function", label: "connect" },
+          { kind: "Class", label: "Client" },
+        ],
+        node: createNode({ kind: "Variable", label: "timeout", byteRange: [0, 10] }),
+      },
+    ], { filePath: "src/client.ts" });
+
+    const output = formatChanges(changes, { format: "llm" });
+    const parsed = JSON.parse(output);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toMatchObject({
+      file: "src/client.ts",
+      kind: "Variable",
+      name: "timeout",
+      action: "removed",
+      context: ["Function connect", "Class Client"],
+    });
   });
 });

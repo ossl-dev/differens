@@ -19,6 +19,7 @@ import {
   diffCommitRange,
   readFilePair,
   isGitRepo,
+  resolveRef,
   installGitDriver,
 } from "@differens/git";
 import type { SemanticChange } from "@differens/core";
@@ -73,9 +74,18 @@ async function handleDiff(args: string[]): Promise<void> {
   } else if (nonFlagArgs.length === 1 && nonFlagArgs[0]!.includes("..")) {
     await handleRangeDiff(nonFlagArgs[0]!, format);
   } else if (nonFlagArgs.length === 2) {
+    // git-diff style: two refs resolve to commits, otherwise two files
+    if (await isGitRepo()) {
+      const [oldRef, newRef] = nonFlagArgs as [string, string];
+      const [oldSha, newSha] = await Promise.all([resolveRef(oldRef), resolveRef(newRef)]);
+      if (oldSha && newSha) {
+        await handleRangeDiff(`${oldSha}..${newSha}`, format);
+        return;
+      }
+    }
     await handleFileDiff(nonFlagArgs[0]!, nonFlagArgs[1]!, format);
   } else {
-    console.error("usage: differens diff [<old> <new>] [--format=json|md]");
+    console.error("usage: differens diff [<old> <new>] [--format=json|md|llm]");
     process.exit(1);
   }
 }
@@ -131,7 +141,7 @@ async function handleGitDiff(format: string): Promise<void> {
   }
 
   // Terminal/markdown: per-file changes
-  console.log(formatChanges(allNarratives, { format: format as "terminal" | "json" | "markdown" }));
+  console.log(formatChanges(allNarratives, { format: format as "terminal" | "json" | "markdown" | "llm" }));
 
   // Cross-file moves separately
   if (crossFile.moves.length > 0) {
@@ -165,7 +175,7 @@ async function handleRangeDiff(range: string, format: string): Promise<void> {
     allNarratives.push(...narrate(result.changes, { filePath: pair.oldPath }));
   }
 
-  console.log(formatChanges(allNarratives, { format: format as "terminal" | "json" | "markdown" }));
+  console.log(formatChanges(allNarratives, { format: format as "terminal" | "json" | "markdown" | "llm" }));
 }
 
 async function handleFileDiff(
@@ -187,7 +197,7 @@ async function handleFileDiff(
   }
 
   const changes = narrate(result.changes, { filePath: pair.oldPath });
-  console.log(formatChanges(changes, { format: format as "terminal" | "json" | "markdown" }));
+  console.log(formatChanges(changes, { format: format as "terminal" | "json" | "markdown" | "llm" }));
 }
 
 // ---------- Languages ----------
@@ -224,6 +234,7 @@ function parseFormat(args: string[]): string {
     }
     if (arg === "--json" || arg === "-j") return "json";
     if (arg === "--markdown" || arg === "--md") return "markdown";
+    if (arg === "--llm" || arg === "-l") return "llm";
   }
   return "terminal";
 }
@@ -233,13 +244,13 @@ function printUsage(): void {
 
 usage:
   differens diff                      diff working tree vs HEAD
-  differens diff <old> <new>           diff two files
+  differens diff <old> <new>           diff two files, or two commits (git refs)
   differens diff main..feature         diff commit range
   differens languages                  list supported languages
   differens install-git-driver          register as git difftool
 
 options:
-  --format=json|markdown               output format (default: terminal)
+  --format=json|markdown|llm           output format (default: terminal)
   --help, -h                           show this help
   --version, -v                        show version number
 

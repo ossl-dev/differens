@@ -90,17 +90,20 @@ export interface InsertAction {
   node: Node;
   parent: Node;
   position: number;
+  context: NodeContext[];
 }
 
 export interface DeleteAction {
   type: "Delete";
   node: Node;
+  context: NodeContext[];
 }
 
 export interface UpdateAction {
   type: "Update";
   node: Node;
   detail: RenameDetail | ValueChangeDetail;
+  context: NodeContext[];
 }
 
 export interface MoveAction {
@@ -110,9 +113,20 @@ export interface MoveAction {
   toParent: Node;
   fromPosition: number;
   toPosition: number;
+  context: NodeContext[];
 }
 
 export type EditAction = InsertAction | DeleteAction | UpdateAction | MoveAction;
+
+/**
+ * One level of ancestry for a changed node, nearest first.
+ * Lets narration say "removed function X from class Y" and lets
+ * AI tooling consume the full containment chain without re-parsing.
+ */
+export interface NodeContext {
+  kind: string;
+  label?: string;
+}
 
 export interface RenameDetail {
   kind: "Renamed";
@@ -384,10 +398,17 @@ function walkAndDiff(
   const partner = state.oldToNew.get(oldNode);
 
   if (!partner) {
-    // Node was deleted
-    actions.push({ type: "Delete", node: oldNode });
+    // Deleted: context is the ancestry chain in the OLD tree
+    actions.push({
+      type: "Delete",
+      node: oldNode,
+      context: ancestryChain(oldNode, oldParents),
+    });
     return;
   }
+
+  // Context for surviving nodes comes from the NEW tree
+  const ctx = ancestryChain(partner, newParents);
 
   // Check for label changes (rename detection)
   if (oldNode.label !== partner.label) {
@@ -400,6 +421,7 @@ function walkAndDiff(
           from: oldNode.label,
           to: partner.label,
         },
+        context: ctx,
       });
     } else if (oldNode.label || partner.label) {
       // One side has label, other doesn't  --  still a meaningful change
@@ -411,6 +433,7 @@ function walkAndDiff(
           from: oldNode.label ?? "unnamed",
           to: partner.label ?? "unnamed",
         },
+        context: ctx,
       });
     }
   }
@@ -425,6 +448,7 @@ function walkAndDiff(
         from: oldNode.value,
         to: partner.value,
       },
+      context: ctx,
     });
   }
 
@@ -443,6 +467,7 @@ function walkAndDiff(
         toParent: newParent,
         fromPosition: oldParent.children.indexOf(oldNode),
         toPosition: newParent.children.indexOf(partner),
+        context: ctx,
       });
     } else {
       // Same parent but different position  --  reorder
@@ -456,6 +481,7 @@ function walkAndDiff(
           toParent: newParent,
           fromPosition: oldPos,
           toPosition: newPos,
+          context: ctx,
         });
       }
     }
@@ -465,6 +491,20 @@ function walkAndDiff(
   for (const child of oldNode.children) {
     walkAndDiff(child, state, actions, oldParents, newParents);
   }
+}
+
+/**
+ * Build the ancestry chain for a node, nearest ancestor first.
+ * Root is excluded (it's just the file wrapper).
+ */
+function ancestryChain(node: Node, parents: Map<Node, Node>): NodeContext[] {
+  const chain: NodeContext[] = [];
+  let current = parents.get(node);
+  while (current) {
+    chain.push({ kind: current.kind, label: current.label });
+    current = parents.get(current);
+  }
+  return chain;
 }
 
 // ---------- Main diff API ----------
@@ -526,7 +566,13 @@ export function diffTrees(
     const parent = newParents.get(node);
     if (parent) {
       const pos = parent.children.indexOf(node);
-      actions.push({ type: "Insert", node, parent, position: pos >= 0 ? pos : parent.children.length });
+      actions.push({
+        type: "Insert",
+        node,
+        parent,
+        position: pos >= 0 ? pos : parent.children.length,
+        context: ancestryChain(node, newParents),
+      });
     }
   }
 
