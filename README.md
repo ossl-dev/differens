@@ -27,17 +27,17 @@ The core is deterministic. Same inputs produce the same output every time. The o
 
 And when it can't parse something, it falls back gracefully. Unparseable code falls back to structural tree diff. That falls back to line diff. That falls back to "changed / unchanged." The tool never refuses to give you an answer.
 
-## Quick start
+## Install
 
 ```bash
-# Install
-bun install
-bun run build
+# Published on npm
+bun add -g @ossl/differens-cli
 
-# Run from source
+# Or from source
+bun install
 bun run apps/cli/src/index.ts <inputs>
 
-# Or build a standalone executable
+# Or a standalone executable, no dependencies
 bun build apps/cli/src/index.ts --compile --outfile differens
 ```
 
