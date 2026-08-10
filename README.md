@@ -30,21 +30,35 @@ And when it can't parse something, it falls back gracefully. Unparseable code fa
 ## Install
 
 ```bash
-# Published on npm
-bun add -g @ossl/differens-cli
+npm install -g differens
+```
 
-# Or from source
+Or run it without installing:
+
+```bash
+npx differens
+```
+
+Node 18.17 or newer. The tree-sitter grammars ship as prebuilt binaries for the
+common platforms, so there is nothing to compile.
+
+<details>
+<summary>From source, or as a standalone executable</summary>
+
+```bash
 bun install
 bun run apps/cli/src/index.ts <inputs>
 
-# Or a standalone executable, no dependencies
+# single-file executable
 bun build apps/cli/src/index.ts --compile --outfile differens
 ```
 
-The tree-sitter grammars are native addons and cannot be embedded in a
-`--compile`d executable, so a standalone binary line-diffs source files unless
-it is run from a directory where the grammars are installed. Use the npm
-install or run from source for semantic diffing.
+The grammars are native addons and cannot be embedded in a `--compile`d
+executable, so a standalone binary line-diffs source files unless it is run
+from a directory where the grammars are installed. Use the npm install for
+semantic diffing.
+
+</details>
 
 ## Usage
 
@@ -132,7 +146,8 @@ index, Dice bottom-up, LIS-minimised moves), JSON/YAML/TOML adapters, tree-sitte
 adapter with TypeScript/Python/Rust/Go extractors, git integration (working tree, commit
 ranges, commit pairs, batched blob reads), directory diffing, a cross-file correlator, and
 the narration engine with terminal/markdown/json/llm output. Per-file diffs run on a
-process pool. ~100 tests, zero failures.
+process pool. ~100 tests, zero failures. Published on npm as
+[`differens`](https://www.npmjs.com/package/differens), runs on Node.
 
 ## Prior art worth reading before contributing
 

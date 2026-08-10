@@ -62,7 +62,7 @@ bun run apps/cli/src/index.ts <inputs>
 **From the built bundle:** same code, just compiled.
 
 ```bash
-bun run build --filter=@ossl/differens-cli
+bun run build --filter=differens
 ./apps/cli/dist/index.js <inputs>
 ```
 
@@ -73,7 +73,7 @@ bun build ./apps/cli/src/index.ts --compile --outfile differens
 ./differens <inputs>
 ```
 
-**Published on npm:** `bun add -g @ossl/differens-cli`, then:
+**Published on npm:** `npm install -g differens`, then:
 
 ```bash
 differens <inputs>

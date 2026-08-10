@@ -1,27 +1,56 @@
 {
-  "name": "@ossl/differens-cli",
+  "name": "differens",
   "version": "0.1.0",
   "description": "Semantic diffing: what actually happened to your code, not which lines changed",
+  "keywords": [
+    "diff",
+    "semantic-diff",
+    "ast",
+    "ast-diff",
+    "tree-sitter",
+    "gumtree",
+    "git",
+    "difftool",
+    "code-review",
+    "llm",
+    "cli"
+  ],
+  "homepage": "https://github.com/ossl-dev/differens#readme",
+  "bugs": {
+    "url": "https://github.com/ossl-dev/differens/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ossl-dev/differens.git",
+    "directory": "apps/cli"
+  },
+  "license": "MIT",
+  "author": "Mohammed Aman Khan",
   "type": "module",
   "bin": {
     "differens": "./dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target bun --external tree-sitter --external 'tree-sitter-*' && chmod +x dist/index.js",
+    "build": "bun build src/index.ts --outdir dist --target node --external tree-sitter --external 'tree-sitter-*' && chmod +x dist/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src/",
     "test": "bun test",
-    "clean": "rm -rf dist/"
+    "clean": "rm -rf dist/",
+    "prepack": "cp ../../README.md ../../LICENSE .",
+    "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "@differens/core": "workspace:*",
-    "@differens/correlate": "workspace:*",
-    "@differens/git": "workspace:*",
-    "@differens/narrate": "workspace:*",
-    "@differens/tiers": "workspace:*",
     "tree-sitter": "^0.25.1",
     "tree-sitter-go": "^0.25.0",
     "tree-sitter-javascript": "^0.25.0",
@@ -30,6 +59,11 @@
     "tree-sitter-typescript": "^0.23.2"
   },
   "devDependencies": {
+    "@differens/core": "workspace:*",
+    "@differens/correlate": "workspace:*",
+    "@differens/git": "workspace:*",
+    "@differens/narrate": "workspace:*",
+    "@differens/tiers": "workspace:*",
     "@differens/tsconfig": "workspace:*"
   }
 }

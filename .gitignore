@@ -1,5 +1,10 @@
 node_modules/
 dist/
+
+# copied into the published package by apps/cli's prepack
+apps/cli/README.md
+apps/cli/LICENSE
+
 .turbo/
 *.log
 .DS_Store
