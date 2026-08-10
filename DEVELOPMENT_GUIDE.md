@@ -51,15 +51,53 @@ bun run build        # Build all packages
 bun run typecheck    # TypeScript check across all packages
 ```
 
-The CLI compiles to a standalone binary:
+## Running the CLI
+
+**From source (dev):** no build step needed, Bun runs TypeScript directly.
+
+```bash
+bun run apps/cli/src/index.ts <inputs>
+```
+
+**From the built bundle:** same code, just compiled.
+
+```bash
+bun run build --filter=@ossl/differens-cli
+./apps/cli/dist/index.js <inputs>
+```
+
+**Standalone executable:** single file with the Bun runtime embedded, no dependencies.
+
 ```bash
 bun build ./apps/cli/src/index.ts --compile --outfile differens
+./differens <inputs>
 ```
+
+**Published on npm:** `bun add -g @ossl/differens-cli`, then:
+
+```bash
+differens <inputs>
+```
+
+## CLI usage
+
+The CLI is the diff, no subcommand:
+
+```bash
+differens                        # diff working tree vs HEAD
+differens a.ts b.ts              # two files
+differens old/ new/              # two directories
+differens main..feature          # commit range
+differens 2a8178e 3a5015f        # two commits by id or branch
+differens a.json b.json --format=llm
+```
+
+Formats: terminal (default), `--format=json`, `--format=markdown`, `--format=llm` (compact JSON for AI tools with containment chains and before/after values).
 
 ## Tests
 
 ```bash
-bun run test         # 96 tests across 6 packages (zero failures)
+bun run test         # 100+ tests across 6 packages (zero failures)
 bun run lint         # Biome lint all packages
 bun run format       # Biome format all packages
 ```

@@ -12,14 +12,23 @@
       },
     },
     "apps/cli": {
-      "name": "@differens/cli",
+      "name": "@ossl/differens-cli",
       "version": "0.1.0",
+      "bin": {
+        "differens": "./dist/index.js",
+      },
       "dependencies": {
         "@differens/core": "workspace:*",
         "@differens/correlate": "workspace:*",
         "@differens/git": "workspace:*",
         "@differens/narrate": "workspace:*",
         "@differens/tiers": "workspace:*",
+        "tree-sitter": "^0.25.1",
+        "tree-sitter-go": "^0.25.0",
+        "tree-sitter-javascript": "^0.25.0",
+        "tree-sitter-python": "^0.25.0",
+        "tree-sitter-rust": "^0.24.0",
+        "tree-sitter-typescript": "^0.23.2",
       },
       "devDependencies": {
         "@differens/tsconfig": "workspace:*",
@@ -102,8 +111,6 @@
 
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@1.9.4", "", { "os": "win32", "cpu": "x64" }, "sha512-8Y5wMhVIPaWe6jw2H+KlEm4wP/f7EW3810ZLmDlrEEy5KvBsb9ECEfu/kMWD484ijfQ8+nIi0giMgu9g1UAuuA=="],
 
-    "@differens/cli": ["@differens/cli@workspace:apps/cli"],
-
     "@differens/core": ["@differens/core@workspace:packages/core"],
 
     "@differens/correlate": ["@differens/correlate@workspace:packages/correlate"],
@@ -115,6 +122,8 @@
     "@differens/tiers": ["@differens/tiers@workspace:packages/tiers"],
 
     "@differens/tsconfig": ["@differens/tsconfig@workspace:packages/tsconfig"],
+
+    "@ossl/differens-cli": ["@ossl/differens-cli@workspace:apps/cli"],
 
     "@turbo/darwin-64": ["@turbo/darwin-64@2.10.9", "", { "os": "darwin", "cpu": "x64" }, "sha512-Jh+pTGXLNz8+1tkUU13TI/f+ZOI+OvC4YbHi1H+57iSpLt5DR3xgptd+4sA07RdjdRR/RX/01uQQu2OkbzIefA=="],
 
