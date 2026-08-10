@@ -30,7 +30,8 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    printUsage();
+    // Bare invocation: diff working tree vs HEAD
+    await handleDiff([]);
     return;
   }
 
@@ -38,6 +39,7 @@ async function main(): Promise<void> {
 
   switch (command) {
     case "diff":
+      // Explicit alias, same as bare invocation
       await handleDiff(rest);
       break;
     case "languages":
@@ -55,9 +57,9 @@ async function main(): Promise<void> {
       console.log("differens v0.1.0");
       break;
     default:
-      console.error(`unknown command: ${command}`);
-      console.error("try: differens diff, differens languages, differens --help");
-      process.exit(1);
+      // Anything else is treated as diff inputs:
+      // differens a.ts b.ts, differens main..feature, differens <sha1> <sha2>
+      await handleDiff(args);
   }
 }
 
@@ -244,9 +246,9 @@ function printUsage(): void {
   console.log(`differens, a semantic diffing engine
 
 usage:
-  differens diff                      diff working tree vs HEAD
-  differens diff <old> <new>           diff two files, or two commits (git refs)
-  differens diff main..feature         diff commit range
+  differens                            diff working tree vs HEAD
+  differens <old> <new>                diff two files, or two commits (git refs)
+  differens main..feature              diff commit range
   differens languages                  list supported languages
   differens install-git-driver          register as git difftool
 
