@@ -85,6 +85,40 @@ function alreadyPublished(name: string, version: string): boolean {
 // resolved without asking the registry what exists.
 const versions = new Map(TARGETS.map((t) => [read(t.dir).name, read(t.dir).version]));
 
+/**
+ * Fail before building if the logged-in account cannot publish these names.
+ *
+ * Publishing a scoped package you have no rights to returns 404, not 403 --
+ * the registry will not confirm that a package it is hiding from you exists.
+ * So the natural reading ("my package is missing") is the wrong one, and the
+ * real answer, that this npm account is not in the org, is nowhere in the
+ * message. Ask up front instead.
+ */
+function preflight(): void {
+  const me = execFileSync("npm", ["whoami"], { encoding: "utf8" }).trim();
+  const scopes = new Set(
+    TARGETS.flatMap(({ dir, alsoAs }) => [read(dir).name, ...(alsoAs ?? [])])
+      .filter((name) => name.startsWith("@"))
+      .map((name) => name.slice(1, name.indexOf("/"))),
+  );
+
+  for (const scope of scopes) {
+    let role = "";
+    try {
+      role = execFileSync("npm", ["org", "ls", scope, me], { encoding: "utf8" }).trim();
+    } catch {
+      // Org missing, or invisible to this account -- same outcome either way.
+    }
+    if (role === "") {
+      throw new Error(
+        `npm user "${me}" is not a member of the "${scope}" org, so @${scope}/* cannot be published.\n` +
+          `Add them (\`npm org set ${scope} ${me} owner\`, run by an owner of the org) or log in as an account that is a member.`,
+      );
+    }
+  }
+}
+
+preflight();
 execFileSync("bun", ["run", "build"], { cwd: repoRoot, stdio: "inherit" });
 
 for (const { dir, alsoAs } of TARGETS) {
