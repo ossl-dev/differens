@@ -125,8 +125,6 @@ Pick an unchecked box, open an issue saying you're working on it, send a PR. One
 
 ## External recommendations assessment (2026-08-11)
 
-Reviewed 25 AI-generated recommendations against current roadmap. What aligns, what doesn't, what we add.
-
 **Already done / covered:**
 - #2 Subtree fingerprints → 64-bit FNV-1a Merkle-style hashing in core
 - #3 Multi-stage pipeline → Tier system (T0-T5) with graceful degradation
