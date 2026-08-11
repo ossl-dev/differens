@@ -56,10 +56,10 @@ pub struct Config {
 Running `differens old.rs new.rs`:
 
 ```
-renamed function parse_config to load_config
-  changed return type from Config to Result<Config, Error>
-  added error handling with map_err
-added field timeout_ms: u64 to struct Config
+  ~ renamed function `parse_config` to `load_config`
+  ~ changed value of return type from `Config` to `Result<Config, Error>`
+  + added field `timeout_ms` in struct `Config`
+3 modifications
 ```
 
 ### Known limitations

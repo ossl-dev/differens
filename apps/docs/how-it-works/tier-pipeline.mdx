@@ -15,11 +15,11 @@ Byte-level hash comparison. Used for images, fonts, archives, and anything else 
 
 ### T1: raw (LCS line diff)
 
-The safety net: a line-level longest-common-subsequence diff over the raw text. It is the fallback for every tier above it. It is capped at 10,000 lines. Beyond that, T1 hands off to T0's hash-only comparison instead of running an unbounded LCS.
+The safety net: a line-level longest-common-subsequence diff over the raw text. It is the fallback for every tier above it. It is capped at 2,000 lines. Beyond that, T1 returns a whole-file `Update` action instead of running an unbounded LCS.
 
 ### T2: prose (word-level)
 
-Word-level diff for plain text, Markdown, and logs. Paragraphs and sentences become tree nodes, so a moved paragraph is a `Move` instead of a delete-plus-insert. Punctuation and whitespace changes update leaf nodes rather than rewriting whole paragraphs.
+Word-level diff for plain text and logs. Paragraphs and sentences become tree nodes, so a moved paragraph is a `Move` instead of a delete-plus-insert. Punctuation and whitespace changes update leaf nodes rather than rewriting whole paragraphs.
 
 ### T3: markup (lenient HTML/XML)
 
@@ -41,15 +41,14 @@ The tiers form a chain. Each tier can hand off to the tier below it:
 
 1. **T5 parse fails** (syntax error, unsupported construct) → fall back to a generic tree-sitter CST diff, still structural.
 2. **Generic CST fails** (no tree-sitter grammar, garbage input) → T1 line diff.
-3. **T1 hits the 10k-line cap** → T0 hash-only comparison.
+3. **T1 hits the 2,000-line cap** → returns a whole-file `Update` action.
 
-The worst case is a byte-level comparison. It is less informative than a structural diff, but it still runs.
+The worst case for text is a line diff. It is less informative than a structural diff, but it still runs.
 
 ```mermaid
 flowchart TD
     A[Unparseable code] --> B[Generic tree-sitter CST diff]
     B --> C[LCS line diff T1]
-    C --> D[Byte-level hash T0]
 ```
 
 ## Classification rules
@@ -61,7 +60,8 @@ The content router classifies by extension, then by content sniff:
 | Binary sniff fails (NUL bytes, invalid UTF-8) | T0 |
 | `.png .jpg .gif .webp .pdf .zip .gz .tar` | T0 |
 | Everything else, default | T1 |
-| `.md .mdx .txt .log .rst` | T2 |
+| `.md .mdx .rst` | T1 |
+| `.txt .log` | T2 |
 | `.html .htm .xml .svg` | T3 |
 | `.json .jsonc .yaml .yml .toml` | T4 |
 | `.ts .tsx .js .jsx .mjs .cjs` | T5 |
@@ -76,8 +76,8 @@ Extension-based classification is the first cut; the content sniff is the backst
 | Tier | Handles | Fallback |
 | --- | --- | --- |
 | T0 | Binary files, hash-only comparison | (floor) |
-| T1 | Raw text, LCS line diff, 10k-line cap | T0 hash-only |
-| T2 | Prose, Markdown, logs, word-level diff | T1 line diff |
+| T1 | Raw text, LCS line diff, 2,000-line cap | Whole-file `Update` |
+| T2 | Prose (plain text, logs), word-level diff | T1 line diff |
 | T3 | HTML/XML, lenient tokenizer | T1 line diff |
 | T4 | JSON/YAML/TOML, key-path diff | T1 line diff |
 | T5 | Code, tree-sitter + semantic extractors | T1 line diff (or generic CST) |

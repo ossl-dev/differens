@@ -41,7 +41,7 @@ Schema notes:
 
 - `perFile` is an array of `SemanticChange` objects: `description`, `filePath`, and the full `action` (typed `EditAction`, containment `context` chain included, nearest ancestor first).
 - `crossFileMoves` is a flattened summary of kind, name, source, destination, and whether the node was edited in transit.
-- **BigInt-safe**: the serializer converts `bigint` values to strings before emitting. Downstream parsers never see `bigint` in hash fields.
+- Hash values are serialized as integers. The JSON replacer handles `bigint` as a precaution, though hashes currently fit in 53-bit safe integers.
 
 ## LLM
 
@@ -50,7 +50,7 @@ Schema notes:
 ```text
 differens/1 2 files 5 changes 4 named
 # src/checkout.ts
-~ function computeTotal :12 < class Checkout calculateTotalAmount -> computeTotal
+~ function computeTotal :12 < class Checkout computeTotal -> calculateTotalAmount
 + function applyDiscount :40
 # src/cart.ts
 * 2 comments

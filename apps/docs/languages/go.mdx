@@ -69,8 +69,9 @@ func validateEmail(email string) error {
 Running `differens old.go new.go`:
 
 ```
-method ValidateEmail: replaced body with call to validateEmail
-extracted function validateEmail from method ValidateEmail
+  ~ changed block from `if !strings.Contains(email, "@")…` to `return validateEmail(email)` in function `ValidateEmail`
+  + added function `validateEmail`
+2 modifications
 ```
 
 ### Known limitations

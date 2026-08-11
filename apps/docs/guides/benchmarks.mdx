@@ -14,7 +14,7 @@ Differens compares code structurally instead of line by line. Parsing and matchi
 | Small files (a few hundred lines) | ~1k nodes | Tree diff in well under a millisecond of matching; parse dominates |
 | Large files (a few thousand lines) | ~100k+ nodes | Matching is linear: 350k nodes in roughly 70 ms; parse and I/O dominate |
 | Monorepo changesets | Hundreds of files | Per-file diffs run on a worker pool sized to your core count; 200-file changesets add ~400 git spawns before any diffing unless blobs are batched (they are) |
-| Files over 2 MiB | n/a | Read, but not tree-parsed; the tier ladder line-diffs them |
+| Files over 2 MiB | n/a | Read as empty; whole-file additions or removals, not line-diffed |
 
 Matching is linear in node count: top-down anchors, bottom-up containers, leaf recovery. The worst-case bottom-up bound is quadratic in container pairs. That is why the engine has a `maxNodes` valve: trees above the limit fall back to a line diff instead of risking a slow match.
 

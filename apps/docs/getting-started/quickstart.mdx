@@ -44,12 +44,14 @@ npx differens before.ts after.ts
 ## Step 3: Read the output
 
 ```text
-rename: function `computeTotal` -> `calculateTotalAmount`
-insert: parameter `discount` in function `calculateTotalAmount`
-insert: statement `const base = ...` in function `calculateTotalAmount`
-update: return expression: `items.reduce(...)` -> `base - discount`
-match: export `TAX_RATE` (unchanged)
+  ~ renamed function `computeTotal` to `calculateTotalAmount`
+  - removed return from function `computeTotal`
+  + added return in function `calculateTotalAmount`
+  + added variable `base` in function `calculateTotalAmount`
+  + added required param in function `calculateTotalAmount`
 ```
+
+Each line is a typed edit action prefixed with an icon: `~` update, `+` insert, `-` delete. The function rename is one action, not a delete and an insert.
 
 Compare that to a line diff of the same change:
 
@@ -62,36 +64,56 @@ Compare that to a line diff of the same change:
   }
 ```
 
-The line diff reports the whole function as deleted and rewritten. Differens reports a rename, an added parameter, an added statement, an updated expression, and an unchanged `TAX_RATE`.
+The line diff says the whole function was deleted and rewritten. Differens says: the function was renamed, a parameter was added, a variable was added, and the return was replaced.
 
 <Info>
-Each action in the output is a typed edit: `rename`, `move`, `insert`, `delete`, `update`. The narration engine produces these from the Chawathe edit script computed by the matching core.
+Nodes that did not change (like `TAX_RATE`) produce no output. The diff core only emits actions for nodes that differ between the two trees.
 </Info>
 
 ## Step 4: Try JSON output
 
-Machine-readable output, one typed action per entry:
+Pass `--format=json` for machine-readable output:
 
 <CodeGroup>
 ```bash Command
 differens before.ts after.ts --format=json
 ```
 ```json Output
-{
-  "actions": [
-    { "kind": "rename", "node": "function", "from": "computeTotal", "to": "calculateTotalAmount" },
-    { "kind": "insert", "node": "parameter", "name": "discount" },
-    { "kind": "insert", "node": "statement", "detail": "const base = ..." },
-    { "kind": "update", "node": "return", "detail": "items.reduce(...) -> base - discount" }
-  ],
-  "files": ["before.ts", "after.ts"]
-}
+[
+  {
+    "type": "Update",
+    "node": { "kind": "Function", "label": "calculateTotalAmount" },
+    "detail": { "kind": "Renamed", "from": "computeTotal", "to": "calculateTotalAmount" },
+    "context": [
+      { "kind": "Export", "label": "" },
+      { "kind": "file", "label": "" }
+    ]
+  },
+  {
+    "type": "Delete",
+    "node": { "kind": "Return", "label": "" },
+    "context": [
+      { "kind": "Block", "label": "" },
+      { "kind": "Function", "label": "computeTotal" }
+    ]
+  },
+  {
+    "type": "Insert",
+    "node": { "kind": "Return", "label": "" },
+    "context": [
+      { "kind": "Block", "label": "" },
+      { "kind": "Function", "label": "calculateTotalAmount" }
+    ]
+  }
+]
 ```
 </CodeGroup>
 
+Each entry is one typed edit action: `Insert`, `Delete`, `Update`, or `Move`. The `context` field gives the containment chain (nearest ancestor first) so you can reconstruct where every change happened. See [Machine Outputs](/guides/machine-outputs) for the full schema and the compact `--format=llm` mode.
+
 ## Step 5: Diff a git working tree
 
-Run Differens inside a git repository. It diffs the working tree against `HEAD` and correlates moves across all changed files:
+Run `differens` with no arguments inside a git repository. It diffs the working tree against `HEAD`:
 
 <CodeGroup>
 ```bash Command
@@ -99,30 +121,51 @@ cd your-project
 differens
 ```
 ```text Output (excerpt)
-diff: src/utils.ts -> src/helpers/math.ts
-move: function `computeTotal` -> `calculateTotalAmount` (across files)
-insert: parameter `discount` in function `calculateTotalAmount`
+src/utils.ts
+  ~ renamed function `computeTotal` to `calculateTotalAmount`
+  + added variable `timeout` in module `utils`
+
+src/app.ts
+  ~ changed value of port from `3000` to `8080`
+
+  cross-file moves:
+  → function `formatPrice` from src/old/utils.ts to src/new/utils.ts
+
+3 modifications, 1 move
 ```
 </CodeGroup>
 
-You can also diff a commit range instead:
+You can also diff a commit range:
 
 ```bash
 differens main..feature
 ```
 
+Or two specific commits:
+
+```bash
+differens 8f3a1c2 5b0e9d7
+```
+
 ## Step 6: Diff two directories
 
-Compare two whole directories. Differens matches files across the trees and reports renames at the file level too:
+Compare two directories. Files present in both are diffed; files only on one side show as additions or removals:
 
 <CodeGroup>
 ```bash Command
 differens old/ new/
 ```
 ```text Output (excerpt)
-move: src/utils.ts -> src/helpers/math.ts
-rename: interface `CartItem` -> `LineItem` in src/models.ts
-match: 142 of 150 files unchanged
+src/utils.ts
+  ~ renamed function `parseConfig` to `loadConfig`
+
+src/models.ts
+  ~ renamed interface `CartItem` to `LineItem`
+
+  cross-file moves:
+  → renamed file src/helpers/math.ts to src/utils/math.ts
+
+146 modifications, 1 move
 ```
 </CodeGroup>
 

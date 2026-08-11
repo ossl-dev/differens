@@ -25,7 +25,7 @@ flowchart LR
 
 Structure buckets say shapes match. Content hashes say code matches. Within a structure bucket, nodes are compared by content hash: kind, label, value, and children. A function moved unchanged to another file matches on both hashes. The correlator emits a `Move` with source and destination file paths instead of a `Delete` plus an `Insert`.
 
-Content hashes also catch renames at a distance: a renamed function whose body is untouched has a different label but identical children, so its content hash still matches the original's body subtree.
+Jaccard similarity catches renames at a distance (stage 3).
 
 ## Stage 3: Jaccard similarity for modified moves
 

@@ -11,12 +11,12 @@ Most inputs diff quickly, but some are slow, and some edge cases produce results
 
 **Symptom:** Diffing a large tree or monorepo takes much longer than expected.
 
-**Cause:** Container matching at the bottom of the tree is O(n²) in the worst case. A 50,000-node safety valve (`maxNodes`) caps the tree size, so very large inputs are truncated rather than diffed exhaustively.
+**Cause:** Container matching at the bottom of the tree is O(n²) in the worst case. A 250,000-node safety valve (`maxNodes`) caps the tree size, so very large inputs are truncated rather than diffed exhaustively.
 
 **Workaround:** Check the file sizes involved, and diff specific files instead of whole directories. On a large repository, diffing one file is much faster than diffing a directory or the whole working tree.
 
 <Info>
-The 50k `maxNodes` limit is intentional, not a bug. It keeps diffs bounded on pathological inputs. Improvements to bottom-up container matching scaling are tracked in the roadmap.
+The 250k `maxNodes` limit is intentional, not a bug. It keeps diffs bounded on pathological inputs. Improvements to bottom-up container matching scaling are tracked in the roadmap.
 </Info>
 
 ## Deep nesting causes a crash
@@ -58,14 +58,6 @@ YAML with non-standard indentation (4 spaces, tabs) may parse with collapsed or 
 <Warning>
 Attribute values containing a bare `>` can confuse the markup tokenizer, producing truncated or malformed trees. Escape them as `&gt;` to be safe.
 </Warning>
-
-## Tree-sitter init fails on the first call
-
-**Symptom:** The first diff of a code file errors out, but retrying the same command works.
-
-**Cause:** An asynchronous tree-sitter grammar initialization race. The grammar is not fully ready when the first parse starts. The initialization result is cached in a promise, which mitigates the race for subsequent calls.
-
-**Workaround:** Retry the command. Because the promise is cached, the second call reuses the completed initialization and proceeds normally.
 
 ## Build errors
 

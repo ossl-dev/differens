@@ -79,12 +79,13 @@ def apply_promo(price: float, max_discount: float = 0.5) -> float:
     return price * (1 - max_discount)
 ```
 ```text Output
-diff: pricing.py -> discounts.py
-move: function `apply_discount` (across files)
-rename: function `apply_discount` -> `apply_promo`
-insert: parameter `max_discount` in function `apply_promo`
-update: return expression in `apply_promo`
-update: call expression in `checkout`: `apply_discount(total)` -> `apply_promo(total)`
+  cross-file moves:
+  → function `apply_discount` from pricing.py to discounts.py
+  ~ renamed function `apply_discount` to `apply_promo`
+  + added parameter `max_discount` in function `apply_promo`
+  ~ changed value of return expression from `price * (1 - TAX_RATE)` to `price * (1 - max_discount)`
+  ~ changed value of call expression from `apply_discount(total)` to `apply_promo(total)` in function `checkout`
+4 modifications, 1 move
 ```
 </CodeGroup>
 

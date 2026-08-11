@@ -82,13 +82,13 @@ export function calculateTotalAmount(items: Item[], discount: number): number {
 }
 ```
 ```text Output
-diff: src/utils.ts -> src/helpers/math.ts
-move: function `computeTotal` (across files)
-rename: function `computeTotal` -> `calculateTotalAmount`
-insert: parameter `discount` in function `calculateTotalAmount`
-insert: statement `const base = ...` in function `calculateTotalAmount`
-update: return expression: `items.reduce(...)` -> `base - discount`
-match: export `TAX_RATE` (unchanged)
+  cross-file moves:
+  → function `computeTotal` from src/utils.ts to src/helpers/math.ts
+  ~ renamed function `computeTotal` to `calculateTotalAmount`
+  + added parameter `discount` in function `calculateTotalAmount`
+  + added statement `const base = ...` in function `calculateTotalAmount`
+  ~ changed value of return expression from `items.reduce(...)` to `base - discount`
+4 modifications, 1 move
 ```
 </CodeGroup>
 

@@ -103,7 +103,7 @@ If both arguments are directories, Differens walks each one and diffs matching r
 differens release/1.0/ release/1.1/
 ```
 
-Files present on only one side are whole-file additions or removals. Generated and vendor directories (`node_modules`, `dist`, `.git`, …) are skipped. Files over 2 MiB are line-diffed instead of parsed.
+Files present on only one side are whole-file additions or removals. Generated and vendor directories (`node_modules`, `dist`, `.git`, …) are skipped. Files over 2 MiB are treated as whole-file additions or removals.
 
 ## How it compares to git diff
 
