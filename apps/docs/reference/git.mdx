@@ -43,8 +43,7 @@ Both files are handled in one process. The CLI sees `DRIVER_FLAG` and reads the 
 ## Usage
 
 <CodeGroup>
-
-```ts Title="Diff the working tree"
+```ts Diff the working tree
 import { diffWorkingTree } from "@ossl-dev/differens-git";
 
 const pairs = await diffWorkingTree();  // vs HEAD
@@ -53,13 +52,13 @@ for (const p of pairs) {
 }
 ```
 
-```ts Title="Diff a commit range"
+```ts Diff a commit range
 import { diffCommitRange } from "@ossl-dev/differens-git";
 
 const pairs = await diffCommitRange("main..feature");
 ```
 
-```ts Title="Register the diff driver"
+```ts Register the diff driver
 import { diffDriverCommand, installGitDriver, generateGitAttributes } from "@ossl-dev/differens-git";
 
 await installGitDriver(diffDriverCommand(process.execPath, ["cli.js", DRIVER_FLAG]));
@@ -67,7 +66,6 @@ console.log(generateGitAttributes(["ts", "tsx", "py", "rs", "go"]));
 // *.ts diff=differens
 // *.tsx diff=differens
 ```
-
 </CodeGroup>
 
 ## Removing the driver

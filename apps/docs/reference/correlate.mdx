@@ -52,8 +52,7 @@ Same-file pairs are skipped throughout. The core already handles intra-file move
 ## Usage
 
 <CodeGroup>
-
-```ts Title="Correlate per-file diffs"
+```ts Correlate per-file diffs
 import { correlate } from "@ossl-dev/differens-correlate";
 import type { FileChanges } from "@ossl-dev/differens-correlate";
 
@@ -71,11 +70,10 @@ for (const m of moves) {
 // formatPrice src/a.ts -> src/b.ts false 1
 ```
 
-```text Title="As the CLI reports it"
+```text As the CLI reports it
   → function `formatPrice` from src/a.ts to src/b.ts
   → renamed and edited file src/old/utils.ts to src/new/utils.ts
 ```
-
 </CodeGroup>
 
 A `kind: "file"` match on both sides is a rename, not a move. The CLI reports it as `renamed file <from> to <to>` (or `renamed and edited` when `modified` is set).

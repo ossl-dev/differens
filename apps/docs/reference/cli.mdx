@@ -1,6 +1,6 @@
 ---
 title: "CLI Reference"
-description: "The differens command , all flags, formats, and modes"
+description: "The differens command: all flags, formats, and modes"
 ---
 
 # CLI Reference
@@ -17,7 +17,7 @@ differens [options] [args]
 | --- | --- |
 | `differens` | Working tree vs HEAD (git mode) |
 | `differens diff` | Explicit alias for the above |
-| `differens <old> <new>` | Two files , or two commits, when both args resolve as git refs |
+| `differens <old> <new>` | Two files, or two commits when both args resolve as git refs |
 | `differens <old>/ <new>/` | Two directories, walked file by file |
 | `differens main..feature` | Commit range |
 | `differens <sha1> <sha2>` | Two commits (refs are resolved first, files are the fallback) |
@@ -46,40 +46,38 @@ There are no environment variables.
 ## Examples
 
 <CodeGroup>
-
-```bash Title="Diff the working tree"
+```bash Diff the working tree
 differens
 ```
 
-```bash Title="Diff two files"
+```bash Diff two files
 differens src/app.ts src/app.new.ts
 ```
 
-```bash Title="Diff two directories"
+```bash Diff two directories
 differens release/1.0/ release/1.1/
 ```
 
-```bash Title="Diff a commit range"
+```bash Diff a commit range
 differens main..feature
 ```
 
-```bash Title="Diff two commits"
+```bash Diff two commits
 differens 8f3a1c2 5b0e9d7
 ```
 
-```bash Title="JSON output"
+```bash JSON output
 differens main..feature --format=json
 differens main..feature --json
 ```
 
-```bash Title="List languages"
+```bash List languages
 differens languages
 ```
 
-```bash Title="Install the git driver"
+```bash Install the git driver
 differens install-git-driver
 ```
-
 </CodeGroup>
 
 ## Exit behavior

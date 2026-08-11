@@ -74,17 +74,15 @@ Line grammar:
 Pipe it straight into a model:
 
 <CodeGroup>
-
-```bash Title="Feed an LLM"
+```bash Feed an LLM
 differens main..feature --format=llm | llm "summarize this changeset"
 ```
 
-```text Title="Sample model answer"
+```text Sample model answer
 Renamed computeTotal to calculateTotalAmount inside Checkout, added
 applyDiscount, and moved formatPrice from src/old/utils.ts to
 src/new/utils.ts with minor edits.
 ```
-
 </CodeGroup>
 
 ## Markdown

@@ -12,12 +12,11 @@ Differens plugs into your normal `git diff` workflow. Instead of line hunks, it 
 One command registers Differens as a git diff driver in your repo's local config, then prints the `.gitattributes` lines you need to opt files in:
 
 <CodeGroup>
-
-```bash Title="Register the driver"
+```bash Register the driver
 differens install-git-driver
 ```
 
-```text Title="Output"
+```text Output
 git diff driver installed.
 add to .gitattributes:
   *.ts diff=differens
@@ -30,7 +29,6 @@ add to .gitattributes:
 
 then `git diff` narrates those files instead of printing hunks.
 ```
-
 </CodeGroup>
 
 Add the `diff=differens` lines to `.gitattributes` (repo root or per-directory) for every extension you want covered. Files without the attribute keep normal `git diff` output.
@@ -38,8 +36,7 @@ Add the `diff=differens` lines to `.gitattributes` (repo root or per-directory) 
 Now `git diff` on a `.ts` file shows the change instead of a hunk:
 
 <CodeGroup>
-
-```text Title="Before: git diff"
+```text Before: git diff
 - function computeTotal(items: Item[]): number {
 -   return items.reduce((acc, item) => acc + item.price, 0);
 + function calculateTotalAmount(items: Item[], discount: number): number {
@@ -48,13 +45,12 @@ Now `git diff` on a `.ts` file shows the change instead of a hunk:
   }
 ```
 
-```text Title="After: differens driver"
+```text After: differens driver
   ~ renamed function `computeTotal` to `calculateTotalAmount`
   + added parameter `discount`
 
 1 modification, 1 addition
 ```
-
 </CodeGroup>
 
 The driver receives both versions of every changed file, so this works in `git diff`, `git diff --staged`, and `git difftool`. To remove the driver later, unset the config. See the note in the [git package reference](/reference/git).

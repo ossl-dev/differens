@@ -57,8 +57,8 @@ Node types without a mapping keep their raw tree-sitter type name.
 
 Extract `apply_discount` out of `pricing.py` into a new `discounts.py`, rename it to `apply_promo`, and add a `max_discount` parameter:
 
-<CodeGroup title="Refactor: extract, rename, add parameter">
-<Code title="pricing.py (before)" language="python">
+<CodeGroup>
+```python pricing.py (before)
 TAX_RATE = 0.08
 
 def apply_discount(price: float) -> float:
@@ -66,26 +66,26 @@ def apply_discount(price: float) -> float:
 
 def checkout(total: float) -> float:
     return apply_discount(total) + 2.99
-</Code>
-<Code title="pricing.py (after)" language="python">
+```
+```python pricing.py (after)
 TAX_RATE = 0.08
 from discounts import apply_promo
 
 def checkout(total: float) -> float:
     return apply_promo(total) + 2.99
-</Code>
-<Code title="discounts.py (after)" language="python">
+```
+```python discounts.py (after)
 def apply_promo(price: float, max_discount: float = 0.5) -> float:
     return price * (1 - max_discount)
-</Code>
-<Code title="Output" language="text">
+```
+```text Output
 diff: pricing.py -> discounts.py
 move: function `apply_discount` (across files)
 rename: function `apply_discount` -> `apply_promo`
 insert: parameter `max_discount` in function `apply_promo`
 update: return expression in `apply_promo`
 update: call expression in `checkout`: `apply_discount(total)` -> `apply_promo(total)`
-</Code>
+```
 </CodeGroup>
 
 The line diff shows `pricing.py` losing two functions and `discounts.py` gaining one. The semantic diff shows one function moved across files, renamed, and given a defaulted parameter. `checkout` barely changed.

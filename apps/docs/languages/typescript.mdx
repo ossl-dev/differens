@@ -64,24 +64,24 @@ Node types without a mapping keep their raw tree-sitter type name.
 
 Rename `computeTotal` to `calculateTotalAmount`, add a `discount` parameter, and move the function to another file:
 
-<CodeGroup title="Refactor: rename, add parameter, move file">
-<Code title="before.ts" language="typescript">
+<CodeGroup>
+```typescript before.ts
 export function computeTotal(items: Item[]): number {
   return items.reduce((acc, item) => acc + item.price, 0);
 }
 
 export const TAX_RATE = 0.08;
-</Code>
-<Code title="after.ts" language="typescript">
+```
+```typescript after.ts
 export const TAX_RATE = 0.08;
-</Code>
-<Code title="helpers/math.ts" language="typescript">
+```
+```typescript helpers/math.ts
 export function calculateTotalAmount(items: Item[], discount: number): number {
   const base = items.reduce((acc, item) => acc + item.price, 0);
   return base - discount;
 }
-</Code>
-<Code title="Output" language="text">
+```
+```text Output
 diff: src/utils.ts -> src/helpers/math.ts
 move: function `computeTotal` (across files)
 rename: function `computeTotal` -> `calculateTotalAmount`
@@ -89,7 +89,7 @@ insert: parameter `discount` in function `calculateTotalAmount`
 insert: statement `const base = ...` in function `calculateTotalAmount`
 update: return expression: `items.reduce(...)` -> `base - discount`
 match: export `TAX_RATE` (unchanged)
-</Code>
+```
 </CodeGroup>
 
 A line diff would report `utils.ts` losing a function and `math.ts` gaining one, with the whole body rewritten. The semantic diff reports one function that moved, was renamed, and gained a parameter.

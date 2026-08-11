@@ -16,44 +16,44 @@ Differens ships as an npm CLI plus seven published packages. It is built with Bu
 
 Install globally, or add it to your project as a dev dependency:
 
-<CodeGroup title="Install methods">
-<Code title="npm (global)" language="bash">
+<CodeGroup>
+```bash npm (global)
 npm install -g differens
-</Code>
-<Code title="bun (global)" language="bash">
+```
+```bash bun (global)
 bun install -g differens
-</Code>
-<Code title="npm (project-local)" language="bash">
+```
+```bash npm (project-local)
 npm install -D differens
-</Code>
-<Code title="Source build" language="bash">
+```
+```bash Source build
 git clone https://github.com/ossl-dev/differens
 cd differens
 bun install
 bun run build
 bun link
-</Code>
+```
 </CodeGroup>
 
 ## Install the libraries
 
 Each stage of the pipeline is published as a separate package under the `@ossl-dev` scope. Install only the pieces you use:
 
-<CodeGroup title="Library install">
-<Code title="npm" language="bash">
+<CodeGroup>
+```bash npm
 npm install @ossl-dev/differens-core
-</Code>
-<Code title="bun" language="bash">
+```
+```bash bun
 bun add @ossl-dev/differens-core
-</Code>
-<Code title="All libraries" language="bash">
+```
+```bash All libraries
 npm install \
   @ossl-dev/differens-core \
   @ossl-dev/differens-tiers \
   @ossl-dev/differens-narrate \
   @ossl-dev/differens-correlate \
   @ossl-dev/differens-git
-</Code>
+```
 </CodeGroup>
 
 ## The seven packages
@@ -72,11 +72,11 @@ npm install \
 
 To ship Differens as a single binary that needs no runtime install:
 
-<CodeGroup title="Compile a binary">
-<Code title="bun build --compile" language="bash">
+<CodeGroup>
+```bash bun build --compile
 bun build --compile packages/cli/src/index.ts --outfile differens
 ./differens --help
-</Code>
+```
 </CodeGroup>
 
 <Info>

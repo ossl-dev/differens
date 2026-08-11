@@ -32,13 +32,13 @@ export const TAX_RATE = 0.08;
 
 ## Step 2: Run the diff
 
-<CodeGroup title="First diff">
-<Code title="Terminal" language="bash">
+<CodeGroup>
+```bash Terminal
 differens before.ts after.ts
-</Code>
-<Code title="npx (no install)" language="bash">
+```
+```bash npx (no install)
 npx differens before.ts after.ts
-</Code>
+```
 </CodeGroup>
 
 ## Step 3: Read the output
@@ -72,11 +72,11 @@ Each action in the output is a typed edit: `rename`, `move`, `insert`, `delete`,
 
 Machine-readable output, one typed action per entry:
 
-<CodeGroup title="JSON output">
-<Code title="Command" language="bash">
+<CodeGroup>
+```bash Command
 differens before.ts after.ts --format=json
-</Code>
-<Code title="Output" language="json">
+```
+```json Output
 {
   "actions": [
     { "kind": "rename", "node": "function", "from": "computeTotal", "to": "calculateTotalAmount" },
@@ -86,23 +86,23 @@ differens before.ts after.ts --format=json
   ],
   "files": ["before.ts", "after.ts"]
 }
-</Code>
+```
 </CodeGroup>
 
 ## Step 5: Diff a git working tree
 
 Run Differens inside a git repository. It diffs the working tree against `HEAD` and correlates moves across all changed files:
 
-<CodeGroup title="Working tree diff">
-<Code title="Command" language="bash">
+<CodeGroup>
+```bash Command
 cd your-project
 differens
-</Code>
-<Code title="Output (excerpt)" language="text">
+```
+```text Output (excerpt)
 diff: src/utils.ts -> src/helpers/math.ts
 move: function `computeTotal` -> `calculateTotalAmount` (across files)
 insert: parameter `discount` in function `calculateTotalAmount`
-</Code>
+```
 </CodeGroup>
 
 You can also diff a commit range instead:
@@ -115,15 +115,15 @@ differens main..feature
 
 Compare two whole directories. Differens matches files across the trees and reports renames at the file level too:
 
-<CodeGroup title="Directory diff">
-<Code title="Command" language="bash">
+<CodeGroup>
+```bash Command
 differens old/ new/
-</Code>
-<Code title="Output (excerpt)" language="text">
+```
+```text Output (excerpt)
 move: src/utils.ts -> src/helpers/math.ts
 rename: interface `CartItem` -> `LineItem` in src/models.ts
 match: 142 of 150 files unchanged
-</Code>
+```
 </CodeGroup>
 
 ## What's next

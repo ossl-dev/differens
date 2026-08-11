@@ -25,17 +25,15 @@ The valve defaults to `250,000` nodes. It was raised from the original `50,000` 
 The benchmark harness lives in the CLI package and is run with Bun:
 
 <CodeGroup>
-
-```bash Title="Run the benchmarks"
+```bash Run the benchmarks
 bun run apps/cli/bench/bench.ts
 ```
 
-```text Title="Sample output"
+```text Sample output
 matching 350k nodes ................. ~70ms
 parse 1000-line ts file ............. ~8ms
 200-file changeset, warm cache ...... ~1.2s
 ```
-
 </CodeGroup>
 
 ## Compared to git diff

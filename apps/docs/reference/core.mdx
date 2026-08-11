@@ -76,8 +76,7 @@ Both hashes are 53-bit-safe folds of two 32-bit FNV-1a streams, so subtree equal
 ## Usage
 
 <CodeGroup>
-
-```ts Title="Diff two value trees"
+```ts Diff two value trees
 import { diffTrees, treeFromValue } from "@ossl-dev/differens-core";
 
 const oldTree = treeFromValue({ host: "localhost", port: 8080 });
@@ -91,7 +90,7 @@ for (const action of changes) {
 }
 ```
 
-```ts Title="Build a tree by hand"
+```ts Build a tree by hand
 import { createNode } from "@ossl-dev/differens-core";
 
 const tree = createNode({
@@ -101,5 +100,4 @@ const tree = createNode({
   byteRange: [0, 50],
 });
 ```
-
 </CodeGroup>

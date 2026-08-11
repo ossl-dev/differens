@@ -61,8 +61,7 @@ Narration shapes:
 ## Usage
 
 <CodeGroup>
-
-```ts Title="Narrate an edit script"
+```ts Narrate an edit script
 import { narrate, formatChanges } from "@ossl-dev/differens-narrate";
 
 const changes = narrate(actions, { filePath: "src/checkout.ts" });
@@ -75,18 +74,17 @@ for (const c of changes) {
 console.log(formatChanges(changes, { format: "terminal" }));
 ```
 
-```text Title="Terminal output"
+```text Terminal output
   ~ renamed function `computeTotal` to `calculateTotalAmount`
   + added function `applyDiscount` from class `Checkout`
 
 3 modifications, 1 addition
 ```
 
-```text Title="LLM output"
+```text LLM output
 differens/1 1 files 2 changes 2 named
 # src/checkout.ts
 ~ function computeTotal :12 < class Checkout calculateTotalAmount -> computeTotal
 + function applyDiscount :40
 ```
-
 </CodeGroup>

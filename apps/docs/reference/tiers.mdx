@@ -83,8 +83,7 @@ interface LanguageExtractor {
 ## Usage
 
 <CodeGroup>
-
-```ts Title="Diff two files through the pipeline"
+```ts Diff two files through the pipeline
 import { classifyFile, diffWithTier } from "@ossl-dev/differens-tiers";
 
 const oldSource = "export function total(a, b) { return a + b; }";
@@ -97,7 +96,7 @@ console.log(result.tier);        // Tier.Code
 console.log(result.changes);     // one Update action: Renamed, total -> sum
 ```
 
-```ts Title="List supported languages"
+```ts List supported languages
 import { initExtractors, getExtractors } from "@ossl-dev/differens-tiers";
 
 await initExtractors();
@@ -105,5 +104,4 @@ for (const { language, level, extensions } of getExtractors()) {
   console.log(language, level, extensions.join(", "));
 }
 ```
-
 </CodeGroup>
