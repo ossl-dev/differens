@@ -55,6 +55,13 @@ Pick an unchecked box, open an issue saying you're working on it, send a PR. One
 - [ ] Content-addressed parse cache (keyed by blob hash)
 - [ ] `maxFileSize` option actually enforced in tier pipeline (currently only maxNodes checked)
 - [ ] Benchmark suite: typical file diffs, large file fallback, cross-file correlation at scale
+- [ ] Worker pool for parallel parsing (Bun worker_threads)
+- [ ] Streaming output for large diffs (SSE / chunked JSON)
+- [ ] Regression test corpus (small/medium/large repo snapshots)
+
+**Testing**
+- [ ] Corpus tests against known refactors (extract method, rename, move file, reformat)
+- [ ] Fuzz test the parser pipeline with random edits
 
 ---
 
@@ -65,6 +72,7 @@ Pick an unchecked box, open an issue saying you're working on it, send a PR. One
 - [ ] PR/commit range mode: `differens diff main..feature` with cross-file move narration
 - [ ] File-level rename detection via git's `--find-renames` for directory and range diff modes
 - [ ] Changeset grouping: cluster related changes (all the moves from one refactor, all the renames from another)
+- [ ] Configurable AST canonicalization: normalize whitespace/comments, canonicalize identifiers (behind `--normalize` flag, conservative by default)
 
 ---
 
@@ -115,6 +123,42 @@ Pick an unchecked box, open an issue saying you're working on it, send a PR. One
 
 ---
 
+## External recommendations assessment (2026-08-11)
+
+Reviewed 25 AI-generated recommendations against current roadmap. What aligns, what doesn't, what we add.
+
+**Already done / covered:**
+- #2 Subtree fingerprints → 64-bit FNV-1a Merkle-style hashing in core
+- #3 Multi-stage pipeline → Tier system (T0-T5) with graceful degradation
+- #4 Move/rename detection → Cross-file correlator (structure hash buckets, Jaccard similarity)
+- #14 Mixed tree-and-token diffing → Token diffs at leaves, tree matching for structure
+- #17 Machine-friendly outputs → `--format=json`, `--format=markdown`, `--format=llm`
+- #18 Config file → Already in Phase 2
+- #6 Change-level metadata → Phase 3 changeset summaries
+- #7 Natural-language summaries → Phase 4 `--ai` flag
+- #8 Deterministic anchors → Phase 4 per-change metadata
+- #9 Incremental cache → Phase 2 content-addressed parse cache
+- #11 Lazy parsing → Tier fallback system
+- #16 ML-enhancements → Phase 4 optional local LLM
+- #19 Integration features → Phase 2 git driver, Phase 5 editor extensions
+- #20 Diagnostics → Phase 2 benchmark suite
+- #21 Extensibility → Phase 5 / stretch plugin marketplace
+- #23 Benchmarking → Phase 2 benchmark suite
+
+**Good ideas, added to roadmap below:**
+- #1 AST normalization → Added to Phase 3 as "configurable AST canonicalization"
+- #10 Parallelization → Added to Phase 2 performance: "worker pool for parallel parsing"
+- #12 Memory/IO → Added to Phase 2: "streaming output for large diffs"
+- #22 Corpus tests → Added to Phase 2: "regression test corpus"
+- #25 Sandboxed parsing → Noted: tree-sitter grammars don't execute code; safe by design
+
+**Skipped (over-engineered for current stage):**
+- #5 TS-specific symbol mapping → Too narrow; TS extractor already gives good results
+- #13 LSH/MinHash → Jaccard similarity sufficient; revisit if correlator becomes bottleneck
+- #15 APTED tree edit distance → GumTree matching works; add only if precision gap proven
+- #24 Telemetry → Premature; no distribution channel yet
+
+---
 ## Ideas / maybe someday
 
 - Streaming diff for very large files (process chunks, not whole file at once)

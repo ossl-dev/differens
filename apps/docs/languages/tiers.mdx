@@ -1,0 +1,44 @@
+---
+title: "Tier Adapters"
+description: "How non-code file formats are diffed"
+---
+
+## Tier system
+
+Every file that Differens processes goes through a tier adapter. The content router classifies files by extension and dispatches them to the right tier. Each tier can fall back to the tier below it — if the code parser fails, the line diff catches it. If the file is too large for line diff, the hash fallback catches it.
+
+### Tier reference
+
+| Tier | Name | Handles | Detects | Fallback |
+|---|---|---|---|---|
+| T5 | Code | `.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.rs`, `.go` | Functions, classes, methods, imports, renames, moves | T1 |
+| T4 | Data | `.json`, `.yaml`, `.yml`, `.toml` | Key additions, removals, value changes, nesting changes | T1 |
+| T3 | Markup | `.html`, `.htm`, `.xml`, `.svg` | Element additions, removals, attribute changes, tree restructuring | T1 |
+| T2 | Prose | `.txt`, `.log`, `LICENSE`, `README`, `CHANGELOG` | Word-level additions, deletions | T1 |
+| T1 | Raw | All text files, markdown (`.md`, `.mdx`), reST, AsciiDoc | Line-level additions, deletions | T0 |
+| T0 | Binary | All binary files (terminal) | File-level hash comparison, byte-size delta | (none) |
+
+### Classification rules
+
+The content router (`classifyFile` in `@ossl-dev/differens-tiers`) maps extensions:
+
+- **Code extensions** (`.ts`, `.py`, `.rs`, `.go`, etc.) → T5, with a tree-sitter grammar lookup. If no grammar is installed for the language, falls to T1.
+- **Data extensions** (`.json`, `.yaml`, `.toml`) → T4. Unparseable data (malformed JSON) falls to T1.
+- **Markup** (`.html`, `.htm`, `.xml`, `.svg`) → T3. Element tree with attribute diffs.
+- **Markdown and doc formats** (`.md`, `.mdx`, `.rst`, `.adoc`) → T1 line diff.
+- **Prose** (`.txt`, `.log`, files named `LICENSE`, `README`, `CHANGELOG`, `AUTHORS`) → T2 word-level diff.
+- **Everything else** → T1 (line diff) or T0 (binary detection via null bytes).
+
+### Graceful degradation
+
+The tier pipeline never fails. At every level:
+
+1. Try the most specific parser for the file type.
+2. If it throws, try the next tier down.
+3. T0 is the terminal tier — it always produces an answer (hash comparison).
+
+This means you can run `differens` on any file, any format, any size, and it will always return a result — from full semantic analysis down to "file changed, 1423 bytes different."
+
+### Adding a tier adapter
+
+New formats get new tiers. See [Contributing](/guides/contributing) for the step-by-step guide. The key constraint: every adapter must produce a `Node` tree consumable by the diff core. What the tree contains is up to the adapter — tree-sitter CST, JSON path tree, HTML element tree, or any other structured representation.

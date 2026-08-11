@@ -1,0 +1,81 @@
+---
+title: "@ossl-dev/differens-correlate"
+description: "Cross-file correlation API reference"
+---
+
+# @ossl-dev/differens-correlate
+
+Cross-file move and rename detection. After per-file diffing, it correlates deleted nodes from one file with inserted nodes in another and reports them as cross-file `Move`s — "this function was moved, not deleted and copy-pasted."
+
+Only **named** nodes are correlated; an anonymous fragment that is structurally identical in two files is not a move anyone recognises.
+
+Install:
+
+```bash
+npm install @ossl-dev/differens-correlate
+```
+
+## Exports
+
+| Export | Kind | Description |
+| --- | --- | --- |
+| `correlate` | function | `FileChanges[]` → `CrossFileResult` |
+| `FileChanges` | interface | `{ filePath, actions }` — one per-file diff result |
+| `CrossFileResult` | interface | `{ moves: CrossFileMatch[] }` |
+| `CrossFileMatch` | interface | A detected move/rename |
+| `CorrelateOptions` | interface | `{ renameSimilarityThreshold }` |
+
+## correlate
+
+```ts
+correlate(fileChanges: FileChanges[], options?: Partial<CorrelateOptions>): CrossFileResult
+```
+
+```ts
+// CrossFileMatch:
+// { node: Node; fromFile: string; toFile: string;
+//   modified: boolean; similarity: number }
+```
+
+`renameSimilarityThreshold` defaults to `0.6` — the minimum similarity for a partial match to count as a move. `similarity` is `1.0` for exact matches; `modified` is `true` when the node changed during the move.
+
+Nodes that stay unmatched are left as the plain `Delete`/`Insert` the per-file diff already reported.
+
+## The three-stage algorithm
+
+1. **Structure hash buckets** — all deleted and inserted named nodes are bucketed by `structureHash` (kind + children, no labels), so only structurally identical candidates ever meet.
+2. **Content hash exact matches** — within a bucket, equal `contentHash` (or equal `value`) is an unambiguous `Move` with `similarity: 1.0`. A renamed file carries its path in the label, so its `contentHash` differs on both sides even when the content is byte-identical — hence the value comparison.
+3. **Jaccard similarity** — remaining candidates are scored by token-level Jaccard similarity over the flattened node text; the best pair above the threshold becomes a `Move` with `modified: true` when the score is below `1.0`.
+
+Same-file pairs are skipped throughout — the core already handles intra-file moves.
+
+## Usage
+
+<CodeGroup>
+
+```ts Title="Correlate per-file diffs"
+import { correlate } from "@ossl-dev/differens-correlate";
+import type { FileChanges } from "@ossl-dev/differens-correlate";
+
+// a.ts lost formatPrice; b.ts gained it
+const fileChanges: FileChanges[] = [
+  { filePath: "src/a.ts", actions: [deletePrice, deleteHelpers] },
+  { filePath: "src/b.ts", actions: [insertPrice, insertCart] },
+];
+
+const { moves } = correlate(fileChanges);
+
+for (const m of moves) {
+  console.log(m.node.label, m.fromFile, "->", m.toFile, m.modified, m.similarity);
+}
+// formatPrice src/a.ts -> src/b.ts false 1
+```
+
+```text Title="As the CLI reports it"
+  → function `formatPrice` from src/a.ts to src/b.ts
+  → renamed and edited file src/old/utils.ts to src/new/utils.ts
+```
+
+</CodeGroup>
+
+A `kind: "file"` match on both sides is a rename, not a move — the CLI narrates it as `renamed file <from> to <to>` (or `renamed and edited` when `modified` is set).

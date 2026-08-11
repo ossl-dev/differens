@@ -1,0 +1,93 @@
+---
+title: "CLI Reference"
+description: "The differens command — all flags, formats, and modes"
+---
+
+# CLI Reference
+
+The `differens` command. One binary, five modes, four output formats.
+
+```
+differens [options] [args]
+```
+
+## Modes
+
+| Invocation | What it diffs |
+| --- | --- |
+| `differens` | Working tree vs HEAD (git mode) |
+| `differens diff` | Explicit alias for the above |
+| `differens <old> <new>` | Two files — or two commits, when both args resolve as git refs |
+| `differens <old>/ <new>/` | Two directories, walked file by file |
+| `differens main..feature` | Commit range |
+| `differens <sha1> <sha2>` | Two commits (refs are resolved first, files are the fallback) |
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `--format=terminal\|json\|markdown\|llm` | Output format (default `terminal`) |
+| `--json`, `-j` | Shorthand for `--format=json` |
+| `--markdown`, `--md` | Shorthand for `--format=markdown` |
+| `--llm`, `-l` | Shorthand for `--format=llm` |
+| `--help`, `-h` | Print usage |
+| `--version`, `-v` | Print version (read from package.json, never drifts) |
+
+## Subcommands
+
+| Command | Description |
+| --- | --- |
+| `diff` | Explicit diff mode; takes the same inputs as bare invocation |
+| `languages` | List supported languages with their level (L6 semantic / L5 generic) and extensions |
+| `install-git-driver` | Register Differens as the git diff driver and print the `.gitattributes` lines to add |
+
+There are no environment variables.
+
+## Examples
+
+<CodeGroup>
+
+```bash Title="Diff the working tree"
+differens
+```
+
+```bash Title="Diff two files"
+differens src/app.ts src/app.new.ts
+```
+
+```bash Title="Diff two directories"
+differens release/1.0/ release/1.1/
+```
+
+```bash Title="Diff a commit range"
+differens main..feature
+```
+
+```bash Title="Diff two commits"
+differens 8f3a1c2 5b0e9d7
+```
+
+```bash Title="JSON output"
+differens main..feature --format=json
+differens main..feature --json
+```
+
+```bash Title="List languages"
+differens languages
+```
+
+```bash Title="Install the git driver"
+differens install-git-driver
+```
+
+</CodeGroup>
+
+## Exit behavior
+
+- Any mode prints a friendly empty-state ("nothing changed", "nothing changed in range: …") instead of failing on an empty diff.
+- Errors exit `1` with a message on stderr: not in a git repo, file cannot be read, a directory against a file, or malformed args.
+- Files too large to tree-parse (over 2 MiB) or too large to match are line-diffed instead, with a `note: fell back to … diff` on stderr.
+
+## Internal flags
+
+The CLI also accepts two flags it never expects a human to type: `--git-diff-driver` (git invokes the registered driver with it) and a worker flag used by the parallel diff pool. Ignore them in scripts.

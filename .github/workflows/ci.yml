@@ -1,0 +1,49 @@
+name: CI
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'apps/docs/**'
+  pull_request:
+    paths:
+      - 'packages/**'
+      - 'apps/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'tsconfig.json'
+      - 'biome.json'
+      - 'turbo.json'
+      - '.github/workflows/ci.yml'
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Lint (Biome)
+        run: bun run lint
+      - name: Test
+        run: bun run test
+
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Check formatting (Biome)
+        run: bunx biome check --formatter-enabled=true --linter-enabled=false .

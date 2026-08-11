@@ -1,0 +1,133 @@
+---
+title: "Quickstart"
+description: "Run your first semantic diff in under a minute"
+---
+
+# Quickstart
+
+Follow along — you will have your first semantic diff in under a minute.
+
+## Step 1: Create two files
+
+Create `before.ts` and `after.ts` — a function that gets renamed and gains a parameter:
+
+```typescript
+// before.ts
+export function computeTotal(items: Item[]): number {
+  return items.reduce((acc, item) => acc + item.price, 0);
+}
+
+export const TAX_RATE = 0.08;
+```
+
+```typescript
+// after.ts
+export function calculateTotalAmount(items: Item[], discount: number): number {
+  const base = items.reduce((acc, item) => acc + item.price, 0);
+  return base - discount;
+}
+
+export const TAX_RATE = 0.08;
+```
+
+## Step 2: Run the diff
+
+<CodeGroup title="First diff">
+<Code title="Terminal" language="bash">
+differens before.ts after.ts
+</Code>
+<Code title="npx (no install)" language="bash">
+npx differens before.ts after.ts
+</Code>
+</CodeGroup>
+
+## Step 3: Read the output
+
+```text
+rename: function `computeTotal` -> `calculateTotalAmount`
+insert: parameter `discount` in function `calculateTotalAmount`
+insert: statement `const base = ...` in function `calculateTotalAmount`
+update: return expression: `items.reduce(...)` -> `base - discount`
+match: export `TAX_RATE` (unchanged)
+```
+
+Compare that to a line diff of the same change:
+
+```diff
+- export function computeTotal(items: Item[]): number {
+-   return items.reduce((acc, item) => acc + item.price, 0);
++ export function calculateTotalAmount(items: Item[], discount: number): number {
++   const base = items.reduce((acc, item) => acc + item.price, 0);
++   return base - discount;
+  }
+```
+
+The line diff says the whole function was deleted and rewritten. Differens says: it was renamed, one parameter was added, one statement was added, one expression changed — and `TAX_RATE` did not change at all.
+
+<Info>
+Each action in the output is a typed edit: `rename`, `move`, `insert`, `delete`, `update`. The narration engine produces these from the Chawathe edit script computed by the matching core.
+</Info>
+
+## Step 4: Try JSON output
+
+Machine-readable output, one typed action per entry:
+
+<CodeGroup title="JSON output">
+<Code title="Command" language="bash">
+differens before.ts after.ts --format=json
+</Code>
+<Code title="Output" language="json">
+{
+  "actions": [
+    { "kind": "rename", "node": "function", "from": "computeTotal", "to": "calculateTotalAmount" },
+    { "kind": "insert", "node": "parameter", "name": "discount" },
+    { "kind": "insert", "node": "statement", "detail": "const base = ..." },
+    { "kind": "update", "node": "return", "detail": "items.reduce(...) -> base - discount" }
+  ],
+  "files": ["before.ts", "after.ts"]
+}
+</Code>
+</CodeGroup>
+
+## Step 5: Diff a git working tree
+
+Point Differens at your repo and it diffs the working tree against `HEAD`, correlating moves across all changed files:
+
+<CodeGroup title="Working tree diff">
+<Code title="Command" language="bash">
+cd your-project
+differens
+</Code>
+<Code title="Output (excerpt)" language="text">
+diff: src/utils.ts -> src/helpers/math.ts
+move: function `computeTotal` -> `calculateTotalAmount` (across files)
+insert: parameter `discount` in function `calculateTotalAmount`
+</Code>
+</CodeGroup>
+
+You can also diff a commit range instead:
+
+```bash
+differens main..feature
+```
+
+## Step 6: Diff two directories
+
+Compare whole directory trees — Differens matches files across the trees and reports renames at the file level too:
+
+<CodeGroup title="Directory diff">
+<Code title="Command" language="bash">
+differens old/ new/
+</Code>
+<Code title="Output (excerpt)" language="text">
+move: src/utils.ts -> src/helpers/math.ts
+rename: interface `CartItem` -> `LineItem` in src/models.ts
+match: 142 of 150 files unchanged
+</Code>
+</CodeGroup>
+
+## What's next
+
+- [CLI reference](/reference/cli) — every command, flag, and format
+- [Guides](/guides/git-integration) — git integration, machine outputs, and benchmarks
+- [How it works](/how-it-works/architecture) — the matching and tier pipeline under the hood

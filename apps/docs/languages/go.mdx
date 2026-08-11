@@ -1,0 +1,81 @@
+---
+title: "Go"
+description: "Semantic diffing for Go"
+---
+
+## Go extractor
+
+The Go extractor maps tree-sitter Go CST nodes to canonical concepts. It detects structural changes at the package level — functions, methods, types, and interfaces.
+
+### Detected concepts
+
+| tree-sitter node type | Canonical concept |
+|---|---|
+| `function_declaration` | Function |
+| `method_declaration` | Method |
+| `type_declaration` (struct) | Struct |
+| `type_declaration` (interface) | Interface |
+| `import_declaration` | Import |
+| `var_declaration` (top-level) | Variable |
+| `const_declaration` | Constant |
+| `type_declaration` (other) | Type alias |
+
+### Example
+
+Two versions of a Go package — a method extracted to a new function:
+
+```go
+// old.go
+package users
+
+type Store struct {
+    db *sql.DB
+}
+
+func (s *Store) ValidateEmail(email string) error {
+    if !strings.Contains(email, "@") {
+        return errors.New("invalid email")
+    }
+    if len(email) > 254 {
+        return errors.New("email too long")
+    }
+    return nil
+}
+```
+
+```go
+// new.go
+package users
+
+type Store struct {
+    db *sql.DB
+}
+
+func (s *Store) ValidateEmail(email string) error {
+    return validateEmail(email)
+}
+
+func validateEmail(email string) error {
+    if !strings.Contains(email, "@") {
+        return errors.New("invalid email")
+    }
+    if len(email) > 254 {
+        return errors.New("email too long")
+    }
+    return nil
+}
+```
+
+Running `differens old.go new.go`:
+
+```
+method ValidateEmail: replaced body with call to validateEmail
+extracted function validateEmail from method ValidateEmail
+```
+
+### Known limitations
+
+- Implicit interfaces (structural typing) are not tracked — an interface implemented by coincidence is not flagged as a relationship.
+- Package renames affect import paths; the cross-file correlator handles this when run across the full package.
+- Cgo blocks are treated as opaque; the extractor does not descend into C preambles.
+- Generic type parameters (Go 1.18+) are parsed structurally but type parameter renames may not be detected as renames (reported as structural changes).

@@ -1,0 +1,92 @@
+---
+title: "@ossl-dev/differens-narrate"
+description: "Narration engine API reference"
+---
+
+# @ossl-dev/differens-narrate
+
+The narration engine — turns typed `EditAction`s into human-readable text. Template-based, deterministic, and fast. Output is a `SemanticChange[]`, each pairing the raw action with an English `description`.
+
+Install:
+
+```bash
+npm install @ossl-dev/differens-narrate
+```
+
+## Exports
+
+| Export | Kind | Description |
+| --- | --- | --- |
+| `narrate` | function | `EditAction[]` → `SemanticChange[]` with descriptions |
+| `narrateAction` | function | One action → one English sentence |
+| `summarize` | function | One summary sentence for a changeset ("3 additions, 1 move") |
+| `formatChanges` | function | Render `SemanticChange[]` in terminal/json/markdown/llm |
+| `humanizeKind` | function | `"call_expression"` / `"CallExpression"` → `"call expression"` |
+| `OutputFormat` | type | `"terminal" \| "json" \| "markdown" \| "llm"` |
+
+## narrate
+
+```ts
+narrate(actions: EditAction[], opts?: { filePath?: string }): SemanticChange[]
+```
+
+```ts
+// SemanticChange:
+// { action: EditAction; description: string; filePath?: string;
+//   fromFilePath?: string; toFilePath?: string }
+```
+
+Duplicate `Update`s for the same rename are collapsed — renaming a function reports it once (the named node wins), not once per identifier occurrence.
+
+## Vocabulary
+
+Kinds are canonicalized at the extractor layer and humanized by `humanizeKind` (camelCase and underscore splitting, lowercased). Language synonyms all land on the same concept:
+
+| Canonical | Source node types (language-specific) |
+| --- | --- |
+| `function` | `fn` (Rust), `def` (Python), `func` (Go), `function_declaration` (TS/JS), `FunctionDeclaration` |
+| `class` | `class` (TS/JS/Python), `ClassDeclaration`, `type_declaration` (Rust) |
+| `variable` | `let`/`const`/`var` (TS/JS), `variable_declarator`, `assignment` |
+| `import` | `import_statement`, `import_declaration`, `use_declaration` (Rust) |
+
+Narration shapes:
+
+- `added function \`parseConfig\``
+- `removed class \`RetryPolicy\``
+- `renamed function \`foo\` to \`bar\``
+- `changed value of config key \`host\` from \`localhost\` to \`0.0.0.0\``
+- `moved function \`parseConfig\` from utils.ts to config.ts`
+- Scoped: `removed variable \`timeout\` from function \`connect\`` — the nearest named ancestor is always included when it adds information.
+
+## Usage
+
+<CodeGroup>
+
+```ts Title="Narrate an edit script"
+import { narrate, formatChanges } from "@ossl-dev/differens-narrate";
+
+const changes = narrate(actions, { filePath: "src/checkout.ts" });
+
+for (const c of changes) {
+  console.log(c.description);
+  // "renamed function `computeTotal` to `calculateTotalAmount`"
+}
+
+console.log(formatChanges(changes, { format: "terminal" }));
+```
+
+```text Title="Terminal output"
+  ~ renamed function `computeTotal` to `calculateTotalAmount`
+  + added function `applyDiscount` from class `Checkout`
+
+3 modifications, 1 addition
+```
+
+```text Title="LLM output"
+differens/1 1 files 2 changes 2 named
+# src/checkout.ts
+~ function computeTotal :12 < class Checkout calculateTotalAmount -> computeTotal
++ function applyDiscount :40
+```
+
+</CodeGroup>

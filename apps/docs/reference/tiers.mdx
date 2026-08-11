@@ -1,0 +1,109 @@
+---
+title: "@ossl-dev/differens-tiers"
+description: "Content router and tier adapter API reference"
+---
+
+# @ossl-dev/differens-tiers
+
+The parsing pipeline. A content router picks a tier by file extension and magic bytes, and the tier adapter parses the file into a `Node` tree for `@ossl-dev/differens-core`. If a tier fails to parse or its diff falls back, the pipeline drops to the next lower tier — raw line diff is the floor.
+
+Install:
+
+```bash
+npm install @ossl-dev/differens-tiers
+```
+
+## Tiers
+
+| Tier | Value | Handles |
+| --- | --- | --- |
+| `Tier.Binary` | `0` | Binary files — byte-size update, no parse |
+| `Tier.Raw` | `1` | Line diff (`diffLines`) |
+| `Tier.Prose` | `2` | Word diff for free prose (txt, log, readme, changelog) |
+| `Tier.Markup` | `3` | HTML/XML/SVG — tree diff of tags |
+| `Tier.Data` | `4` | JSON/YAML/TOML — tree diff of values |
+| `Tier.Code` | `5` | tree-sitter backed code parsing |
+
+## Exports
+
+| Export | Kind | Description |
+| --- | --- | --- |
+| `classifyFile` | function | Map a path to its tier |
+| `diffWithTier` | function | Diff two sources through the tier pipeline |
+| `isParseable` | function | Will this file get a tree diff or only lines? |
+| `initExtractors` | function | Await grammar loading (returns `Promise<void>`) |
+| `getExtractors` | function | List available language extractors |
+| `parseCode` / `parseData` | function | Parse a single side into a `Node` tree |
+| `hasGrammar` | function | Is a grammar loaded for an extension? |
+| `Tier` | enum | Tier identifiers above |
+
+## classifyFile
+
+```ts
+classifyFile(filePath: string): FileInfo
+// FileInfo: { path, extension, tier }
+```
+
+Extension-based routing with a binary sniff (NUL bytes or failed UTF-8 decode) on top. Markdown goes to `Tier.Raw`, not prose — lines are structure in docs.
+
+## diffWithTier
+
+```ts
+diffWithTier(oldSource: string, newSource: string, oldPath: string, newPath: string): TierDiffResult
+```
+
+```ts
+// TierDiffResult:
+// { changes: EditAction[]; nodeCount: number; tier: Tier; fallback?: string }
+```
+
+Behavior worth knowing:
+
+- Entirely new or removed files become a single `Insert`/`Delete` of a `kind: "file"` node — one fact, not a tree diff.
+- Identical sources short-circuit with no changes.
+- A tier result is kept only if it parses **and** produces a usable tree diff; the core's `fallback` verdict propagates instead of being reported as "no changes".
+- On any failure the pipeline falls back to raw lines, with `fallback: "lines"`.
+
+## LanguageExtractor
+
+Each code language is a `LanguageExtractor` — a few dozen match arms mapping tree-sitter CST node types to canonical concepts, not a parser:
+
+```ts
+interface LanguageExtractor {
+  readonly language: string;            // e.g. "typescript"
+  readonly extensions: string[];        // e.g. ["ts", "tsx"]
+  extractConcept(nodeType: string): string;          // CST type -> canonical concept
+  extractLabel(node: SyntaxNode, source: string): string | undefined;
+  readonly labelFallbackTypes?: ReadonlySet<string>;
+}
+```
+
+`getExtractors()` reports them as `ExtractorInfo { language, level: "L6" | "L5", extensions }`, where L6 extractors are hand-tuned for semantics and L5 are generic.
+
+## Usage
+
+<CodeGroup>
+
+```ts Title="Diff two files through the pipeline"
+import { classifyFile, diffWithTier } from "@ossl-dev/differens-tiers";
+
+const oldSource = "export function total(a, b) { return a + b; }";
+const newSource = "export function sum(a, b) { return a + b; }";
+
+const info = classifyFile("src/math.ts");   // { path, extension: "ts", tier: 5 }
+const result = diffWithTier(oldSource, newSource, "src/math.ts", "src/math.ts");
+
+console.log(result.tier);        // Tier.Code
+console.log(result.changes);     // one Update action: Renamed, total -> sum
+```
+
+```ts Title="List supported languages"
+import { initExtractors, getExtractors } from "@ossl-dev/differens-tiers";
+
+await initExtractors();
+for (const { language, level, extensions } of getExtractors()) {
+  console.log(language, level, extensions.join(", "));
+}
+```
+
+</CodeGroup>

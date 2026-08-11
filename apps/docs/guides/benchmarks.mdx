@@ -1,0 +1,57 @@
+---
+title: "Benchmarks"
+description: "Performance characteristics and comparison to git diff"
+---
+
+# Benchmarks
+
+Differens trades `git diff`'s instant line comparison for parse + match. The cost is a fast, linear matching pass; the payoff is answers like "renamed" and "moved" instead of delete/insert noise.
+
+## Typical numbers
+
+| Input | Scale | Behavior |
+| --- | --- | --- |
+| Small files (a few hundred lines) | ~1k nodes | Tree diff in well under a millisecond of matching; parse dominates |
+| Large files (a few thousand lines) | ~100k+ nodes | Matching is linear — 350k nodes in roughly 70 ms; parse and I/O dominate |
+| Monorepo changesets | Hundreds of files | Per-file diffs run on a worker pool sized to your core count; 200-file changesets add ~400 git spawns before any diffing unless blobs are batched (they are) |
+| Files over 2 MiB | — | Read, but not tree-parsed; the tier ladder line-diffs them |
+
+Matching itself is linear in node count — top-down anchors, bottom-up containers, leaf recovery. The worst-case bottom-up bound is quadratic in container pairs, which is why the engine carries a `maxNodes` valve: trees above the limit fall back to a line diff instead of risking a slow match.
+
+The valve default is `250,000` nodes (raised from the original `50,000` once matching became linear — the old ceiling was sending ordinary large files to line diffing for no reason). The current limit is about memory, not time. It is configurable per call via `MatchOptions.maxNodes`.
+
+## How to run benchmarks
+
+The benchmark harness lives in the CLI package and is run with Bun:
+
+<CodeGroup>
+
+```bash Title="Run the benchmarks"
+bun run apps/cli/bench/bench.ts
+```
+
+```text Title="Sample output"
+matching 350k nodes ................. ~70ms
+parse 1000-line ts file ............. ~8ms
+200-file changeset, warm cache ...... ~1.2s
+```
+
+</CodeGroup>
+
+## Compared to git diff
+
+| Situation | `git diff` | `differens` |
+| --- | --- | --- |
+| One-line change in a 5k-line file | Instant | Slightly slower (parse + match), but reports the actual change |
+| Reformat / whitespace churn | Long noisy hunk | Nothing — no semantic change, no output |
+| Rename of a function | Whole function looks rewritten | One `renamed` action |
+| Function moved between files | Delete + insert | One cross-file `Move` |
+| Generated bundles, lockfiles, vendor blobs | Same hunk cost as anything else | Skipped (over 2 MiB) or line-diffed |
+
+For line-level changes on unparseable files, both engines land on the same algorithm — line diff — and Differens is the same order of speed.
+
+## Fast, slow, being worked on
+
+- **Fast**: structural matching on code and data files, whole-file adds/removals (one action, no tree), same-file moves, batched blob reads.
+- **Slow**: the first parse of a huge file on a cold cache; enormous trees that trip the `maxNodes` valve and fall back to lines; very large binary comparisons (hash only, so rarely worth it).
+- **Being worked on**: streaming ndjson output for long changesets, incremental matching across repeated runs, and faster prose/word diffing on big documents.

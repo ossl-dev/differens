@@ -1,0 +1,132 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Differens",
+  "colors": {
+    "primary": "#0EA5E9",
+    "light": "#FAFAFA",
+    "dark": "#0C0A09"
+  },
+  "appearance": {
+    "default": "dark",
+    "strict": true
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Home",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "index",
+              "getting-started/installation",
+              "getting-started/quickstart"
+            ]
+          },
+          {
+            "group": "How It Works",
+            "pages": [
+              "how-it-works/architecture",
+              "how-it-works/tree-matching",
+              "how-it-works/tier-pipeline",
+              "how-it-works/cross-file-correlation"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/git-integration",
+              "guides/machine-outputs",
+              "guides/benchmarks"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Languages",
+        "groups": [
+          {
+            "group": "Semantic Extractors",
+            "pages": [
+              "languages/overview",
+              "languages/typescript",
+              "languages/python",
+              "languages/rust",
+              "languages/go"
+            ]
+          },
+          {
+            "group": "Tier Adapters",
+            "pages": [
+              "languages/tiers"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "Packages",
+            "pages": [
+              "reference/core",
+              "reference/tiers",
+              "reference/narrate",
+              "reference/correlate",
+              "reference/git",
+              "reference/cli"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Contributing",
+        "pages": ["guides/contributing", "guides/troubleshooting"]
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/ossl-dev/differens"
+    }
+  },
+  "description": "Semantic diffing engine — understand what actually changed in your code",
+  "seo": {
+    "indexing": "all"
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "add-mcp",
+      "vscode",
+      "mcp",
+      "claude",
+      "windsurf",
+      "chatgpt",
+      "cursor"
+    ],
+    "display": "toc"
+  },
+  "fonts": {
+    "family": "Space Grotesk"
+  },
+  "navbar": {
+    "links": [
+      {
+        "href": "https://github.com/ossl-dev/differens",
+        "label": "GitHub"
+      }
+    ]
+  },
+  "logo": "/images/logo-dark.svg",
+  "favicon": "/images/favicon.svg",
+  "styling": {
+    "eyebrows": "breadcrumbs",
+    "latex": true
+  },
+  "icons": {
+    "library": "lucide"
+  }
+}

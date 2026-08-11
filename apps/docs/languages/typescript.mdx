@@ -1,0 +1,103 @@
+---
+title: "TypeScript / JavaScript"
+description: "Semantic diffing for TypeScript and JavaScript"
+---
+
+# TypeScript / JavaScript
+
+The TypeScript extractor covers both languages — one grammar for `.ts`/`.tsx`, another for `.js`/`.jsx`/`.mjs`/`.cjs` — and maps both onto the same canonical concepts.
+
+## What it detects
+
+- **Functions** — declarations, expressions, and arrow functions all become `Function`
+- **Methods** — `method_definition` becomes `Method`
+- **Classes** — declarations and expressions become `Class`
+- **Interfaces** — `interface_declaration` becomes `Interface`
+- **Types** — `type_alias_declaration` becomes `TypeDef`
+- **Enums** — `enum_declaration` becomes `Enum`
+- **Imports** — `import_statement` becomes `Import`, with `NamedImports` / `NamespaceImport` children
+- **Exports** — `export_statement` and `export_default` become `Export`
+- **Variables** — `variable_declaration` (`var`) and `lexical_declaration` (`let`/`const`) become `Variable`, labeled with the declarator name
+- **JSX** — elements, attributes, and expressions are their own concepts
+- **Control flow** — if / for / while / switch / try / return / throw
+- **Literals and expressions** — strings, numbers, templates, regex, booleans, objects, arrays, calls, member access, operators, await / yield
+
+## Node type mapping
+
+| tree-sitter node type | Canonical concept |
+| --- | --- |
+| `program` | `file` |
+| `function_declaration` / `function_expression` / `arrow_function` | `Function` |
+| `method_definition` | `Method` |
+| `class_declaration` / `class_expression` | `Class` |
+| `interface_declaration` | `Interface` |
+| `type_alias_declaration` | `TypeDef` |
+| `enum_declaration` | `Enum` |
+| `variable_declaration` / `lexical_declaration` | `Variable` |
+| `import_statement` | `Import` |
+| `export_statement` / `export_default` | `Export` |
+| `named_imports` / `namespace_import` | `NamedImports` / `NamespaceImport` |
+| `jsx_element` / `jsx_self_closing_element` | `JSXElement` |
+| `jsx_attribute` / `jsx_text` / `jsx_expression` | `JSXAttribute` / `JSXText` / `JSXExpression` |
+| `jsx_opening_element` / `jsx_closing_element` | `JSXOpening` / `JSXClosing` |
+| `call_expression` / `new_expression` | `CallExpression` / `NewExpression` |
+| `member_expression` / `subscript_expression` | `MemberAccess` / `IndexAccess` |
+| `assignment_expression` / `binary_expression` / `unary_expression` | `Assignment` / `BinaryOp` / `UnaryOp` |
+| `ternary_expression` / `await_expression` / `yield_expression` | `TernaryOp` / `Await` / `Yield` |
+| `if_statement` / `for_statement` / `while_statement` / `switch_statement` | `IfBlock` / `ForLoop` / `WhileLoop` / `SwitchBlock` |
+| `try_statement` / `catch_clause` | `TryBlock` / `CatchClause` |
+| `return_statement` / `throw_statement` | `Return` / `Throw` |
+| `object` / `array` | `ObjectLiteral` / `ArrayLiteral` |
+| `string` / `number` / `template_string` / `regex` | `string_literal` / `number_literal` / `template_literal` / `regex_literal` |
+| `true` / `false` / `null` / `undefined` | `boolean_literal` / `boolean_literal` / `null_literal` / `undefined_literal` |
+| `type_annotation` / `type_arguments` / `type_parameters` | `TypeAnnotation` / `TypeArguments` / `TypeParameters` |
+| `optional_parameter` / `required_parameter` / `rest_parameter` | `OptionalParam` / `RequiredParam` / `RestParam` |
+| `property_signature` / `call_signature` / `method_signature` / `index_signature` | `PropertySignature` / `CallSignature` / `MethodSignature` / `IndexSignature` |
+| `decorator` / `comment` | `Decorator` / `Comment` |
+| `statement_block` / `expression_statement` | `Block` / `Expression` |
+
+Node types without a mapping keep their raw tree-sitter type name.
+
+**Labels.** Most declarations are named via the `name` field, read straight off the tree-sitter cursor. `variable_declaration` and `lexical_declaration` are the exceptions — their names live on a `variable_declarator` child, so they go through `extractLabel`.
+
+## Example: a TypeScript refactor
+
+Rename `computeTotal` to `calculateTotalAmount`, add a `discount` parameter, and move the function to another file:
+
+<CodeGroup title="Refactor: rename, add parameter, move file">
+<Code title="before.ts" language="typescript">
+export function computeTotal(items: Item[]): number {
+  return items.reduce((acc, item) => acc + item.price, 0);
+}
+
+export const TAX_RATE = 0.08;
+</Code>
+<Code title="after.ts" language="typescript">
+export const TAX_RATE = 0.08;
+</Code>
+<Code title="helpers/math.ts" language="typescript">
+export function calculateTotalAmount(items: Item[], discount: number): number {
+  const base = items.reduce((acc, item) => acc + item.price, 0);
+  return base - discount;
+}
+</Code>
+<Code title="Output" language="text">
+diff: src/utils.ts -> src/helpers/math.ts
+move: function `computeTotal` (across files)
+rename: function `computeTotal` -> `calculateTotalAmount`
+insert: parameter `discount` in function `calculateTotalAmount`
+insert: statement `const base = ...` in function `calculateTotalAmount`
+update: return expression: `items.reduce(...)` -> `base - discount`
+match: export `TAX_RATE` (unchanged)
+</Code>
+</CodeGroup>
+
+A line diff would report `utils.ts` losing a function and `math.ts` gaining one, with the whole body rewritten. The semantic diff reports one function that moved, was renamed, and gained a parameter.
+
+## Known limitations
+
+- **Multi-declarator variables** — `const a = 1, b = 2` labels the `Variable` with the first declarator's name only.
+- **Interface members are distinct concepts** — `property_signature`, `call_signature`, and `method_signature` are separate concepts, not a unified "member".
+- **JSX text is a flat node** — `jsx_text` collapses contiguous text, so inline formatting changes inside JSX text can read as a single update.
+- **No type-flow inference** — the extractor does not distinguish a value used as a type from a type used as a value.
+- **Unmapped node types pass through** — anything outside the map keeps its raw tree-sitter type name.

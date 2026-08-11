@@ -1,0 +1,81 @@
+---
+title: "@ossl-dev/differens-git"
+description: "Git integration API reference"
+---
+
+# @ossl-dev/differens-git
+
+Git integration — shells out to the `git` binary to collect file pairs, and registers Differens as a git diff driver. Returns `GitDiffInput[]` pairs ready for the tier pipeline.
+
+Install:
+
+```bash
+npm install @ossl-dev/differens-git
+```
+
+## Exports
+
+| Export | Kind | Description |
+| --- | --- | --- |
+| `diffWorkingTree` | function | Working tree vs HEAD → `GitDiffInput[]` |
+| `diffCommitRange` | function | `"main..feature"` → `GitDiffInput[]` |
+| `diffDirectories` | function | Two directory trees, file by file |
+| `readFilePair` | function | Two standalone files → one `GitDiffInput` |
+| `installGitDriver` | function | Register `diff.differens.command` in local git config |
+| `diffDriverCommand` | function | Render runtime + args into the shell-quoted command git config wants |
+| `generateGitAttributes` | function | `.gitattributes` lines (`*.ts diff=differens`) |
+| `DRIVER_FLAG` | const | `"--git-diff-driver"` — the flag git-appended driver args follow |
+| `MAX_DIFF_BYTES` | const | `2 MiB` — files above this are read but not tree-parsed |
+| `isGitRepo` | function | Are we inside a git repository? |
+| `resolveRef` | function | Ref → commit SHA, or `null` if invalid |
+
+```ts
+// GitDiffInput:
+// { oldPath: string; newPath: string; oldSource: string; newSource: string }
+```
+
+## How the diff driver works
+
+Git invokes a registered driver with seven arguments: `path old-file old-hex old-mode new-file new-hex new-mode`, where the two file arguments are temporaries git wrote the blobs to. Those temporaries carry generated names, so the tier must be picked from `path` — classifying by temp name would find no extension and line-diff everything.
+
+The two files come back in one process: the CLI handles `DRIVER_FLAG`, and blobs are read in a single `git cat-file --batch` stream rather than one `git show` spawn per file per side.
+
+## Usage
+
+<CodeGroup>
+
+```ts Title="Diff the working tree"
+import { diffWorkingTree } from "@ossl-dev/differens-git";
+
+const pairs = await diffWorkingTree();  // vs HEAD
+for (const p of pairs) {
+  console.log(p.oldPath, p.oldSource.length, "->", p.newSource.length);
+}
+```
+
+```ts Title="Diff a commit range"
+import { diffCommitRange } from "@ossl-dev/differens-git";
+
+const pairs = await diffCommitRange("main..feature");
+```
+
+```ts Title="Register the diff driver"
+import { diffDriverCommand, installGitDriver, generateGitAttributes } from "@ossl-dev/differens-git";
+
+await installGitDriver(diffDriverCommand(process.execPath, ["cli.js", DRIVER_FLAG]));
+console.log(generateGitAttributes(["ts", "tsx", "py", "rs", "go"]));
+// *.ts diff=differens
+// *.tsx diff=differens
+```
+
+</CodeGroup>
+
+## Removing the driver
+
+There is no uninstall helper yet — remove the config manually:
+
+```bash
+git config --unset-all diff.differens.command
+git config --unset-all diff.differens.textconv
+git config --unset-all diff.differens.cachetextconv
+```

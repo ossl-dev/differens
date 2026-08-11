@@ -1,0 +1,105 @@
+---
+title: "@ossl-dev/differens-core"
+description: "Tree matching and edit script API reference"
+---
+
+# @ossl-dev/differens-core
+
+The matching engine at the heart of Differens. It takes two node trees, matches them with a GumTree-lineage algorithm — top-down isomorphic matching for anchors, bottom-up container matching for the rest, leaf recovery — and produces a typed edit script with a minimal Move set.
+
+The package has **zero dependencies**. Tier adapters in `@ossl-dev/differens-tiers` parse source into `Node` trees and call `diffTrees`.
+
+Install:
+
+```bash
+npm install @ossl-dev/differens-core
+```
+
+## Exports
+
+| Export | Kind | Description |
+| --- | --- | --- |
+| `diffTrees` | function | Match two trees and produce an edit script |
+| `treeFromValue` | function | Build a `Node` tree from a plain JS value |
+| `createNode` | function | Build one `Node`, computing its hashes |
+| `Node` | interface | The tree node shape |
+| `EditAction` | union | `Insert` / `Delete` / `Update` / `Move` |
+| `MatchOptions` | interface | Matching knobs |
+| `DiffResult` | interface | Return shape of `diffTrees` |
+
+## diffTrees
+
+```ts
+diffTrees(oldRoot: Node, newRoot: Node, options?: Partial<MatchOptions>): DiffResult
+```
+
+Returns `{ changes: EditAction[], nodeCount: number, fallback?: "lines" }`. `fallback` is set when either tree exceeds `maxNodes`; the caller should line-diff instead of trusting the (empty) change list.
+
+### MatchOptions
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `minHeight` | `2` | Below this height an ambiguous subtree only matches when its parent already did |
+| `bottomUpRatio` | `0.5` | Minimum Dice coefficient of matched descendants to pair two containers |
+| `maxNodes` | `250_000` | Node-count valve — larger inputs fall back to a line diff |
+
+## Node
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `kind` | `string` | Canonical concept, e.g. `"function"` |
+| `label?` | `string` | Name, when the node has one |
+| `value?` | `string` | Source text or primitive value |
+| `children` | `Node[]` | Child nodes |
+| `byteRange` | `[start, end]` | Source offsets |
+| `line?` | `number` | 1-based source line, when the adapter knows it |
+| `height` | `number` | Distance from the leaves |
+| `contentHash` | `number` | Merkle hash over kind + label + value + children |
+| `structureHash` | `number` | Merkle hash over kind + children only (label/value ignored) |
+
+Both hashes are 53-bit-safe folds of two 32-bit FNV-1a streams, so subtree equality is an integer compare.
+
+## EditAction
+
+| Type | Fields |
+| --- | --- |
+| `Insert` | `node`, `parent`, `position`, `context` |
+| `Delete` | `node`, `context` |
+| `Update` | `node`, `detail: RenameDetail \| ValueChangeDetail`, `context` |
+| `Move` | `node`, `fromParent`, `toParent`, `fromPosition`, `toPosition`, `context` |
+
+`context: NodeContext[]` is the containment chain, nearest ancestor first — each entry is `{ kind, label? }`. It lets narration say "removed `parse` from class `Config`" and lets AI tooling consume the full chain without re-parsing.
+
+`RenameDetail`: `{ kind: "Renamed", from, to }`.
+`ValueChangeDetail`: `{ kind: "ValueChanged", from?, to? }`.
+
+## Usage
+
+<CodeGroup>
+
+```ts Title="Diff two value trees"
+import { diffTrees, treeFromValue } from "@ossl-dev/differens-core";
+
+const oldTree = treeFromValue({ host: "localhost", port: 8080 });
+const newTree = treeFromValue({ host: "0.0.0.0", port: 8080 });
+
+const { changes } = diffTrees(oldTree, newTree);
+
+for (const action of changes) {
+  console.log(action.type, action.node.kind, action.node.label);
+  // "Update" "leaf" "host"   (detail: ValueChanged)
+}
+```
+
+```ts Title="Build a tree by hand"
+import { createNode } from "@ossl-dev/differens-core";
+
+const tree = createNode({
+  kind: "function",
+  label: "parseConfig",
+  children: [createNode({ kind: "identifier", value: "config", byteRange: [0, 6] })],
+  byteRange: [0, 50],
+});
+```
+
+</CodeGroup>

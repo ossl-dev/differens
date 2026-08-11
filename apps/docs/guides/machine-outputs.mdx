@@ -1,0 +1,105 @@
+---
+title: "Machine Outputs"
+description: "JSON, LLM, and streaming formats for tooling and AI"
+---
+
+# Machine Outputs
+
+Three machine-readable formats, one flag: `--format=json`, `--format=llm`, and `--format=markdown`. All are stable and deterministic — same input, same output.
+
+## JSON
+
+`differens main..feature --format=json` prints one document with everything: the per-file narrated changes and the cross-file moves.
+
+```json
+{
+  "perFile": [
+    {
+      "description": "renamed function `computeTotal` to `calculateTotalAmount`",
+      "filePath": "src/checkout.ts",
+      "action": {
+        "type": "Update",
+        "node": { "kind": "function", "label": "calculateTotalAmount", "line": 12 },
+        "detail": { "kind": "Renamed", "from": "computeTotal", "to": "calculateTotalAmount" },
+        "context": [{ "kind": "class", "label": "Checkout" }]
+      }
+    }
+  ],
+  "crossFileMoves": [
+    {
+      "kind": "function",
+      "name": "formatPrice",
+      "fromFile": "src/old/utils.ts",
+      "toFile": "src/new/utils.ts",
+      "modified": false
+    }
+  ]
+}
+```
+
+Schema notes:
+
+- `perFile` is an array of `SemanticChange` objects — `description`, `filePath`, and the full `action` (typed `EditAction`, containment `context` chain included, nearest ancestor first).
+- `crossFileMoves` is a flattened summary — kind, name, source, destination, and whether the node was edited in transit.
+- **BigInt-safe**: the serializer converts `bigint` values to strings before emitting, so downstream parsers never choke on hash fields.
+
+## LLM
+
+`--format=llm` is a compact, self-contained document built to cost less than the raw diff it replaces. One line per named change, the file named once, unnamed churn collapsed into a tally. Every named change carries its source line, so a model can read twenty lines of context instead of the whole file.
+
+```text
+differens/1 2 files 5 changes 4 named
+# src/checkout.ts
+~ function computeTotal :12 < class Checkout calculateTotalAmount -> computeTotal
++ function applyDiscount :40
+# src/cart.ts
+* 2 comments
+# cross-file
+> formatPrice src/old/utils.ts -> src/new/utils.ts edited
+```
+
+Line grammar:
+
+| Part | Meaning |
+| --- | --- |
+| `differens/1 <files> files <changes> changes <named> named` | Header, one line |
+| `# <path>` | File heading, named once |
+| `+` `-` `~` `>` | Insert, Delete, Update, Move |
+| `:12` | 1-based source line of the change |
+| `< class Checkout` | Nearest named ancestor scope |
+| `from -> to` | Rename or value change |
+| `* 2 comments` | Rolled-up minor changes (unnamed nodes, prose lines) |
+| `# cross-file` / `> name from -> to [edited]` | Cross-file moves section |
+
+Pipe it straight into a model:
+
+<CodeGroup>
+
+```bash Title="Feed an LLM"
+differens main..feature --format=llm | llm "summarize this changeset"
+```
+
+```text Title="Sample model answer"
+Renamed computeTotal to calculateTotalAmount inside Checkout, added
+applyDiscount, and moved formatPrice from src/old/utils.ts to
+src/new/utils.ts with minor edits.
+```
+
+</CodeGroup>
+
+## Markdown
+
+`--format=markdown` is PR-ready: one `##` heading per file, one bullet per change.
+
+```md
+## src/checkout.ts
+
+- renamed function `computeTotal` to `calculateTotalAmount`
+- added function `applyDiscount`
+```
+
+Empty changesets render as `_no logical changes_`.
+
+## Streaming (future)
+
+ndjson streaming output is on the roadmap — one change per line as trees finish matching, for long-running diffs over large changesets. Track it in the repo's open issues.
