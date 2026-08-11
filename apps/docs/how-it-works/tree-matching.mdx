@@ -79,7 +79,7 @@ The script is minimal: one action per affected node, and a rename is one `Update
 
 ## Content hash vs structure hash
 
-Every node carries two hashes — 53-bit-safe folds of two 32-bit FNV-1a streams — both computed bottom-up (Merkle-style):
+Every node carries two hashes, 53-bit-safe folds of two 32-bit FNV-1a streams, both computed bottom-up (Merkle-style):
 
 - **Content hash**: kind + label + value + the children's content hashes. Two nodes with the same content hash are the same code. Renaming `greet` changes the label and therefore the content hash.
 - **Structure hash**: kind + the children's structure hashes. Labels and values are ignored, so `function greet(...)` and `function farewell(...)` with identical bodies share a structure hash. This is what phase 1 matches on.
@@ -93,7 +93,7 @@ Hashes use FNV-1a over two independent 32-bit streams, folded into one 53-bit-sa
 The collision bound follows from the birthday problem: at the 250,000-node cap, the chance of any two nodes colliding is about 0.0003%.
 
 <Info>
-Hashes are JavaScript numbers — not full 64-bit integers, so no `BigInt` handling is involved. The JSON formatter serializes them explicitly. See [Output](/guides/machine-outputs).
+Hashes are JavaScript numbers, not full 64-bit integers, so no `BigInt` handling is involved. The JSON formatter serializes them as regular integers. See [Output](/guides/machine-outputs).
 </Info>
 
 ## Safety valves
