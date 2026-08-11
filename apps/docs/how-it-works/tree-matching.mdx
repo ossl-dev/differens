@@ -5,11 +5,11 @@ description: "How the GumTree algorithm finds structural matches between two cod
 
 # Tree Matching
 
-The diff core runs one algorithm — GumTree lineage — in three phases: top-down isomorphic matching, bottom-up container matching, and a Chawathe edit script over the matched pairs. All six tiers feed the same algorithm; only the trees differ.
+The diff core runs one algorithm, in the GumTree lineage, across three phases: top-down isomorphic matching, bottom-up container matching, and a Chawathe edit script over the matched pairs. All six tiers feed the same algorithm; only the trees differ.
 
 ## Phase 1: top-down isomorphic matching
 
-The algorithm walks both trees top-down and pairs subtrees that are structurally identical. Two subtrees are isomorphic when their structure hashes match exactly — same kind, same children, same shape, with labels and values ignored.
+The algorithm walks both trees top-down and pairs subtrees that are structurally identical. Two subtrees are isomorphic when their structure hashes match exactly: same kind, same children, same shape, with labels and values ignored.
 
 Take these two small ASTs. `a.ts`:
 
@@ -28,7 +28,7 @@ function greet(name: string): string {
 }
 ```
 
-The `return` node in `a.ts` and the `return` node in `b.ts` differ, but the parameter list — `name: string` — is identical in both. Top-down matching anchors on those identical subtrees first:
+The `return` node in `a.ts` and the `return` node in `b.ts` differ, but the parameter list, `name: string`, is identical in both. Top-down matching anchors on those identical subtrees first:
 
 ```text
 old: function_declaration
@@ -39,7 +39,7 @@ new: function_declaration
              └── required_parameter "name"        ← matched (structure hash equal)
 ```
 
-Isomorphic anchors are cheap to find — one hash comparison per candidate — and they seed the rest of the algorithm with high-confidence pairs.
+Isomorphic anchors are cheap to find: one hash comparison per candidate. They seed the rest of the algorithm with high-confidence pairs.
 
 ## Phase 2: bottom-up container matching
 
@@ -61,7 +61,7 @@ new: function_declaration  ← matched in phase 2 (1 of 2 children matched)
              └── return
 ```
 
-The matcher only compares candidates whose parents already match — a node can never match against something in a different subtree. That pruning is what keeps the phase tractable.
+The matcher only compares candidates whose parents already match. A node can never match against something in a different subtree, and that pruning is what keeps the phase tractable.
 
 ## Chawathe edit scripts
 
@@ -81,26 +81,26 @@ The script is minimal: one action per affected node, and a rename is one `Update
 
 Every node carries two 64-bit hashes, both computed bottom-up (Merkle-style):
 
-- **Content hash** — kind + label + value + the children's content hashes. Two nodes with the same content hash are the same code. Renaming `greet` changes the label and therefore the content hash.
-- **Structure hash** — kind + the children's structure hashes. Labels and values are ignored, so `function greet(...)` and `function farewell(...)` with identical bodies share a structure hash. This is what phase 1 matches on.
+- **Content hash**: kind + label + value + the children's content hashes. Two nodes with the same content hash are the same code. Renaming `greet` changes the label and therefore the content hash.
+- **Structure hash**: kind + the children's structure hashes. Labels and values are ignored, so `function greet(...)` and `function farewell(...)` with identical bodies share a structure hash. This is what phase 1 matches on.
 
-The distinction is what makes the pipeline work end to end: structure hashes find *where things are*, content hashes find *what things are*, and the correlator uses both.
+Structure hashes find *where things are*; content hashes find *what things are*. The correlator uses both.
 
 ## 64-bit FNV-1a hashing
 
-Hashes use FNV-1a over the full 64-bit space. Each node's hash combines its own fields with its children's hashes, so a change anywhere in a subtree changes every ancestor's hash — the Merkle property that makes subtree equality a single comparison.
+Hashes use FNV-1a over the full 64-bit space. Each node's hash combines its own fields with its children's hashes, so a change anywhere in a subtree changes every ancestor's hash. That Merkle property makes subtree equality a single comparison.
 
 The collision bound follows from the birthday problem: at the 50k-node cap, the chance of any two nodes colliding is about 0.000007%.
 
 <Info>
-Hashes are real 64-bit integers, wider than JavaScript's safe number range, so they are stored and serialized as `BigInt`. The JSON formatter serializes them explicitly — see [Output](/guides/machine-outputs).
+Hashes are real 64-bit integers, wider than JavaScript's safe number range, so they are stored and serialized as `BigInt`. The JSON formatter serializes them explicitly. See [Output](/guides/machine-outputs).
 </Info>
 
 ## Safety valves
 
 Tree matching is inherently super-linear, so the core enforces two bounds:
 
-- **`maxNodes` = 50k** — trees larger than this are diffed at a coarser granularity instead of node-by-node, which keeps the birthday bound quoted above honest.
-- **O(n²) bottom-up matching** — the bottom-up phase is bounded to quadratic worst-case work; candidate pairs are only considered inside already-matched parents, which keeps typical runs far below the bound.
+- **`maxNodes` = 50k**: trees larger than this are diffed at a coarser granularity instead of node-by-node, which keeps the birthday bound quoted above honest.
+- **O(n²) bottom-up matching**: the bottom-up phase is bounded to quadratic worst-case work; candidate pairs are only considered inside already-matched parents, which keeps typical runs far below the bound.
 
-The valves fail soft: exceeding a bound degrades the diff to fewer, larger matched nodes — never to a crash.
+The valves fail soft: exceeding a bound degrades the diff to fewer, larger matched nodes instead of aborting.

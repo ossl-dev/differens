@@ -6,14 +6,14 @@ mode: "center"
 
 # Contributing
 
-Thanks for wanting to make Differens better. This guide covers everything from your first clone to shipping a release.
+Thanks for wanting to improve Differens. This guide covers cloning the repo, making changes, and shipping a release.
 
 ## Code of conduct
 
 Be respectful. Differens is a small project maintained by people with day jobs, so:
 
 - Assume good intent in reviews and discussions
-- Give constructive feedback — say what is wrong and why, not just that it is wrong
+- Give constructive feedback. Say what is wrong and why, not just that it is wrong
 - Be patient: maintainers review in their spare time
 - Keep discussions on the topic of the project
 
@@ -35,7 +35,7 @@ Verify everything works:
 
 ```bash
 bun run build      # Build all packages
-bun run test       # 100+ tests across 6 packages — must be zero failures
+bun run test       # 100+ tests across 6 packages, must be zero failures
 ```
 
 Per-package tests run faster when you are iterating on one area:
@@ -46,7 +46,7 @@ bun test packages/tiers/src/
 ```
 
 <Info>
-No build step is needed to run the CLI from source — Bun runs TypeScript directly:
+No build step is needed to run the CLI from source. Bun runs TypeScript directly:
 
 ```bash
 bun run apps/cli/src/index.ts <inputs>
@@ -58,13 +58,13 @@ bun run apps/cli/src/index.ts <inputs>
 1. **Pick or open an issue.** Say what you want to work on so nobody else starts the same thing.
 2. **Branch from `main`.** Give the branch a short descriptive name.
 3. **Write code + tests.** Every behavior change gets a test.
-4. **Run `bun run test`** — must be all green.
-5. **Run `bun run lint`** — must be clean (Biome).
+4. **Run `bun run test`**. Must be all green.
+5. **Run `bun run lint`**. Must be clean (Biome).
 6. **Open a PR against `main`.** Reference the issue in the description.
 
 ### Commit style
 
-Human-readable, past-tense, lowercase after the first word. Think of the commit message as a sentence describing what the diff did.
+Human-readable, past-tense, lowercase after the first word. Write it as a sentence describing what the diff did.
 
 Good:
 
@@ -74,8 +74,8 @@ Good:
 
 Avoid:
 
-- `fix: root insert` — too terse, does not say what or why
-- `Implemented comprehensive solution for edge case handling in the tree matching subsystem` — too verbose to skim
+- `fix: root insert`. Too terse, does not say what or why
+- `Implemented comprehensive solution for edge case handling in the tree matching subsystem`. Too verbose to skim
 
 ### Formatting
 
@@ -83,7 +83,7 @@ Biome handles formatting and linting. Run `bun run format` before committing, or
 
 ## Adding a language extractor
 
-Extractors map tree-sitter node types to canonical concepts (`Function`, `Class`, `Method`, `Import`, ...) so diffs read as "renamed method" instead of "renamed node `method_definition`". Languages without an extractor still work — they fall back to structural diff with raw tree-sitter node labels.
+Extractors map tree-sitter node types to canonical concepts (`Function`, `Class`, `Method`, `Import`, ...) so diffs read as "renamed method" instead of "renamed node `method_definition`". Languages without an extractor still work. They fall back to structural diff with raw tree-sitter node labels.
 
 1. Create `packages/tiers/src/code/<language>.ts`
 2. Implement the `LanguageExtractor` interface from `extractor.ts`
@@ -94,7 +94,7 @@ Extractors map tree-sitter node types to canonical concepts (`Function`, `Class`
 
 ## Adding a tier adapter
 
-Adapters sit on the abstraction ladder: T0 is raw bytes, T5 is code. Each tier parses its content into a `Node` tree that the one diff core consumes — the core never cares where its input came from.
+Adapters sit on the abstraction ladder: T0 is raw bytes, T5 is code. Each tier parses its content into a `Node` tree that the one diff core consumes. The core does not need to know where its input came from.
 
 1. Create the adapter in `packages/tiers/src/`
 2. It must produce a `Node` tree (see `packages/core/src/index.ts` for the interface)
@@ -104,7 +104,7 @@ Adapters sit on the abstraction ladder: T0 is raw bytes, T5 is code. Each tier p
 6. Add tests in `packages/tiers/src/index.test.ts`
 
 <Info>
-Graceful degradation is a core design rule: every tier can fall back to the one below it. A new adapter should never leave a file type un-diffable — the tool never crashes or refuses to produce an answer.
+Graceful degradation is a core design rule: every tier can fall back to the one below it. A new adapter should not leave a file type un-diffable. If the adapter fails, the tier below takes over and the file still gets a diff.
 </Info>
 
 ## Project structure
@@ -172,12 +172,12 @@ bun run release -- --dry-run   # preview first
 bun run release
 ```
 
-Everything after `--` passes through to `npm publish`, so `--otp=123456` is how a one-time code gets in when the account uses app-based 2FA. A passkey has no code: npm falls back to a browser challenge, which needs a real terminal — run releases from your own shell, not from a CI step or a pipe.
+Everything after `--` passes through to `npm publish`, so `--otp=123456` is how a one-time code gets in when the account uses app-based 2FA. A passkey has no code. npm falls back to a browser challenge, which needs a real terminal. Run releases from your own shell, not from a CI step or a pipe.
 
 The release is resumable: a version already on the registry is skipped rather than retried, and a scope the account cannot publish into skips only its own packages. `scripts/publish.ts` stages each publish into a temp directory and never rewrites the repo manifests, so an interrupted run cannot leave the workspace half-published.
 
 ## Where to ask questions
 
-- **GitHub issues** — bugs, feature requests, and questions about behavior. Search first; your question may already be answered.
-- **Pull requests** — discuss code changes in the PR thread.
-- **The repository itself** — `DEVELOPMENT_GUIDE.md` at the repo root is the source of truth for development workflow and architecture notes.
+- **GitHub issues**. Bugs, feature requests, and questions about behavior. Search first; your question may already be answered.
+- **Pull requests**. Discuss code changes in the PR thread.
+- **The repository itself**. `DEVELOPMENT_GUIDE.md` at the repo root is the source of truth for development workflow and architecture notes.

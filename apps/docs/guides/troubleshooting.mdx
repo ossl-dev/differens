@@ -5,7 +5,7 @@ description: "Common issues and how to fix them"
 
 # Troubleshooting
 
-Differens is designed to degrade gracefully — it never crashes or refuses to produce an answer — but some inputs are slower, and some edge cases produce results that need explanation. Each issue below lists the symptom, the cause, and what to do about it.
+Most inputs diff quickly, but some are slow, and some edge cases produce results that need explanation. Each issue below lists the symptom, the cause, and a workaround.
 
 ## Diff is too slow
 
@@ -13,10 +13,10 @@ Differens is designed to degrade gracefully — it never crashes or refuses to p
 
 **Cause:** Container matching at the bottom of the tree is O(n²) in the worst case. A 50,000-node safety valve (`maxNodes`) caps the tree size, so very large inputs are truncated rather than diffed exhaustively.
 
-**Workaround:** Check the file sizes involved, and diff specific files instead of whole directories. Diffs on individual files are dramatically faster than directory-wide or working-tree-wide diffs on large repositories.
+**Workaround:** Check the file sizes involved, and diff specific files instead of whole directories. On a large repository, diffing one file is much faster than diffing a directory or the whole working tree.
 
 <Info>
-The 50k `maxNodes` valve is a deliberate safety limit, not a bug — it keeps the diff bounded and predictable on pathological inputs. Work on improving the scaling of bottom-up container matching is tracked in the roadmap.
+The 50k `maxNodes` limit is intentional, not a bug. It keeps diffs bounded on pathological inputs. Improvements to bottom-up container matching scaling are tracked in the roadmap.
 </Info>
 
 ## Deep nesting causes a crash
@@ -25,7 +25,7 @@ The 50k `maxNodes` valve is a deliberate safety limit, not a bug — it keeps th
 
 **Cause:** Recursion depth in the matcher. Content nested deeper than roughly 10,000 levels can exhaust the call stack.
 
-**Workaround:** This is a known issue and is being worked on — the fix replaces recursive tree walks with iterative stacks. In the meantime, split the input into smaller pieces or diff at a coarser level (for example, diff a subtree instead of the whole file).
+**Workaround:** A fix is in progress: the matcher will use iterative stacks instead of recursive tree walks. In the meantime, split the input into smaller pieces, or diff at a coarser level. For example, diff a subtree instead of the whole file.
 
 ## YAML diffs are wrong
 
@@ -43,15 +43,15 @@ YAML with non-standard indentation (4 spaces, tabs) may parse with collapsed or 
 
 **Symptom:** A renamed function or variable appears as a pair of Delete and Insert actions instead of a rename.
 
-**Cause:** Rename detection at the leaf level is a known limitation — individual leaf nodes do not carry enough context for the matcher to pair them as renames.
+**Cause:** Rename detection at the leaf level is a known limitation. Individual leaf nodes do not carry enough context for the matcher to pair them as renames.
 
-**Workaround:** This is largely cosmetic. The narration layer (`@ossl-dev/differens-narrate`) mitigates the limitation by reading the surrounding context and phrasing such changes as moves or renames in prose output, which is the intended way to consume diffs for humans and LLMs.
+**Workaround:** This is largely cosmetic. The narration layer (`@ossl-dev/differens-narrate`) reads the surrounding context and phrases such changes as moves or renames in its prose output. That is the intended way to consume diffs, whether by humans or LLMs.
 
 ## Markup parser misbehaves
 
 **Symptom:** HTML/XML diffs are wrong, especially around attributes.
 
-**Cause:** The markup tokenizer (T3 tier) is regex-based, and it can misparse a `>` that appears inside an attribute value — for example `<div title="a > b">`. The tokenizer treats the `>` as closing the tag.
+**Cause:** The markup tokenizer (T3 tier) is regex-based, and it can misparse a `>` that appears inside an attribute value, for example `<div title="a > b">`. The tokenizer treats the `>` as closing the tag.
 
 **Workaround:** Rewrite the attribute value so it does not contain a raw `>` (for example, use `&gt;` or `&#62;`), or diff the file with a different tier.
 
@@ -63,7 +63,7 @@ Attribute values containing a bare `>` can confuse the markup tokenizer, produci
 
 **Symptom:** The first diff of a code file errors out, but retrying the same command works.
 
-**Cause:** An asynchronous tree-sitter grammar initialization race — the grammar is not fully ready when the first parse starts. The initialization result is cached in a promise, which mitigates the race for subsequent calls.
+**Cause:** An asynchronous tree-sitter grammar initialization race. The grammar is not fully ready when the first parse starts. The initialization result is cached in a promise, which mitigates the race for subsequent calls.
 
 **Workaround:** Retry the command. Because the promise is cached, the second call reuses the completed initialization and proceeds normally.
 
@@ -95,7 +95,7 @@ If you upgraded Bun, run `bun install` again to refresh the lockfile and native 
 bun run typecheck
 ```
 
-If errors persist after a clean typecheck, the packages depend on each other through the workspace — rebuild the dependents:
+If errors persist after a clean typecheck, the packages depend on each other through the workspace. Rebuild the dependents:
 
 ```bash
 bun run build

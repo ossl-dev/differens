@@ -5,11 +5,11 @@ description: "Use Differens as your git diff tool"
 
 # Git Integration
 
-Differens can sit in the middle of your normal `git diff` workflow: instead of hunks, you get narrated, semantic changes.
+Differens plugs into your normal `git diff` workflow. Instead of line hunks, it reports the semantic changes: renames, moves, added parameters.
 
 ## Install the driver
 
-One command registers Differens as a git diff driver in your local repo's config, and prints the `.gitattributes` lines you need to opt files into it:
+One command registers Differens as a git diff driver in your repo's local config, then prints the `.gitattributes` lines you need to opt files in:
 
 <CodeGroup>
 
@@ -33,13 +33,13 @@ then `git diff` narrates those files instead of printing hunks.
 
 </CodeGroup>
 
-Add the `diff=differens` lines to your `.gitattributes` (repo root or per-directory) for every extension you want narrated. Files without the attribute keep normal `git diff` output.
+Add the `diff=differens` lines to `.gitattributes` (repo root or per-directory) for every extension you want covered. Files without the attribute keep normal `git diff` output.
 
-Now `git diff` on a `.ts` file shows the narrated change instead of a hunk:
+Now `git diff` on a `.ts` file shows the change instead of a hunk:
 
 <CodeGroup>
 
-```text Title="Before — git diff"
+```text Title="Before: git diff"
 - function computeTotal(items: Item[]): number {
 -   return items.reduce((acc, item) => acc + item.price, 0);
 + function calculateTotalAmount(items: Item[], discount: number): number {
@@ -48,7 +48,7 @@ Now `git diff` on a `.ts` file shows the narrated change instead of a hunk:
   }
 ```
 
-```text Title="After — differens driver"
+```text Title="After: differens driver"
   ~ renamed function `computeTotal` to `calculateTotalAmount`
   + added parameter `discount`
 
@@ -57,21 +57,21 @@ Now `git diff` on a `.ts` file shows the narrated change instead of a hunk:
 
 </CodeGroup>
 
-Git hands the driver both sides of every changed file, so this works in `git diff`, `git diff --staged`, and `git difftool`. To remove the driver later, unset the config — see the note in the [git package reference](/reference/git).
+The driver receives both versions of every changed file, so this works in `git diff`, `git diff --staged`, and `git difftool`. To remove the driver later, unset the config. See the note in the [git package reference](/reference/git).
 
 ## Standalone modes
 
-No git driver required — `differens` talks to git itself.
+No git driver required. `differens` reads git directly.
 
 ### Working tree
 
-With no arguments, `differens` diffs the working tree against HEAD — every changed file, correlated across files:
+With no arguments, `differens` diffs the working tree against HEAD and correlates the changes across files:
 
 ```bash
 differens
 ```
 
-This is `git diff HEAD` narrated: it picks up unstaged and staged changes, plus untracked files are not included.
+This is `git diff HEAD` in semantic form. It picks up unstaged and staged changes. Untracked files are excluded.
 
 ### Commit ranges
 
@@ -79,7 +79,7 @@ This is `git diff HEAD` narrated: it picks up unstaged and staged changes, plus 
 differens main..feature
 ```
 
-Diff every file that changed between two refs. Output is grouped per file, and cross-file moves are reported at the end:
+Diffs every file that changed between two refs. Output is grouped per file, with cross-file moves reported at the end:
 
 ```text
 src/checkout.ts
@@ -101,13 +101,13 @@ differens 8f3a1c2 5b0e9d7
 
 ### Two directories
 
-If both arguments are directories, Differens walks them and diffs matching relative paths:
+If both arguments are directories, Differens walks each one and diffs matching relative paths:
 
 ```bash
 differens release/1.0/ release/1.1/
 ```
 
-Files present on only one side are whole-file additions or removals. Generated and vendor directories (`node_modules`, `dist`, `.git`, …) are skipped, and files over 2 MiB are line-diffed instead of parsed.
+Files present on only one side are whole-file additions or removals. Generated and vendor directories (`node_modules`, `dist`, `.git`, …) are skipped. Files over 2 MiB are line-diffed instead of parsed.
 
 ## How it compares to git diff
 

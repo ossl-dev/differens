@@ -5,7 +5,7 @@ description: "Narration engine API reference"
 
 # @ossl-dev/differens-narrate
 
-The narration engine — turns typed `EditAction`s into human-readable text. Template-based, deterministic, and fast. Output is a `SemanticChange[]`, each pairing the raw action with an English `description`.
+The narration engine turns `EditAction`s into human-readable text. It is template-based, so the output is deterministic. It returns a `SemanticChange[]`, where each entry pairs the raw action with an English `description`.
 
 Install:
 
@@ -36,11 +36,11 @@ narrate(actions: EditAction[], opts?: { filePath?: string }): SemanticChange[]
 //   fromFilePath?: string; toFilePath?: string }
 ```
 
-Duplicate `Update`s for the same rename are collapsed — renaming a function reports it once (the named node wins), not once per identifier occurrence.
+Duplicate `Update`s for the same rename are collapsed. Renaming a function reports it once, with the named node winning, instead of once per identifier occurrence.
 
 ## Vocabulary
 
-Kinds are canonicalized at the extractor layer and humanized by `humanizeKind` (camelCase and underscore splitting, lowercased). Language synonyms all land on the same concept:
+Kinds are canonicalized at the extractor layer. `humanizeKind` renders them for display, splitting camelCase and underscores and lowercasing. Language-specific node names map to the same canonical kind:
 
 | Canonical | Source node types (language-specific) |
 | --- | --- |
@@ -56,7 +56,7 @@ Narration shapes:
 - `renamed function \`foo\` to \`bar\``
 - `changed value of config key \`host\` from \`localhost\` to \`0.0.0.0\``
 - `moved function \`parseConfig\` from utils.ts to config.ts`
-- Scoped: `removed variable \`timeout\` from function \`connect\`` — the nearest named ancestor is always included when it adds information.
+- Scoped: `removed variable \`timeout\` from function \`connect\``. The nearest named ancestor is included when it adds information.
 
 ## Usage
 

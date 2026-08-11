@@ -5,13 +5,13 @@ description: "Which languages get semantic diffs and what that means"
 
 # Language Support
 
-Differens parses code with tree-sitter and diffs the resulting trees, so the question is never "does this language work?" — any language with a tree-sitter grammar gets structural diffing. The real question is *how much semantics* a language gets: whether Differens knows a node is a `Function` or a `Class`, or just that it is a tree-sitter node type like `function_item`.
+Differens parses code with tree-sitter and diffs the resulting trees. Any language with a tree-sitter grammar gets structural diffing. The real question is how much semantics a language gets: Differens either recognizes a node as a `Function` or a `Class`, or it just sees a tree-sitter node type like `function_item`.
 
 ## Two levels of support
 
-**Semantic extractors (T5, L6).** Four languages ship a per-language extractor: TypeScript/JavaScript, Python, Rust, and Go. An extractor maps tree-sitter node types to canonical concepts — `Function`, `Class`, `Method`, `Import`, `Export`, `Variable`, `Type`, `Enum`, `Struct`, `Trait` — and pulls the declaration name out of the tree. With an extractor, a rename is a *rename*, a move is a *move*, and narration can say "renamed `computeTotal` to `calculateTotalAmount`".
+**Semantic extractors (T5, L6).** Four languages ship a per-language extractor: TypeScript/JavaScript, Python, Rust, and Go. An extractor maps tree-sitter node types to canonical concepts like `Function`, `Class`, `Method`, `Import`, `Export`, `Variable`, `Type`, `Enum`, `Struct`, and `Trait`, then pulls the declaration name out of the tree. With an extractor, a rename is a *rename* and a move is a *move*. Narration can say "renamed `computeTotal` to `calculateTotalAmount`".
 
-**Generic structural diff (T5, L5).** Every other language with a tree-sitter grammar works out of the box at the generic level: the CST is still parsed into a tree and matched structurally, but nodes keep their raw tree-sitter type names instead of canonical concepts, and labels come from the generic `name`-field rule. Reformatting and restructure are still caught; semantic narration is not.
+**Generic structural diff (T5, L5).** Every other language with a tree-sitter grammar still gets structural diffing. The CST is parsed into a tree and matched structurally, but nodes keep their raw tree-sitter type names instead of canonical concepts, and labels come from the generic `name`-field rule. Reformatting and restructure are caught. Semantic narration is not.
 
 ## Languages with full extractors
 
@@ -21,9 +21,9 @@ Differens parses code with tree-sitter and diffs the resulting trees, so the que
 | Python | T5 (L6) | `PythonExtractor` | functions (including async), classes, imports, decorators, assignments, comprehensions, type annotations, control flow |
 | Rust | T5 (L6) | `RustExtractor` | functions, structs, enums, traits, impls, macros, `use` imports, modules, types |
 | Go | T5 (L6) | `GoExtractor` | functions, methods, structs, interfaces, imports, variables, constants, goroutines |
-| Any other tree-sitter grammar | T5 (L5) | — | structural diff with raw tree-sitter node type labels |
+| Any other tree-sitter grammar | T5 (L5) | n/a | structural diff with raw tree-sitter node type labels |
 
-Anything tree-sitter has a grammar for falls back to the generic structural level (T5, L5) — no extractor needed. If no grammar is registered at all, the file falls down the tier ladder to a line diff.
+Anything tree-sitter has a grammar for falls back to the generic structural level (T5, L5). No extractor needed. If no grammar is registered at all, the file falls down the tier ladder to a line diff.
 
 ## The LanguageExtractor interface
 
@@ -44,7 +44,7 @@ export interface LanguageExtractor {
 }
 ```
 
-The tree-sitter cursor walk reads the `name` field directly for every node, so `extractLabel` only runs for the types listed in `labelFallbackTypes` — a set lookup instead of a `childForFieldName` call per node.
+The tree-sitter cursor walk reads the `name` field directly for every node. `extractLabel` only runs for the types listed in `labelFallbackTypes`. That is a set lookup instead of a `childForFieldName` call per node.
 
 ## Adding a language
 

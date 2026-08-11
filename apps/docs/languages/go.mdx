@@ -5,7 +5,7 @@ description: "Semantic diffing for Go"
 
 ## Go extractor
 
-The Go extractor maps tree-sitter Go CST nodes to canonical concepts. It detects structural changes at the package level — functions, methods, types, and interfaces.
+The Go extractor maps tree-sitter Go CST nodes to canonical concepts. It detects structural changes at the package level: functions, methods, types, and interfaces.
 
 ### Detected concepts
 
@@ -22,7 +22,7 @@ The Go extractor maps tree-sitter Go CST nodes to canonical concepts. It detects
 
 ### Example
 
-Two versions of a Go package — a method extracted to a new function:
+Two versions of a Go package. The second version extracts a method into a new function:
 
 ```go
 // old.go
@@ -75,7 +75,7 @@ extracted function validateEmail from method ValidateEmail
 
 ### Known limitations
 
-- Implicit interfaces (structural typing) are not tracked — an interface implemented by coincidence is not flagged as a relationship.
+- Implicit interfaces (structural typing) are not tracked. An interface implemented by coincidence is not flagged as a relationship.
 - Package renames affect import paths; the cross-file correlator handles this when run across the full package.
 - Cgo blocks are treated as opaque; the extractor does not descend into C preambles.
 - Generic type parameters (Go 1.18+) are parsed structurally but type parameter renames may not be detected as renames (reported as structural changes).

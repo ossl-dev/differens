@@ -5,7 +5,7 @@ description: "JSON, LLM, and streaming formats for tooling and AI"
 
 # Machine Outputs
 
-Three machine-readable formats, one flag: `--format=json`, `--format=llm`, and `--format=markdown`. All are stable and deterministic — same input, same output.
+Three machine-readable formats, one flag: `--format=json`, `--format=llm`, and `--format=markdown`. All are stable and deterministic. Same input, same output.
 
 ## JSON
 
@@ -39,13 +39,13 @@ Three machine-readable formats, one flag: `--format=json`, `--format=llm`, and `
 
 Schema notes:
 
-- `perFile` is an array of `SemanticChange` objects — `description`, `filePath`, and the full `action` (typed `EditAction`, containment `context` chain included, nearest ancestor first).
-- `crossFileMoves` is a flattened summary — kind, name, source, destination, and whether the node was edited in transit.
-- **BigInt-safe**: the serializer converts `bigint` values to strings before emitting, so downstream parsers never choke on hash fields.
+- `perFile` is an array of `SemanticChange` objects: `description`, `filePath`, and the full `action` (typed `EditAction`, containment `context` chain included, nearest ancestor first).
+- `crossFileMoves` is a flattened summary of kind, name, source, destination, and whether the node was edited in transit.
+- **BigInt-safe**: the serializer converts `bigint` values to strings before emitting. Downstream parsers never see `bigint` in hash fields.
 
 ## LLM
 
-`--format=llm` is a compact, self-contained document built to cost less than the raw diff it replaces. One line per named change, the file named once, unnamed churn collapsed into a tally. Every named change carries its source line, so a model can read twenty lines of context instead of the whole file.
+`--format=llm` is a compact, self-contained document. It costs less than the raw diff it replaces. Each named change gets one line, each file is named once, and unnamed churn collapses into a tally. Every named change carries its source line, so a model can read twenty lines of context instead of the whole file.
 
 ```text
 differens/1 2 files 5 changes 4 named
@@ -89,7 +89,7 @@ src/new/utils.ts with minor edits.
 
 ## Markdown
 
-`--format=markdown` is PR-ready: one `##` heading per file, one bullet per change.
+`--format=markdown` is a changelog you can drop into a PR description: one `##` heading per file, one bullet per change.
 
 ```md
 ## src/checkout.ts
@@ -102,4 +102,4 @@ Empty changesets render as `_no logical changes_`.
 
 ## Streaming (future)
 
-ndjson streaming output is on the roadmap — one change per line as trees finish matching, for long-running diffs over large changesets. Track it in the repo's open issues.
+ndjson streaming output is on the roadmap. It will emit one change per line as trees finish matching, for long-running diffs over large changesets. Track it in the repo's open issues.

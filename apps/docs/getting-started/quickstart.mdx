@@ -5,11 +5,11 @@ description: "Run your first semantic diff in under a minute"
 
 # Quickstart
 
-Follow along — you will have your first semantic diff in under a minute.
+You will have your first semantic diff in under a minute. It takes two files and one command.
 
 ## Step 1: Create two files
 
-Create `before.ts` and `after.ts` — a function that gets renamed and gains a parameter:
+Create `before.ts` and `after.ts`. The example function is renamed and gains a parameter:
 
 ```typescript
 // before.ts
@@ -62,7 +62,7 @@ Compare that to a line diff of the same change:
   }
 ```
 
-The line diff says the whole function was deleted and rewritten. Differens says: it was renamed, one parameter was added, one statement was added, one expression changed — and `TAX_RATE` did not change at all.
+The line diff reports the whole function as deleted and rewritten. Differens reports a rename, an added parameter, an added statement, an updated expression, and an unchanged `TAX_RATE`.
 
 <Info>
 Each action in the output is a typed edit: `rename`, `move`, `insert`, `delete`, `update`. The narration engine produces these from the Chawathe edit script computed by the matching core.
@@ -91,7 +91,7 @@ differens before.ts after.ts --format=json
 
 ## Step 5: Diff a git working tree
 
-Point Differens at your repo and it diffs the working tree against `HEAD`, correlating moves across all changed files:
+Run Differens inside a git repository. It diffs the working tree against `HEAD` and correlates moves across all changed files:
 
 <CodeGroup title="Working tree diff">
 <Code title="Command" language="bash">
@@ -113,7 +113,7 @@ differens main..feature
 
 ## Step 6: Diff two directories
 
-Compare whole directory trees — Differens matches files across the trees and reports renames at the file level too:
+Compare two whole directories. Differens matches files across the trees and reports renames at the file level too:
 
 <CodeGroup title="Directory diff">
 <Code title="Command" language="bash">
@@ -128,6 +128,6 @@ match: 142 of 150 files unchanged
 
 ## What's next
 
-- [CLI reference](/reference/cli) — every command, flag, and format
-- [Guides](/guides/git-integration) — git integration, machine outputs, and benchmarks
-- [How it works](/how-it-works/architecture) — the matching and tier pipeline under the hood
+- [CLI reference](/reference/cli): every command, flag, and format
+- [Guides](/guides/git-integration): git integration, machine outputs, and benchmarks
+- [How it works](/how-it-works/architecture): the matching algorithm, tier pipeline, and cross-file correlation

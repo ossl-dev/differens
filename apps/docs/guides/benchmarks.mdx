@@ -5,20 +5,20 @@ description: "Performance characteristics and comparison to git diff"
 
 # Benchmarks
 
-Differens trades `git diff`'s instant line comparison for parse + match. The cost is a fast, linear matching pass; the payoff is answers like "renamed" and "moved" instead of delete/insert noise.
+Differens compares code structurally instead of line by line. Parsing and matching cost more than `git diff`'s instant line comparison, but matching is fast: a single linear pass. In return, it reports "renamed" and "moved" where `git diff` shows a delete/insert pair.
 
 ## Typical numbers
 
 | Input | Scale | Behavior |
 | --- | --- | --- |
 | Small files (a few hundred lines) | ~1k nodes | Tree diff in well under a millisecond of matching; parse dominates |
-| Large files (a few thousand lines) | ~100k+ nodes | Matching is linear — 350k nodes in roughly 70 ms; parse and I/O dominate |
+| Large files (a few thousand lines) | ~100k+ nodes | Matching is linear: 350k nodes in roughly 70 ms; parse and I/O dominate |
 | Monorepo changesets | Hundreds of files | Per-file diffs run on a worker pool sized to your core count; 200-file changesets add ~400 git spawns before any diffing unless blobs are batched (they are) |
-| Files over 2 MiB | — | Read, but not tree-parsed; the tier ladder line-diffs them |
+| Files over 2 MiB | n/a | Read, but not tree-parsed; the tier ladder line-diffs them |
 
-Matching itself is linear in node count — top-down anchors, bottom-up containers, leaf recovery. The worst-case bottom-up bound is quadratic in container pairs, which is why the engine carries a `maxNodes` valve: trees above the limit fall back to a line diff instead of risking a slow match.
+Matching is linear in node count: top-down anchors, bottom-up containers, leaf recovery. The worst-case bottom-up bound is quadratic in container pairs. That is why the engine has a `maxNodes` valve: trees above the limit fall back to a line diff instead of risking a slow match.
 
-The valve default is `250,000` nodes (raised from the original `50,000` once matching became linear — the old ceiling was sending ordinary large files to line diffing for no reason). The current limit is about memory, not time. It is configurable per call via `MatchOptions.maxNodes`.
+The valve defaults to `250,000` nodes. It was raised from the original `50,000` once matching became linear. The old ceiling was sending ordinary large files to line diffing for no reason. The current limit is about memory, not time. It is configurable per call via `MatchOptions.maxNodes`.
 
 ## How to run benchmarks
 
@@ -43,12 +43,12 @@ parse 1000-line ts file ............. ~8ms
 | Situation | `git diff` | `differens` |
 | --- | --- | --- |
 | One-line change in a 5k-line file | Instant | Slightly slower (parse + match), but reports the actual change |
-| Reformat / whitespace churn | Long noisy hunk | Nothing — no semantic change, no output |
+| Reformat / whitespace churn | Long noisy hunk | Nothing: no semantic change, no output |
 | Rename of a function | Whole function looks rewritten | One `renamed` action |
 | Function moved between files | Delete + insert | One cross-file `Move` |
 | Generated bundles, lockfiles, vendor blobs | Same hunk cost as anything else | Skipped (over 2 MiB) or line-diffed |
 
-For line-level changes on unparseable files, both engines land on the same algorithm — line diff — and Differens is the same order of speed.
+For line-level changes on unparseable files, both engines use the same algorithm: a line diff. Differens is the same order of speed.
 
 ## Fast, slow, being worked on
 

@@ -5,7 +5,7 @@ description: "Install the Differens CLI and libraries"
 
 # Installation
 
-Differens is distributed as an npm CLI plus seven published packages. Everything is built with Bun, TypeScript, and Turborepo, and runs on any platform that supports Bun or Node.
+Differens ships as an npm CLI plus seven published packages. It is built with Bun, TypeScript, and Turborepo, and runs on any platform that supports Bun or Node.
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ Differens is distributed as an npm CLI plus seven published packages. Everything
 
 ## Install the CLI
 
-The easiest way to get started:
+Install globally, or add it to your project as a dev dependency:
 
 <CodeGroup title="Install methods">
 <Code title="npm (global)" language="bash">
@@ -37,7 +37,7 @@ bun link
 
 ## Install the libraries
 
-Each stage of the pipeline is published as its own package under the `@ossl-dev` scope, so you can depend on exactly the pieces you need:
+Each stage of the pipeline is published as a separate package under the `@ossl-dev` scope. Install only the pieces you use:
 
 <CodeGroup title="Library install">
 <Code title="npm" language="bash">
@@ -70,7 +70,7 @@ npm install \
 
 ## Standalone executable
 
-To ship Differens as a single binary without a runtime install:
+To ship Differens as a single binary that needs no runtime install:
 
 <CodeGroup title="Compile a binary">
 <Code title="bun build --compile" language="bash">
@@ -80,7 +80,7 @@ bun build --compile packages/cli/src/index.ts --outfile differens
 </CodeGroup>
 
 <Info>
-The compiled binary bundles Bun's runtime, so it runs on machines without Bun or Node installed — at the cost of a larger file.
+The compiled binary bundles Bun's runtime, so it runs on machines without Bun or Node installed. The tradeoff is a larger file.
 </Info>
 
 ## Verify the installation
@@ -102,4 +102,4 @@ Options:
   --version          Show the version number
 ```
 
-Ready to try it? Head to the [Quickstart](/getting-started/quickstart).
+Next: the [Quickstart](/getting-started/quickstart).

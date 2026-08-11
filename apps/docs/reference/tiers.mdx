@@ -5,7 +5,7 @@ description: "Content router and tier adapter API reference"
 
 # @ossl-dev/differens-tiers
 
-The parsing pipeline. A content router picks a tier by file extension and magic bytes, and the tier adapter parses the file into a `Node` tree for `@ossl-dev/differens-core`. If a tier fails to parse or its diff falls back, the pipeline drops to the next lower tier — raw line diff is the floor.
+The parsing pipeline. A content router picks a tier by file extension and magic bytes. The tier adapter parses the file into a `Node` tree for `@ossl-dev/differens-core`. If a tier fails to parse, or its diff falls back, the pipeline drops to the next lower tier. Raw line diff is the floor.
 
 Install:
 
@@ -17,11 +17,11 @@ npm install @ossl-dev/differens-tiers
 
 | Tier | Value | Handles |
 | --- | --- | --- |
-| `Tier.Binary` | `0` | Binary files — byte-size update, no parse |
+| `Tier.Binary` | `0` | Binary files: byte-size update, no parse |
 | `Tier.Raw` | `1` | Line diff (`diffLines`) |
 | `Tier.Prose` | `2` | Word diff for free prose (txt, log, readme, changelog) |
-| `Tier.Markup` | `3` | HTML/XML/SVG — tree diff of tags |
-| `Tier.Data` | `4` | JSON/YAML/TOML — tree diff of values |
+| `Tier.Markup` | `3` | HTML/XML/SVG: tree diff of tags |
+| `Tier.Data` | `4` | JSON/YAML/TOML: tree diff of values |
 | `Tier.Code` | `5` | tree-sitter backed code parsing |
 
 ## Exports
@@ -44,7 +44,7 @@ classifyFile(filePath: string): FileInfo
 // FileInfo: { path, extension, tier }
 ```
 
-Extension-based routing with a binary sniff (NUL bytes or failed UTF-8 decode) on top. Markdown goes to `Tier.Raw`, not prose — lines are structure in docs.
+Extension-based routing, with a binary sniff (NUL bytes or failed UTF-8 decode) on top. Markdown goes to `Tier.Raw`, not prose. Lines are structure in docs.
 
 ## diffWithTier
 
@@ -59,14 +59,14 @@ diffWithTier(oldSource: string, newSource: string, oldPath: string, newPath: str
 
 Behavior worth knowing:
 
-- Entirely new or removed files become a single `Insert`/`Delete` of a `kind: "file"` node — one fact, not a tree diff.
+- Entirely new or removed files become a single `Insert`/`Delete` of a `kind: "file"` node. That is one fact, not a tree diff.
 - Identical sources short-circuit with no changes.
 - A tier result is kept only if it parses **and** produces a usable tree diff; the core's `fallback` verdict propagates instead of being reported as "no changes".
 - On any failure the pipeline falls back to raw lines, with `fallback: "lines"`.
 
 ## LanguageExtractor
 
-Each code language is a `LanguageExtractor` — a few dozen match arms mapping tree-sitter CST node types to canonical concepts, not a parser:
+Each code language is a `LanguageExtractor`: a few dozen match arms that map tree-sitter CST node types to canonical concepts. It is not a parser.
 
 ```ts
 interface LanguageExtractor {
@@ -78,7 +78,7 @@ interface LanguageExtractor {
 }
 ```
 
-`getExtractors()` reports them as `ExtractorInfo { language, level: "L6" | "L5", extensions }`, where L6 extractors are hand-tuned for semantics and L5 are generic.
+`getExtractors()` reports them as `ExtractorInfo { language, level: "L6" | "L5", extensions }`, where L6 extractors have semantic mappings and L5 are generic.
 
 ## Usage
 

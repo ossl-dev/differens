@@ -5,45 +5,45 @@ description: "How the content router classifies files and dispatches to the righ
 
 # Tier Pipeline
 
-Differens parses files at six levels of abstraction, T0 through T5. Each tier is a parser that produces a `Node` tree, and each can fall back to the tier below it. The tier number is the abstraction ladder: T0 is bytes, T5 is code.
+Differens parses files at six levels of abstraction, T0 through T5. Each tier is a parser that produces a `Node` tree. Each tier can fall back to the tier below it. The tier number is the abstraction ladder: T0 is bytes, T5 is code.
 
 ## The tiers
 
-### T0 — binary (hash-only)
+### T0: binary (hash-only)
 
 Byte-level hash comparison. Used for images, fonts, archives, and anything else that fails the text sniff. Output is a single `Update` when the hash changes, with the byte-size delta as context. T0 never attempts to parse.
 
-### T1 — raw (LCS line diff)
+### T1: raw (LCS line diff)
 
-The safety net: a line-level longest-common-subsequence diff over the raw text. It is the fallback for every tier above it and is capped at 10,000 lines — beyond that, T1 hands off to T0's hash-only comparison rather than run an unbounded LCS.
+The safety net: a line-level longest-common-subsequence diff over the raw text. It is the fallback for every tier above it. It is capped at 10,000 lines. Beyond that, T1 hands off to T0's hash-only comparison instead of running an unbounded LCS.
 
-### T2 — prose (word-level)
+### T2: prose (word-level)
 
 Word-level diff for plain text, Markdown, and logs. Paragraphs and sentences become tree nodes, so a moved paragraph is a `Move` instead of a delete-plus-insert. Punctuation and whitespace changes update leaf nodes rather than rewriting whole paragraphs.
 
-### T3 — markup (lenient HTML/XML)
+### T3: markup (lenient HTML/XML)
 
-A lenient HTML/XML tokenizer that tolerates malformed documents — unclosed tags, misnested elements, unescaped entities. Element hierarchy becomes the node tree; attribute order changes are reorders, not updates.
+A lenient HTML/XML tokenizer that tolerates malformed documents: unclosed tags, misnested elements, unescaped entities. Element hierarchy becomes the node tree. Attribute order changes are reorders, not updates.
 
-### T4 — data (JSON / YAML / TOML)
+### T4: data (JSON / YAML / TOML)
 
 Value trees for JSON, the YAML subset Differens supports, and the TOML subset. The diff is key-path based: nested objects become nested nodes, so a key moved between two objects reports as a `Move` with the key path in the label. Array reordering is a `Reorder`.
 
-### T5 — code (tree-sitter)
+### T5: code (tree-sitter)
 
-A tree-sitter CST with per-language semantic extractors. The extractors map raw tree-sitter node types to canonical concepts — `Function`, `Class`, `Method`, `Import` — so the narration can say "function" whether the source said `fn`, `def`, or `func`. Currently: TypeScript/JavaScript, Python, Rust, and Go.
+A tree-sitter CST with per-language semantic extractors. The extractors map raw tree-sitter node types to canonical concepts such as `Function`, `Class`, `Method`, and `Import`. The narration can then say "function" whether the source said `fn`, `def`, or `func`. Currently: TypeScript/JavaScript, Python, Rust, and Go.
 
 Languages without an extractor still work at the generic level: structural diff with raw tree-sitter node type labels. The extractor only adds human-readable concept names.
 
 ## Graceful degradation
 
-The tiers are a chain, and every link can hand off downward:
+The tiers form a chain. Each tier can hand off to the tier below it:
 
 1. **T5 parse fails** (syntax error, unsupported construct) → fall back to a generic tree-sitter CST diff, still structural.
 2. **Generic CST fails** (no tree-sitter grammar, garbage input) → T1 line diff.
 3. **T1 hits the 10k-line cap** → T0 hash-only comparison.
 
-The tool never crashes and never refuses to produce an answer. The worst case is a byte-level comparison — less informative, but always truthful.
+The worst case is a byte-level comparison. It is less informative than a structural diff, but it still runs.
 
 ```mermaid
 flowchart TD
@@ -69,13 +69,13 @@ The content router classifies by extension, then by content sniff:
 | `.rs` | T5 |
 | `.go` | T5 |
 
-Extension-based classification is the first cut; the content sniff is the backstop. A `.txt` file that is actually minified JSON still gets a T2 word-level diff — acceptable, because the tier below can always take over.
+Extension-based classification is the first cut; the content sniff is the backstop. A `.txt` file that is actually minified JSON still gets a T2 word-level diff. That is acceptable, because the tier below can take over.
 
 ## Tier summary
 
 | Tier | Handles | Fallback |
 | --- | --- | --- |
-| T0 | Binary files, hash-only comparison | — (floor) |
+| T0 | Binary files, hash-only comparison | (floor) |
 | T1 | Raw text, LCS line diff, 10k-line cap | T0 hash-only |
 | T2 | Prose, Markdown, logs, word-level diff | T1 line diff |
 | T3 | HTML/XML, lenient tokenizer | T1 line diff |

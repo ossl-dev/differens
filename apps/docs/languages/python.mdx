@@ -5,18 +5,18 @@ description: "Semantic diffing for Python"
 
 # Python
 
-The Python extractor covers `.py` files. Python has one grammar construct for functions, so async functions parse as the same `function_definition` node — the `async` keyword is part of it — and both sync and async `def` become `Function`.
+The Python extractor covers `.py` files. Python has a single grammar construct for functions. Async functions parse as the same `function_definition` node, with the `async` keyword folded into it. Both sync and async `def` become `Function`.
 
 ## What it detects
 
-- **Functions** — `def` (sync and async) becomes `Function`
-- **Classes** — `class_definition` becomes `Class`; methods are `Function` nodes nested inside
-- **Decorators** — `decorator` becomes `Decorator`; a decorated definition becomes a `DecoratedDef` wrapper around the underlying function or class
-- **Imports** — `import_statement`, `import_from_statement`, and `future_import_statement` all become `Import`
-- **Assignments** — `assignment` and `augmented_assignment` become `Assignment` / `AugmentedAssignment`. Python has no separate `Variable` concept; a variable's name surfaces through its assignment's declarator, not a canonical label
-- **Control flow** — if / elif / else, for / while, try / except / finally, with, match / case
-- **Comprehensions and lambdas** — list / dict / set comprehensions, generator expressions, `lambda`
-- **Type annotations** — `type`, `generic_type`, and `union_type` become `TypeAnnotation` / `GenericType` / `UnionType`
+- **Functions**: `def` (sync and async) becomes `Function`
+- **Classes**: `class_definition` becomes `Class`; methods are `Function` nodes nested inside
+- **Decorators**: `decorator` becomes `Decorator`; a decorated definition becomes a `DecoratedDef` wrapper around the underlying function or class
+- **Imports**: `import_statement`, `import_from_statement`, and `future_import_statement` all become `Import`
+- **Assignments**: `assignment` and `augmented_assignment` become `Assignment` / `AugmentedAssignment`. Python has no separate `Variable` concept. A variable's name lives in the declarator of the assignment that binds it, not in a canonical label
+- **Control flow**: if / elif / else, for / while, try / except / finally, with, match / case
+- **Comprehensions and lambdas**: list / dict / set comprehensions, generator expressions, `lambda`
+- **Type annotations**: `type`, `generic_type`, and `union_type` become `TypeAnnotation` / `GenericType` / `UnionType`
 
 ## Node type mapping
 
@@ -88,12 +88,12 @@ update: call expression in `checkout`: `apply_discount(total)` -> `apply_promo(t
 </Code>
 </CodeGroup>
 
-The line diff shows `pricing.py` losing two functions and `discounts.py` gaining one. The semantic diff shows one function moved across files, renamed, and given a defaulted parameter — and `checkout` barely changed.
+The line diff shows `pricing.py` losing two functions and `discounts.py` gaining one. The semantic diff shows one function moved across files, renamed, and given a defaulted parameter. `checkout` barely changed.
 
 ## Known limitations
 
-- **Methods are not distinct** — there is no `Method` concept; a method is a `Function` nested in a `Class`.
-- **No `Variable` concept** — plain assignments become `Assignment`, so renames of variables surface through their declarator children rather than a canonical label.
-- **Decorated definitions wrap the definition** — `DecoratedDef` is a wrapper node, so a decorator change and a body change are separate edits.
-- **Lambdas have no label** — `lambda` becomes `Lambda` with no name.
-- **Unmapped node types pass through** — anything outside the map keeps its raw tree-sitter type name.
+- **Methods are not distinct**: there is no `Method` concept; a method is a `Function` nested in a `Class`.
+- **No `Variable` concept**: plain assignments become `Assignment`, so a renamed variable shows up as a change in its declarator children, not on a canonical label.
+- **Decorated definitions wrap the definition**: `DecoratedDef` is a wrapper node, so a decorator change and a body change are separate edits.
+- **Lambdas have no label**: `lambda` becomes `Lambda` with no name.
+- **Unmapped node types pass through**: anything outside the map keeps its raw tree-sitter type name.

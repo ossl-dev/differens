@@ -24,17 +24,17 @@ Pick an unchecked box, open an issue saying you're working on it, send a PR. One
 - [x] README, development guide, roadmap
 
 **CI / infra**
-- [ ] GitHub Actions: test matrix on Bun latest, lint, typecheck
-- [ ] Biome check in CI (format + lint gates)
-- [ ] README badges (build status, license)
+- [x] GitHub Actions: test matrix on Bun latest, lint, typecheck
+- [x] Biome check in CI (format + lint gates)
+- [x] README badges (build status, license)
 - [x] npm publishing: all six packages plus the CLI under `differens` and `@ossl-dev/differens-cli`
 
 **Docs**
-- [ ] API reference per package
-- [ ] Quick start guide
-- [ ] Per-language extractor documentation
-- [ ] Troubleshooting page
-- [ ] "How it works" architecture deep-dive
+- [x] API reference per package
+- [x] Quick start guide
+- [x] Per-language extractor documentation
+- [x] Troubleshooting page
+- [x] "How it works" architecture deep-dive
 
 ---
 

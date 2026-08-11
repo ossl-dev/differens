@@ -1,11 +1,11 @@
 ---
 title: "CLI Reference"
-description: "The differens command — all flags, formats, and modes"
+description: "The differens command , all flags, formats, and modes"
 ---
 
 # CLI Reference
 
-The `differens` command. One binary, five modes, four output formats.
+The `differens` command is a single binary. It runs in five modes and prints four output formats.
 
 ```
 differens [options] [args]
@@ -17,7 +17,7 @@ differens [options] [args]
 | --- | --- |
 | `differens` | Working tree vs HEAD (git mode) |
 | `differens diff` | Explicit alias for the above |
-| `differens <old> <new>` | Two files — or two commits, when both args resolve as git refs |
+| `differens <old> <new>` | Two files , or two commits, when both args resolve as git refs |
 | `differens <old>/ <new>/` | Two directories, walked file by file |
 | `differens main..feature` | Commit range |
 | `differens <sha1> <sha2>` | Two commits (refs are resolved first, files are the fallback) |
@@ -31,7 +31,7 @@ differens [options] [args]
 | `--markdown`, `--md` | Shorthand for `--format=markdown` |
 | `--llm`, `-l` | Shorthand for `--format=llm` |
 | `--help`, `-h` | Print usage |
-| `--version`, `-v` | Print version (read from package.json, never drifts) |
+| `--version`, `-v` | Print version (read from package.json) |
 
 ## Subcommands
 
@@ -84,10 +84,10 @@ differens install-git-driver
 
 ## Exit behavior
 
-- Any mode prints a friendly empty-state ("nothing changed", "nothing changed in range: …") instead of failing on an empty diff.
+- When the diff is empty, any mode prints "nothing changed" (or "nothing changed in range: …") instead of failing.
 - Errors exit `1` with a message on stderr: not in a git repo, file cannot be read, a directory against a file, or malformed args.
-- Files too large to tree-parse (over 2 MiB) or too large to match are line-diffed instead, with a `note: fell back to … diff` on stderr.
+- Files over 2 MiB, or too large to match, get a line diff instead. Differens writes `note: fell back to … diff` to stderr.
 
 ## Internal flags
 
-The CLI also accepts two flags it never expects a human to type: `--git-diff-driver` (git invokes the registered driver with it) and a worker flag used by the parallel diff pool. Ignore them in scripts.
+The CLI also accepts two flags for internal use: `--git-diff-driver` (git invokes the registered driver with it) and a worker flag used by the parallel diff pool. Ignore them in scripts.

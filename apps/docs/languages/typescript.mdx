@@ -5,22 +5,22 @@ description: "Semantic diffing for TypeScript and JavaScript"
 
 # TypeScript / JavaScript
 
-The TypeScript extractor covers both languages — one grammar for `.ts`/`.tsx`, another for `.js`/`.jsx`/`.mjs`/`.cjs` — and maps both onto the same canonical concepts.
+The TypeScript extractor covers both languages. One grammar handles `.ts`/`.tsx`, another handles `.js`/`.jsx`/`.mjs`/`.cjs`. Both map onto the same canonical concepts.
 
 ## What it detects
 
-- **Functions** — declarations, expressions, and arrow functions all become `Function`
-- **Methods** — `method_definition` becomes `Method`
-- **Classes** — declarations and expressions become `Class`
-- **Interfaces** — `interface_declaration` becomes `Interface`
-- **Types** — `type_alias_declaration` becomes `TypeDef`
-- **Enums** — `enum_declaration` becomes `Enum`
-- **Imports** — `import_statement` becomes `Import`, with `NamedImports` / `NamespaceImport` children
-- **Exports** — `export_statement` and `export_default` become `Export`
-- **Variables** — `variable_declaration` (`var`) and `lexical_declaration` (`let`/`const`) become `Variable`, labeled with the declarator name
-- **JSX** — elements, attributes, and expressions are their own concepts
-- **Control flow** — if / for / while / switch / try / return / throw
-- **Literals and expressions** — strings, numbers, templates, regex, booleans, objects, arrays, calls, member access, operators, await / yield
+- **Functions**: declarations, expressions, and arrow functions all become `Function`
+- **Methods**: `method_definition` becomes `Method`
+- **Classes**: declarations and expressions become `Class`
+- **Interfaces**: `interface_declaration` becomes `Interface`
+- **Types**: `type_alias_declaration` becomes `TypeDef`
+- **Enums**: `enum_declaration` becomes `Enum`
+- **Imports**: `import_statement` becomes `Import`, with `NamedImports` / `NamespaceImport` children
+- **Exports**: `export_statement` and `export_default` become `Export`
+- **Variables**: `variable_declaration` (`var`) and `lexical_declaration` (`let`/`const`) become `Variable`, labeled with the declarator name
+- **JSX**: elements, attributes, and expressions are their own concepts
+- **Control flow**: if / for / while / switch / try / return / throw
+- **Literals and expressions**: strings, numbers, templates, regex, booleans, objects, arrays, calls, member access, operators, await / yield
 
 ## Node type mapping
 
@@ -58,7 +58,7 @@ The TypeScript extractor covers both languages — one grammar for `.ts`/`.tsx`,
 
 Node types without a mapping keep their raw tree-sitter type name.
 
-**Labels.** Most declarations are named via the `name` field, read straight off the tree-sitter cursor. `variable_declaration` and `lexical_declaration` are the exceptions — their names live on a `variable_declarator` child, so they go through `extractLabel`.
+**Labels.** Most declarations are named via the `name` field, read straight off the tree-sitter cursor. `variable_declaration` and `lexical_declaration` are the exceptions. Their names live on a `variable_declarator` child, so they go through `extractLabel`.
 
 ## Example: a TypeScript refactor
 
@@ -96,8 +96,8 @@ A line diff would report `utils.ts` losing a function and `math.ts` gaining one,
 
 ## Known limitations
 
-- **Multi-declarator variables** — `const a = 1, b = 2` labels the `Variable` with the first declarator's name only.
-- **Interface members are distinct concepts** — `property_signature`, `call_signature`, and `method_signature` are separate concepts, not a unified "member".
-- **JSX text is a flat node** — `jsx_text` collapses contiguous text, so inline formatting changes inside JSX text can read as a single update.
-- **No type-flow inference** — the extractor does not distinguish a value used as a type from a type used as a value.
-- **Unmapped node types pass through** — anything outside the map keeps its raw tree-sitter type name.
+- **Multi-declarator variables**: `const a = 1, b = 2` labels the `Variable` with the first declarator's name only.
+- **Interface members are distinct concepts**: `property_signature`, `call_signature`, and `method_signature` are separate concepts, not a unified "member".
+- **JSX text is a flat node**: `jsx_text` collapses contiguous text, so inline formatting changes inside JSX text can read as a single update.
+- **No type-flow inference**: the extractor does not distinguish a value used as a type from a type used as a value.
+- **Unmapped node types pass through**: anything outside the map keeps its raw tree-sitter type name.
