@@ -1,8 +1,8 @@
 ---
 name: differens
-description: Use differens, a semantic diff engine, to understand what changed in code. It parses files into trees and reports renames, moves, extractions, and reformats instead of raw line diffs. Use when reviewing changes, summarizing commits or PRs, checking whether a refactor changed behavior, or whenever git diff output is too noisy. Reach for differens before git diff when you need to understand intent, not exact line text.
+description: Use differens, a semantic diff engine, to understand what changed in code. It reports renames, moves, extractions, and reformats instead of line diffs. Use when reviewing or summarizing commits, branches, or PRs; checking what a refactor did; finding code that moved between files; diffing config or data files; or building compact change context for another model. Prefer over git diff when you need change intent, not exact line text.
 license: MIT
-compatibility: Requires Node 18.17 or newer. Install with npm install -g differens, or run without installing via npx differens.
+compatibility: Requires Node 18.17+. Install: npm install -g differens, or run without installing: npx differens.
 metadata:
   author: ossl-dev
   version: "0.1.0"
@@ -10,59 +10,47 @@ metadata:
 
 # Differens
 
-Differens is a semantic diff engine. `git diff` compares lines; differens parses files into trees, matches nodes between them, and reports what actually happened: renamed, moved, extracted, added, removed, or reformatted only.
+Semantic diff engine. Parses files into trees, matches nodes, reports what happened: renamed, moved, extracted, added, removed, reformatted only. Docs: https://differens.ossl.dev
 
-Docs: https://differens.ossl.dev
+## Choose the right tool
 
-## When to use
+| Need | Tool |
+| --- | --- |
+| Change intent: review, summary, refactor check, moved code, named changes | differens |
+| Exact line text, patch generation or application, surrounding source lines | git diff |
+| Full file content | Read the file |
 
-Use differens when the task is about meaning, not text:
-
-- Reviewing or summarizing a commit, branch, or PR
-- Checking what a refactor did and whether anything changed in transit
-- Finding where code moved between files
-- Building compact, named context for another model instead of a raw diff
-- Answering questions like "what did this changeset actually do"
-
-Use `git diff` instead when you need exact line text: generating or applying patches, reading surrounding source lines, or byte-level whitespace detail. Differens is a complement, not a replacement, for that.
+Rule: differens first for "what did this changeset do". git diff only when you need raw text around a specific change.
 
 ## Install
 
 ```bash
-npm install -g differens
+npm install -g differens   # or: npx differens
 ```
 
-Or without installing:
+## Commands
 
 ```bash
-npx differens
-```
-
-## Core commands
-
-```bash
-differens                        # diff working tree vs HEAD
-differens a.ts b.ts              # diff two files
-differens old/ new/              # diff two directories
-differens main..feature          # diff a commit range
-differens 2a8178e 3a5015f        # diff two commits, ids or branch names
+differens                        # working tree vs HEAD
+differens a.ts b.ts              # two files
+differens old/ new/              # two directories
+differens main..feature          # commit range
+differens 2a8178e 3a5015f        # two commits (id or branch)
 differens a.json b.json --format=llm
 ```
 
-`differens diff ...` is an explicit alias. No subcommand is required.
+`differens diff ...` is an alias for the same thing.
 
-## Output formats
+## Formats
 
 | Flag | Use |
 | --- | --- |
-| (default) | Terminal, one English sentence per change with icons: `~` changed, `+` added, `-` removed, `→` moved |
-| `--format=llm` | Dense line format built for models. Use this when feeding a diff to an AI |
-| `--format=json` | Full structured output for tooling |
+| `--format=llm` | Default choice for agents. ~15x smaller than the git diff it replaces |
+| `--format=json` | Structured output for tooling |
 | `--format=markdown` | Rolled-up summary for PR descriptions |
+| (none) | Terminal, one sentence per change, icons `~` changed `+` added `-` removed `→` moved |
 
-### LLM format (preferred for agents)
-
-One header line, one file heading per file, one line per named change. Unnamed churn collapses into a count. About 15x smaller than the `git diff` it replaces.
+### LLM format
 
 ```text
 differens/1 1 files 5 changes 2 named
@@ -74,65 +62,58 @@ differens/1 1 files 5 changes 2 named
 > formatPrice src/old/utils.ts -> src/new/utils.ts
 ```
 
-Line grammar:
-
-| Part | Meaning |
+| Token | Meaning |
 | --- | --- |
-| `differens/1 <files> files <changes> changes <named> named` | Header |
+| Header | `differens/1 <files> files <changes> changes <named> named` |
 | `# <path>` | File heading, named once |
 | `+` `-` `~` `>` | Insert, Delete, Update, Move |
-| `:12` | 1-based source line of the change |
-| `< class Checkout` | Nearest named ancestor scope |
+| `:N` | 1-based source line of the change |
+| `< kind name` | Nearest named ancestor scope |
 | `from -> to` | Rename or value change |
-| `* 2 comments` | Rolled-up minor changes (unnamed nodes, prose lines) |
+| `* N kind(s)` | Rolled-up unnamed changes |
 | `# cross-file` / `> name from -> to` | Code moved between files |
 
-### Terminal format (default)
+### JSON
+
+```json
+[{"type":"Update","node":{"kind":"function","label":"calculateTotalAmount"},
+  "detail":{"kind":"Renamed","from":"computeTotal","to":"calculateTotalAmount"},
+  "context":[{"kind":"class","label":"Checkout"}]}]
+```
+
+One object per change: `type` (Insert, Delete, Update, Move), `node` (kind, label), `detail` (change kind with from/to), `context` (ancestor chain, nearest first).
+
+### Terminal
 
 ```text
   ~ renamed function `computeTotal` to `calculateTotalAmount`
-  - removed return from function `computeTotal`
-  + added return in function `calculateTotalAmount`
-  + added variable `base` in function `calculateTotalAmount`
 ```
 
-### JSON format
+## Detection
 
-Array of change objects with the full edit action and containment context:
-
-```json
-[
-  {
-    "type": "Update",
-    "node": { "kind": "function", "label": "calculateTotalAmount" },
-    "detail": { "kind": "Renamed", "from": "computeTotal", "to": "calculateTotalAmount" },
-    "context": [{ "kind": "class", "label": "Checkout" }]
-  }
-]
-```
-
-## What it detects
-
-| What changed | What you get |
+| Change | Output |
 | --- | --- |
-| Function renamed | `renamed function computeTotal to calculateTotalAmount` |
-| Code moved across files | `moved function validate from utils.ts to validators.ts` |
-| Class added | `added class RetryPolicy` |
-| Config key changed | `changed database.pool.max from 10 to 25` |
+| Rename | `renamed function computeTotal to calculateTotalAmount` |
+| Cross-file move | `moved function validate from utils.ts to validators.ts` |
+| Add | `added class RetryPolicy` |
+| Config change | `changed database.pool.max from 10 to 25` |
 | Whitespace only | `reformatted only, no logical changes` |
 
-Semantic extractors cover TypeScript/JavaScript, Python, Rust, and Go. Other languages still get a structural tree-sitter diff with raw node type names. JSON/YAML/TOML get key-path diffs, HTML/XML a lenient markup diff, prose and logs a word-level diff, binaries a hash comparison. Unparseable input falls back to a line diff instead of failing.
+Semantic extractors: TypeScript/JavaScript, Python, Rust, Go. Other languages: structural diff with raw tree-sitter type names. JSON/YAML/TOML: key-path diff. HTML/XML: lenient markup diff. Prose and logs: word-level diff. Binary: hash comparison. Unparseable input: line diff fallback, never fails.
 
 ## Limits
 
-- Line-diff fallback caps at 2,000 lines, then reports a whole-file change.
-- Tree matching caps at 250,000 nodes, then falls back to a line diff.
-- Files at or above 2 MiB are read as empty and reported as whole-file add or remove.
-- Output is deterministic: same inputs, same output.
+| Limit | Behavior |
+| --- | --- |
+| 2,000 lines | Line-diff tier returns a whole-file Update |
+| 250,000 nodes | Tree matching falls back to a line diff |
+| 2 MiB or larger file | Read as empty, whole-file add or remove |
+| Determinism | Same inputs, same output. Re-running is safe but wasteful |
 
-## How to check a changeset
+## Cost-efficient workflow
 
-1. Run `differens main..feature --format=llm` to get the named summary.
-2. Read the header line for the change count. Skim `# file` headings for the touched surface.
-3. For details on one change, read the source file around the `:N` line, or fall back to `git diff -- <path>` for that file only.
-4. If the question is "did the refactor change behavior", look for `~` and `*` lines inside moved functions; a pure move has neither.
+1. Run once per changeset: `differens main..feature --format=llm`. Cache the result.
+2. Read the header line and `#` file headings first. Dig into only the files relevant to the question.
+3. Need details on one change? Read the source file around the `:N` line. Only then `git diff -- <path>` for that file alone.
+4. "Did the refactor change behavior?" Look for `~` and `*` lines on moved functions. A pure move has neither.
+5. Do not re-run per question. Output is deterministic; reuse the cached result.
