@@ -49,10 +49,50 @@ flowchart LR
 
 ## When to use Differens
 
-- **Code review**. See the intent behind a change, not the churn. A rename surrounded by reformatting is one action, not forty lines.
-- **PR summaries**. The narration engine writes a human summary of every change in a commit range.
-- **Refactor tracking**. Confirm a refactor moved code without changing it, and find where it went across files.
-- **AI context**. Feed the compact LLM output format to agents and models so they reason about changes instead of diff noise.
+Line diffs are fine when you just want to see which lines changed. Differens earns its keep where intent matters. These are the situations where it pays for itself.
+
+### AI agents and coding assistants
+
+Agents read diffs to work out what a change did. `git diff` makes them reconstruct intent from delete-plus-insert pairs, and it is expensive. On this repo's own 14-file changeset, `git diff` produces 100KB; the LLM format produces 6.5KB, about 15x smaller. One line per change, every rename and move named, source line attached to each:
+
+```bash
+differens main..feature --format=llm
+```
+
+```text
+differens/1 2 files 5 changes 4 named
+# src/checkout.ts
+~ function computeTotal :12 < class Checkout computeTotal -> calculateTotalAmount
++ function applyDiscount :40
+# cross-file
+> formatPrice src/old/utils.ts -> src/new/utils.ts
+```
+
+The model starts from "renamed this, added that, moved the other" instead of raw line noise. Less context burned, fewer wrong inferences, cheaper runs. Agents should reach for `--format=llm` first, and fall back to `git diff` only when they need the raw text around a change.
+
+### Code review
+
+A rename inside a reformatted block shows up as forty lines of churn in `git diff`. Differens reports one action: `renamed function computeTotal to calculateTotalAmount`. Reviewers stop hunting through formatting noise for the real change, so reviews finish faster and catch actual problems instead of diff fatigue.
+
+### Refactoring across files
+
+Moving code between files is a delete in one file plus an insert in another to every line diff. Differens correlates the two sides and reports `moved function validate from utils.ts to validators.ts`, and it flags when the function was edited in transit. After a big refactor you can confirm nothing changed except where it lives, instead of eyeballing thousands of lines.
+
+### PR descriptions and changelogs
+
+`differens main..feature --format=markdown` writes a ready-to-paste PR description: one heading per file, one bullet per change. Nobody has to write "what did I change" from memory again, and the summary always matches the diff because it is generated from it.
+
+### Config and data churn
+
+JSON, YAML, and TOML get key-path diffs: `changed database.pool.max from 10 to 25`. A dependency bump that touches a thousand-line lockfile reports the keys that actually moved instead of a wall of pluses and minuses. Config reviews become readable.
+
+### Docs and prose
+
+Plain text and logs diff at the word level, with paragraphs as nodes. A paragraph moved between sections is a `Move`, not a delete plus an insert, and a rewording updates leaf nodes instead of rewriting the paragraph. Editing documentation stops looking like the whole file changed.
+
+### CI and automation
+
+Output is deterministic and machine-readable, so CI can diff every commit and post the summary into the PR. Formatting-only changes collapse to "reformatted only, no logical changes", which keeps release notes honest without a human reading the diff.
 
 ## Project status
 

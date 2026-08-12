@@ -10,7 +10,7 @@ A diff engine that tells you what actually happened to your code.
 
 Differens parses your code into trees, matches nodes between them, and tells you what changed in terms you actually use: *renamed*, *moved*, *extracted*, *added*, *removed*, *reformatted only*.
 
-📖 **[Documentation](https://differens.mintlify.app)** — full API reference, guides, and architecture deep-dive.
+📖 **[Documentation](https://differens.ossl.dev)** — full API reference, guides, and architecture deep-dive.
 
 ## How it works (the short version)
 

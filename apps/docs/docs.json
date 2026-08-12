@@ -91,7 +91,7 @@
       "github": "https://github.com/ossl-dev/differens"
     }
   },
-  "description": "Semantic diffing engine — understand what actually changed in your code",
+  "description": "Differens is a semantic diff engine that reports renames, moves, and extractions instead of changed lines. Works with or without git, as a CLI or a library.",
   "seo": {
     "indexing": "all"
   },
@@ -123,8 +123,7 @@
   "logo": "/images/logo-dark.svg",
   "favicon": "/images/favicon.svg",
   "styling": {
-    "eyebrows": "breadcrumbs",
-    "latex": true
+    "eyebrows": "breadcrumbs"
   },
   "icons": {
     "library": "lucide"
