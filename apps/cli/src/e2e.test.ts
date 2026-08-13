@@ -226,3 +226,37 @@ describe("CLI: worker pool on large changesets", () => {
     expect(stdout).toContain("30 modifications");
   });
 });
+
+describe("CLI: config file", () => {
+  it("uses the default format from differens.toml", () => {
+    write("a.ts", "export const a = 1;\n");
+    commit();
+    write("a.ts", "export const a = 2;\n");
+    write("differens.toml", 'format = "json"\n');
+    const { stdout, status } = runCli([]);
+    expect(status).toBe(0);
+    expect(stdout.startsWith("{")).toBe(true);
+    expect(stdout).toContain('"perFile"');
+  });
+
+  it("a --format flag overrides the config file", () => {
+    write("a.ts", "export const a = 1;\n");
+    commit();
+    write("a.ts", "export const a = 2;\n");
+    write("differens.toml", 'format = "json"\n');
+    const { stdout, status } = runCli(["--format=markdown"]);
+    expect(status).toBe(0);
+    expect(stdout.startsWith("##")).toBe(true);
+  });
+
+  it("finds the config from a subdirectory", () => {
+    write("a.ts", "export const a = 1;\n");
+    commit();
+    write("a.ts", "export const a = 2;\n");
+    write("differens.toml", 'format = "llm"\n');
+    mkdirSync(join(dir, "sub"), { recursive: true });
+    const { stdout, status } = runCli([], { cwd: join(dir, "sub") });
+    expect(status).toBe(0);
+    expect(stdout).toContain("# a.ts");
+  });
+});

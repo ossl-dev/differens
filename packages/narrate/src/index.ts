@@ -158,7 +158,7 @@ export function summarize(changes: SemanticChange[], opts: NarrationOptions = {}
   return prefix + parts.join(", ");
 }
 
-export type OutputFormat = "terminal" | "json" | "markdown" | "llm";
+export type OutputFormat = "terminal" | "json" | "markdown" | "llm" | "ndjson";
 
 export interface FormatterOptions {
   format: OutputFormat;

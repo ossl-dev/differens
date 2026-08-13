@@ -28,6 +28,7 @@ import {
 import { formatChanges, narrate } from "@ossl-dev/differens-narrate";
 import type { OutputFormat } from "@ossl-dev/differens-narrate";
 import { diffWithTier, getExtractors, initExtractors } from "@ossl-dev/differens-tiers";
+import { loadConfig } from "./config";
 import { WORKER_FLAG, runWorker, selfInvocation } from "./pool";
 import { report } from "./report";
 
@@ -46,6 +47,7 @@ function version(): string {
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
+  const config = loadConfig();
 
   // Internal: this process was spawned by a parent CLI to diff a slice of files.
   if (args[0] === WORKER_FLAG) {
@@ -61,7 +63,7 @@ async function main(): Promise<void> {
 
   if (args.length === 0) {
     // Bare invocation: diff working tree vs HEAD
-    await handleDiff([]);
+    await handleDiff([], config.format);
     return;
   }
 
@@ -70,13 +72,13 @@ async function main(): Promise<void> {
   switch (command) {
     case "diff":
       // Explicit alias, same as bare invocation
-      await handleDiff(rest);
+      await handleDiff(rest, config.format);
       break;
     case "languages":
       await handleLanguages();
       break;
     case "install-git-driver":
-      await handleInstallGitDriver();
+      await handleInstallGitDriver(config.driverExtensions);
       break;
     case "--help":
     case "-h":
@@ -89,14 +91,14 @@ async function main(): Promise<void> {
     default:
       // Anything else is treated as diff inputs:
       // differens a.ts b.ts, differens main..feature, differens <sha1> <sha2>
-      await handleDiff(args);
+      await handleDiff(args, config.format);
   }
 }
 
-async function handleDiff(args: string[]): Promise<void> {
+async function handleDiff(args: string[], defaultFormat: OutputFormat = "terminal"): Promise<void> {
   // Strip format flags before dispatch
   const nonFlagArgs = args.filter((a) => !a.startsWith("--"));
-  const format = parseFormat(args) as OutputFormat;
+  const format = parseFormat(args, defaultFormat);
 
   if (nonFlagArgs.length === 0) {
     // Git mode: diff working tree vs HEAD
@@ -204,30 +206,38 @@ async function handleLanguages(): Promise<void> {
   console.log("binary files: hash only (L0)");
 }
 
-async function handleInstallGitDriver(): Promise<void> {
+async function handleInstallGitDriver(configuredExtensions?: string[]): Promise<void> {
   const [runtime, args] = selfInvocation(DRIVER_FLAG);
   await installGitDriver(diffDriverCommand(runtime, args));
 
+  // Every registered grammar extension, unless the config pins a subset.
+  // A grammar that cannot load here would only produce line diffs under git,
+  // so the list is built from what actually loaded.
+  await initExtractors();
+  const extensions =
+    configuredExtensions ??
+    getExtractors()
+      .flatMap((e) => e.extensions)
+      .sort();
+
   console.log("git diff driver installed.");
   console.log("add to .gitattributes:");
-  for (const line of generateGitAttributes(["ts", "tsx", "js", "jsx", "py", "rs", "go"]).split(
-    "\n",
-  )) {
+  for (const line of generateGitAttributes(extensions).split("\n")) {
     console.log(`  ${line}`);
   }
   console.log("\nthen `git diff` narrates those files instead of printing hunks.");
 }
 
-function parseFormat(args: string[]): string {
+function parseFormat(args: string[], fallback: OutputFormat): OutputFormat {
   for (const arg of args) {
     if (arg.startsWith("--format=")) {
-      return arg.slice(9);
+      return arg.slice(9) as OutputFormat;
     }
     if (arg === "--json" || arg === "-j") return "json";
     if (arg === "--markdown" || arg === "--md") return "markdown";
     if (arg === "--llm" || arg === "-l") return "llm";
   }
-  return "terminal";
+  return fallback;
 }
 
 function printUsage(): void {
