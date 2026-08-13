@@ -1,6 +1,14 @@
 import { describe, expect, it } from "bun:test";
 import type { Node } from "@ossl-dev/differens-core";
-import { Tier, classifyFile, diffWithTier, parseData } from "./index";
+import {
+  Tier,
+  classifyFile,
+  diffWithTier,
+  getExtractors,
+  initExtractors,
+  isParseable,
+  parseData,
+} from "./index";
 // parseMarkup / diffLines / diffWords are not re-exported from the
 // package index, so they are imported from their adapter modules.
 import { parseMarkup } from "./markup";
@@ -339,5 +347,80 @@ describe("diffLines on large inputs", () => {
 
   it("reports nothing for two identical large files", () => {
     expect(diffLines(lines(50_000), lines(50_000))).toEqual([]);
+  });
+});
+
+describe("diffWithTier: whole-file sides", () => {
+  it("reports an empty old side as one whole-file Insert", () => {
+    const result = diffWithTier("", "export const x = 1;\n", "new.ts", "new.ts");
+    expect(result.changes).toHaveLength(1);
+    expect(result.changes[0]!.type).toBe("Insert");
+    if (result.changes[0]!.type === "Insert") {
+      expect(result.changes[0]!.node.kind).toBe("file");
+      expect(result.changes[0]!.node.label).toBe("new.ts");
+    }
+  });
+
+  it("reports an empty new side as one whole-file Delete", () => {
+    const result = diffWithTier("export const x = 1;\n", "", "gone.ts", "gone.ts");
+    expect(result.changes).toHaveLength(1);
+    expect(result.changes[0]!.type).toBe("Delete");
+  });
+
+  it("reports both sides empty as no changes", () => {
+    const result = diffWithTier("", "", "a.ts", "a.ts");
+    expect(result.changes).toEqual([]);
+  });
+});
+
+describe("diffWithTier: binary sniff", () => {
+  it("routes NUL-byte content to the binary tier", () => {
+    const result = diffWithTier("abc\u0000def", "abc\u0000xyz", "data.dat", "data.dat");
+    expect(result.tier).toBe(Tier.Binary);
+    expect(result.changes).toHaveLength(1);
+    expect(result.changes[0]!.type).toBe("Update");
+  });
+
+  it("routes replacement-char content (failed UTF-8) to the binary tier", () => {
+    const result = diffWithTier("abc\ufffd", "xyz\ufffd", "data.dat", "data.dat");
+    expect(result.tier).toBe(Tier.Binary);
+  });
+
+  it("reports byte-size deltas for binary files", () => {
+    const result = diffWithTier("\u0000aaa", "\u0000bbbb", "a.png", "a.png");
+    expect(result.tier).toBe(Tier.Binary);
+    expect(result.changes).toHaveLength(1);
+    if (result.changes[0]!.type === "Update" && result.changes[0]!.detail.kind === "ValueChanged") {
+      expect(result.changes[0]!.detail.from).toBe("4 bytes");
+      expect(result.changes[0]!.detail.to).toBe("5 bytes");
+    }
+  });
+});
+
+describe("isParseable", () => {
+  it("is true for code with grammars and structured data", () => {
+    expect(isParseable("app.ts")).toBe(true);
+    expect(isParseable("config.json")).toBe(true);
+    expect(isParseable("page.html")).toBe(true);
+  });
+
+  it("is false for grammar-less code and plain text", () => {
+    expect(isParseable("Main.java")).toBe(false);
+    expect(isParseable("notes.txt")).toBe(false);
+    expect(isParseable("README.md")).toBe(false);
+  });
+});
+
+describe("extractor listing", () => {
+  it("lists all five languages at L6 with their extensions", () => {
+    const extractors = getExtractors();
+    expect(extractors).toHaveLength(5);
+    const names = extractors.map((e) => e.language).sort();
+    expect(names).toEqual(["go", "javascript", "python", "rust", "typescript"].sort());
+    for (const e of extractors) expect(e.level).toBe("L6");
+  });
+
+  it("resolves initExtractors", async () => {
+    await expect(initExtractors()).resolves.toBeUndefined();
   });
 });

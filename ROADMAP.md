@@ -20,11 +20,11 @@ Pick an unchecked box, open an issue saying you're working on it, send a PR. One
 - [x] Cross-file correlator: structure hash buckets, content hash exact matches, Jaccard similarity for modified moves
 - [x] Git integration: shell-out difftool, working tree diff, commit range diff, diff driver registration
 - [x] CLI: `differens diff`, `differens languages`, `differens install-git-driver`, `--format=json|markdown`, `--help`
-- [x] Tests: 96 tests across 6 packages, zero failures
+- [x] Tests: 292 unit, integration, and CLI e2e tests (real temp git repos) across 6 packages, zero failures, 96% line coverage gated in CI
 - [x] README, development guide, roadmap
 
 **CI / infra**
-- [x] GitHub Actions: test matrix on Bun latest, lint, typecheck
+- [x] GitHub Actions: test matrix on Bun latest, lint, typecheck, coverage gate (90% lines / 85% functions)
 - [x] Biome check in CI (format + lint gates)
 - [x] README badges (build status, license)
 - [x] npm publishing: all six packages plus the CLI under `differens` and `@ossl-dev/differens-cli`
@@ -50,16 +50,17 @@ Pick an unchecked box, open an issue saying you're working on it, send a PR. One
 - [ ] Add remaining format detectors to content router: CSV/TSV, INI, ENV, GraphQL, Dockerfile
 
 **Performance**
-- [ ] Iterative tree traversal (replace recursion to prevent stack overflow on deep trees)
+- [x] Iterative tree traversal (matcher and CST conversion walk with explicit stacks; 200k-deep chains verified)
+- [x] Benchmark suite: parse + match + narrate across sizes, worst cases, and large inputs (`apps/cli/bench/bench.ts`)
+- [x] Worker pool for parallel parsing (child processes; NAPI grammars cannot share threads)
 - [ ] 64-bit hash collision safety: optional content verification on hash match
 - [ ] Content-addressed parse cache (keyed by blob hash)
-- [ ] `maxFileSize` option actually enforced in tier pipeline (currently only maxNodes checked)
-- [ ] Benchmark suite: typical file diffs, large file fallback, cross-file correlation at scale
-- [ ] Worker pool for parallel parsing (Bun worker_threads)
 - [ ] Streaming output for large diffs (SSE / chunked JSON)
 - [ ] Regression test corpus (small/medium/large repo snapshots)
 
 **Testing**
+- [x] Myers diff fuzz-tested against a reference LCS (optimality + alignment validity on random inputs)
+- [x] Unit, integration, and CLI e2e suites; coverage gate in CI (90% lines / 85% functions)
 - [ ] Corpus tests against known refactors (extract method, rename, move file, reformat)
 - [ ] Fuzz test the parser pipeline with random edits
 
@@ -112,14 +113,10 @@ Pick an unchecked box, open an issue saying you're working on it, send a PR. One
 
 ## Bugs and known issues
 
-- O(n^2) bottom-up container matching at scale -- the `maxNodes` safety valve (50k) prevents worst case but large monorepo diffs may trigger it
-- Myers middle-snake code removed; raw tier uses LCS with O(n*m) memory. Fast enough for <10k lines, capped above that
 - Markup tokenizer is regex-based, not a full HTML5 parser -- tolerates everything but may misparse attribute values containing `>`
 - YAML parser handles 2-space indentation only; 4-space YAML may drop nesting. Our YAML subset is intentional, not a full parser
-- Leaf-level renames report as Delete+Insert, not Update/Renamed -- narration layer handles this by convention, but the core action is less precise than it could be
-- Deeply nested structures (>10k depth) may stack overflow -- recursion safety valve not yet in place (mitigated by practical file limits)
-- Tree-sitter grammar init is async and may race with the first `parseCode` call on cold start -- fixed by caching the init promise, but the async overhead remains
-- `diffWorkingTree` uses `git diff HEAD --name-only` which misses staged-but-uncommitted changes (intentional: working tree vs HEAD is the documented contract)
+- Sequences of objects in YAML flatten to scalars (the subset does not nest under sequence items)
+- Bottom-up container matching is quadratic only in degenerate worst cases; candidate caps (4 candidates, 64-wide leaf zip) keep typical runs far below it. `maxNodes` remains as an opt-in valve, default Infinity
 
 ---
 

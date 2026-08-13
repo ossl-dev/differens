@@ -34,16 +34,26 @@ Prerequisites: **Bun >= 1.3** (`bun --version` to check) and **Git** (needed for
 Verify everything works:
 
 ```bash
-bun run build      # Build all packages
-bun run test       # 100+ tests across 6 packages, must be zero failures
+bun run build              # Build all packages
+bun run test               # 292 unit, integration, and CLI e2e tests, must be zero failures
+bun run test:coverage      # Coverage report (96%+ lines gated in CI)
+bun run test:coverage-gate # Same gate CI runs: fails below 90% lines / 85% functions
 ```
 
-Per-package tests run faster when you are iterating on one area:
+Per-package tests run faster when you are iterating on one area, and watch mode
+runs the suite again on every save:
 
 ```bash
 bun test packages/core/src/
-bun test packages/tiers/src/
+bun run test:watch
 ```
+
+The suites are layered: unit tests per module (`packages/*/src/*.test.ts`),
+integration tests through the tier pipeline and the report layer, and e2e tests
+that spawn the real CLI against throwaway git repositories
+(`apps/cli/src/e2e.test.ts`). The git integration tests need the `git` binary
+and create temp repos under the system temp directory; they never touch your
+repositories.
 
 <Info>
 No build step is needed to run the CLI from source. Bun runs TypeScript directly:

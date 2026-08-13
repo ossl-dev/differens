@@ -92,18 +92,22 @@ describe("diffTrees: identical", () => {
 // ---------- diffTrees: rename ----------
 
 describe("diffTrees: rename", () => {
-  it("detects renamed leaf node", () => {
-    const oldTree = tree("program", [leaf("identifier", "foo")]);
-    const newTree = tree("program", [leaf("identifier", "bar")]);
+  it("reports a leaf value change as an Update, not a delete plus insert", () => {
+    const oldTree = tree("program", [leaf("identifier", undefined, "foo")]);
+    const newTree = tree("program", [leaf("identifier", undefined, "bar")]);
 
     const result = diffTrees(oldTree, newTree, { minHeight: 1 });
-    // The leaf was "deleted" and a new one "inserted" because content hash differs
-    // Rename detection at the core level appears as Delete(old) + Insert(new)
-    // The narration layer turns that into "renamed"
-    const deletes = result.changes.filter((a) => a.type === "Delete");
-    const inserts = result.changes.filter((a) => a.type === "Insert");
-    expect(deletes.length).toBe(1);
-    expect(inserts.length).toBe(1);
+    // The parents pair on structure hashes and the leaves recover, so the
+    // value change is one Update instead of a Delete + Insert pair.
+    expect(ofType(result.changes, "Delete")).toHaveLength(0);
+    expect(ofType(result.changes, "Insert")).toHaveLength(0);
+    const updates = ofType(result.changes, "Update");
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.detail.kind).toBe("ValueChanged");
+    if (updates[0]!.detail.kind === "ValueChanged") {
+      expect(updates[0]!.detail.from).toBe("foo");
+      expect(updates[0]!.detail.to).toBe("bar");
+    }
   });
 
   it("uses Update action when nodes are matched but label differs", () => {
@@ -300,22 +304,21 @@ describe("diffTrees: deeply nested identical structures", () => {
     expect(result.nodeCount).toBe(102); // 51 nodes per side
   });
 
-  it("collapses to a root Delete + re-inserts when the deepest leaf changes", () => {
+  it("pairs a 50-level chain and reports the deepest label change as one Update", () => {
     const oldTree = deepChain(50, "a");
     const newTree = deepChain(50, "b");
     const result = diffTrees(oldTree, newTree);
 
-    // No subtree hashes match, so the old chain is deleted as a unit and the
-    // new one is inserted as a unit. Both absorb their subtrees: the root is
-    // unmatched and has no parent to be inserted into, so its single child is
-    // the topmost insertable node.
+    // The containers pair on structure hashes all the way down and leaf
+    // recovery pairs the relabeled bottom leaf: one Update, no delete or
+    // insert noise.
     const deletes = ofType(result.changes, "Delete");
     const inserts = ofType(result.changes, "Insert");
-    expect(deletes).toHaveLength(1);
-    expect(deletes[0]!.node).toBe(oldTree);
-    expect(inserts).toHaveLength(1);
-    expect(inserts[0]!.node).toBe(newTree.children[0]!);
-    expect(ofType(result.changes, "Update")).toHaveLength(0);
+    expect(deletes).toHaveLength(0);
+    expect(inserts).toHaveLength(0);
+    const updates = ofType(result.changes, "Update");
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.detail.kind).toBe("Renamed");
     expect(ofType(result.changes, "Move")).toHaveLength(0);
   });
 });
@@ -338,20 +341,18 @@ describe("diffTrees: structural changes only", () => {
     }
   });
 
-  it("deletes the root and re-inserts the new tree when every label differs", () => {
-    const oldTree = tree("program", [tree("function", [leaf("identifier", "foo")])]);
-    const newTree = tree("program", [tree("function", [leaf("identifier", "bar")])]);
+  it("reports a lone identifier change inside a nested function as one Update", () => {
+    const oldTree = tree("program", [tree("function", [leaf("identifier", undefined, "foo")])]);
+    const newTree = tree("program", [tree("function", [leaf("identifier", undefined, "bar")])]);
     const result = diffTrees(oldTree, newTree);
 
-    // Nothing matches: the unmatched old root absorbs its subtree into one
-    // Delete, and the new function subtree is inserted as one unit.
-    const deletes = ofType(result.changes, "Delete");
-    const inserts = ofType(result.changes, "Insert");
-    expect(deletes).toHaveLength(1);
-    expect(deletes[0]!.node).toBe(oldTree);
-    expect(inserts).toHaveLength(1);
-    expect(inserts.map((i) => i.node)).toEqual([newTree.children[0]!]);
-    expect(ofType(result.changes, "Update")).toHaveLength(0);
+    // Same shape throughout: structure pairing links the containers and the
+    // identifier leaf recovers as a ValueChanged Update.
+    expect(ofType(result.changes, "Delete")).toHaveLength(0);
+    expect(ofType(result.changes, "Insert")).toHaveLength(0);
+    const updates = ofType(result.changes, "Update");
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.detail.kind).toBe("ValueChanged");
     expect(ofType(result.changes, "Move")).toHaveLength(0);
   });
 });

@@ -131,13 +131,18 @@ function lcsTable(a: string[], b: string[]): SeqOp[] {
 export function myersSplit(
   a: string[],
   b: string[],
-  loA: number,
-  hiA: number,
-  loB: number,
-  hiB: number,
-  opsBudget: number,
+  loAIn: number,
+  hiAIn: number,
+  loBIn: number,
+  hiBIn: number,
+  opsBudgetIn: number,
   ops: SeqOp[],
 ): boolean {
+  let loA = loAIn;
+  let hiA = hiAIn;
+  let loB = loBIn;
+  let hiB = hiBIn;
+  let opsBudget = opsBudgetIn;
   let n = hiA - loA;
   let m = hiB - loB;
 

@@ -5,7 +5,7 @@
  * often just wrapping, not structure.
  */
 
-import { diffSequences, mergeHunks, type HunkDiff } from "./sequence";
+import { type HunkDiff, diffSequences, mergeHunks } from "./sequence";
 
 export interface WordDiff {
   type: "Insert" | "Delete" | "Equal";

@@ -10,7 +10,7 @@ A diff engine that tells you what actually happened to your code.
 
 Differens parses your code into trees, matches nodes between them, and tells you what changed in terms you actually use: *renamed*, *moved*, *extracted*, *added*, *removed*, *reformatted only*.
 
-📖 **[Documentation](https://differens.ossl.dev)** — full API reference, guides, and architecture deep-dive.
+📖 **[Documentation](https://differens.ossl.dev)**: full API reference, guides, and architecture deep-dive.
 
 ## How it works (the short version)
 
@@ -194,7 +194,7 @@ index, Dice bottom-up, LIS-minimised moves), JSON/YAML/TOML adapters, tree-sitte
 adapter with TypeScript/Python/Rust/Go extractors, git integration (working tree, commit
 ranges, commit pairs, batched blob reads), directory diffing, a cross-file correlator, and
 the narration engine with terminal/markdown/json/llm output. Per-file diffs run on a
-process pool. ~100 tests, zero failures. Published on npm as
+process pool. 292 tests, zero failures. Published on npm as
 [`differens`](https://www.npmjs.com/package/differens), runs on Node.
 
 ## Prior art worth reading before contributing

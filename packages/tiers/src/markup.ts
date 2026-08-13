@@ -33,8 +33,10 @@ export function parseMarkup(source: string): MarkupNode {
     const wsMatch = /^\s+/.exec(source.slice(pos));
     if (wsMatch) {
       const ws = wsMatch[0];
-      // Attach whitespace as text to the current parent
-      if (ws.trim() && stack.length > 0) {
+      // Attach whitespace as text to the current parent. (Checking
+      // ws.trim() here used to make this branch unreachable: the regex
+      // only ever matches whitespace, so trim() was always empty.)
+      if (stack.length > 0) {
         const parent = stack[stack.length - 1]!;
         if (parent.text) {
           parent.text += ws;

@@ -15,7 +15,9 @@ import type { Node } from "@ossl-dev/differens-core";
 export function parseData(source: string): Node {
   const trimmed = source.trim();
 
-  // Try JSON first
+  // Try JSON first. A failure here is not necessarily an error: TOML
+  // section headers start with "[", and a broken JSON object is often
+  // readable by the YAML subset below.
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
     try {
       const value = JSON.parse(trimmed);

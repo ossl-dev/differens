@@ -142,7 +142,9 @@ console.log("\n== 3 MiB text file, one edit ==");
   const t0 = performance.now();
   const r = diffWithTier(big, big.replace("const value = 42", "const value = 43"), "a.md", "a.md");
   const ms = performance.now() - t0;
-  console.log(`  3 MiB file, one edit ${" ".repeat(15)} ${ms.toFixed(1)} ms -> ${r.changes.length} changes`);
+  console.log(
+    `  3 MiB file, one edit ${" ".repeat(15)} ${ms.toFixed(1)} ms -> ${r.changes.length} changes`,
+  );
 }
 
 function countNodes(n: { children: unknown[] }): number {

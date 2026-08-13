@@ -84,11 +84,23 @@ export async function resolveRef(ref: string): Promise<string | null> {
   }
 }
 
-/** Get list of changed files in working tree vs HEAD */
+/**
+ * Get list of changed files in working tree vs HEAD.
+ *
+ * `git diff HEAD` misses files git has never seen, so untracked files are
+ * listed separately and merged in. A brand-new file is the most important
+ * change to report; dropping it made working-tree mode look broken.
+ */
 export async function getChangedFiles(): Promise<string[]> {
   try {
-    const stdout = (await git(["diff", "HEAD", "--name-only"])).toString();
-    return stdout.trim().split("\n").filter(Boolean);
+    const [changed, untracked] = await Promise.all([
+      git(["diff", "HEAD", "--name-only"]),
+      git(["ls-files", "--others", "--exclude-standard"]),
+    ]);
+    return [
+      ...changed.toString().trim().split("\n"),
+      ...untracked.toString().trim().split("\n"),
+    ].filter(Boolean);
   } catch {
     return [];
   }

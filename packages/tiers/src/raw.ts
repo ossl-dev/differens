@@ -3,7 +3,7 @@
  * Safety net for every other tier — must be fast and never crash.
  */
 
-import { diffSequences, mergeHunks, type HunkDiff } from "./sequence";
+import { type HunkDiff, diffSequences, mergeHunks } from "./sequence";
 
 export type { HunkDiff };
 

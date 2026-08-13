@@ -306,7 +306,12 @@ export function bottomUpMatch(
       }
     }
 
-    if (best >= 0 && bestDice >= opts.bottomUpRatio) m.link(i, best);
+    // A same-kind root with any matched descendant is the same file. Without
+    // this, adding or removing one top-level function in a small file pairs
+    // nothing, the unmatched root absorbs the whole change, and the report
+    // says "removed file" instead of naming the function.
+    const isRoot = oldIdx.parent[i]! < 0;
+    if (best >= 0 && (isRoot ? bestDice > 0 : bestDice >= opts.bottomUpRatio)) m.link(i, best);
   }
 }
 
@@ -383,6 +388,49 @@ export function recoverLeaves(oldIdx: TreeIndex, newIdx: TreeIndex, m: Matching)
       } else if (table[x + 1]![y]! >= table[x]![y + 1]!) x++;
       else y++;
     }
+  }
+}
+
+/**
+ * Pair unmatched containers whose structure hashes agree, one to one.
+ *
+ * A change confined to a leaf value leaves no matched descendants anywhere,
+ * so the Dice test has no evidence and even the roots never pair:
+ * `{port: 1}` vs `{port: 2}` reports the whole object deleted and re-added.
+ * Structure hashes ignore values and labels, so containers that survived a
+ * pure value edit agree on them. Pair the unique agreements, then run leaf
+ * recovery again to produce the ValueChanged pairing underneath.
+ */
+export function recoverContainers(oldIdx: TreeIndex, newIdx: TreeIndex, m: Matching): void {
+  const byStruct = new Map<number, number[]>();
+  for (let j = 0; j < newIdx.n; j++) {
+    if (m.newToOld[j]! >= 0) continue;
+    const node = newIdx.nodes[j]!;
+    if (node.children.length === 0) continue; // leaves: value edits pair below, not here
+    const list = byStruct.get(node.structureHash);
+    if (list) list.push(j);
+    else byStruct.set(node.structureHash, [j]);
+  }
+
+  for (let i = 0; i < oldIdx.n; i++) {
+    if (m.oldToNew[i]! >= 0) continue;
+    const node = oldIdx.nodes[i]!;
+    if (node.children.length === 0) continue;
+    const candidates = byStruct.get(node.structureHash);
+    if (!candidates) continue;
+
+    // Unique and still unclaimed, or the pairing is a guess.
+    let only = -1;
+    for (const j of candidates) {
+      if (m.newToOld[j]! >= 0) continue;
+      if (newIdx.nodes[j]!.kind !== node.kind) continue;
+      if (only >= 0) {
+        only = -1;
+        break;
+      }
+      only = j;
+    }
+    if (only >= 0) m.link(i, only);
   }
 }
 

@@ -8,7 +8,14 @@
 import type { EditAction, MatchOptions } from "./actions";
 import { DEFAULT_OPTIONS } from "./actions";
 import { generateEditScript } from "./edit-script";
-import { Matching, bottomUpMatch, indexTree, recoverLeaves, topDownMatch } from "./match";
+import {
+  Matching,
+  bottomUpMatch,
+  indexTree,
+  recoverContainers,
+  recoverLeaves,
+  topDownMatch,
+} from "./match";
 import type { Node } from "./node";
 
 export * from "./node";
@@ -47,6 +54,11 @@ export function diffTrees(
   const m = new Matching(oldIdx.n, newIdx.n);
   topDownMatch(oldIdx, newIdx, m, opts);
   bottomUpMatch(oldIdx, newIdx, m, opts);
+  recoverLeaves(oldIdx, newIdx, m);
+  // Containers that only differ in leaf values have no matched descendants
+  // for the Dice test; structure hashes pair them so leaf recovery can
+  // report the actual value change instead of a delete plus an insert.
+  recoverContainers(oldIdx, newIdx, m);
   recoverLeaves(oldIdx, newIdx, m);
 
   return { changes: generateEditScript(oldIdx, newIdx, m), nodeCount };
