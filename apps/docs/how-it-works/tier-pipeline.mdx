@@ -13,6 +13,8 @@ Differens parses files at six levels of abstraction, T0 through T5. Each tier is
 
 Byte-level hash comparison. Used for images, fonts, archives, and anything else that fails the text sniff. Output is a single `Update` when the hash changes, with the byte-size delta as context. T0 never attempts to parse.
 
+Format plugins can upgrade T0 per file type: register a `BinaryDiffPlugin` for an extension and it answers or declines, with the byte-delta report as the default. Image perceptual diff, EXIF diff, ELF symbol diff are all plugin-shaped, none built in.
+
 ### T1: raw (line diff)
 
 The safety net: a line-level diff over the raw text. It is the fallback for every tier above it. Small inputs get an exact longest-common-subsequence diff; large inputs get a linear-space Myers diff, so a 100,000-line file with a one-line edit reports exactly that one edit. There is no size cap. A file that shares no lines with the other side at all reports as a single rewrite.
@@ -31,7 +33,7 @@ Value trees for JSON, the YAML subset Differens supports, and the TOML subset. T
 
 ### T5: code (tree-sitter)
 
-A tree-sitter CST with per-language semantic extractors. The extractors map raw tree-sitter node types to canonical concepts such as `Function`, `Class`, `Method`, and `Import`. The narration can then say "function" whether the source said `fn`, `def`, or `func`. Currently: TypeScript/JavaScript, Python, Rust, and Go.
+A tree-sitter CST with per-language semantic extractors. The extractors map raw tree-sitter node types to canonical concepts such as `Function`, `Class`, `Method`, and `Import`. The narration can then say "function" whether the source said `fn`, `def`, or `func`. All sixteen registered languages have extractors: TypeScript/JavaScript, Python, Rust, Go, C, C++, Java, Ruby, PHP, Swift, Kotlin, C#, Scala, Lua, and shell.
 
 Languages without an extractor still work at the generic level: structural diff with raw tree-sitter node type labels. The extractor only adds human-readable concept names.
 
@@ -39,8 +41,8 @@ Languages without an extractor still work at the generic level: structural diff 
 
 The tiers form a chain. Each tier can hand off to the tier below it:
 
-1. **T5 parse fails** (syntax error, unsupported construct) → fall back to a generic tree-sitter CST diff, still structural.
-2. **Generic CST fails** (no tree-sitter grammar, garbage input) → T1 line diff.
+1. **T5 parse fails** (syntax error, unsupported construct) → tree-sitter produces ERROR nodes and the structural diff still runs.
+2. **No grammar registered** (extension has no grammar, or the grammar could not load) → T1 line diff.
 
 The worst case for text is a line diff. It is less informative than a structural diff, but it still runs, at any size.
 
@@ -59,14 +61,13 @@ The content router classifies by extension, then by content sniff:
 | Binary sniff fails (NUL bytes, invalid UTF-8) | T0 |
 | `.png .jpg .gif .webp .pdf .zip .gz .tar` | T0 |
 | Everything else, default | T1 |
-| `.md .mdx .rst` | T1 |
+| `.md .mdx .rst .csv .tsv .graphql` and Dockerfiles | T1 |
 | `.txt .log` | T2 |
 | `.html .htm .xml .svg` | T3 |
-| `.json .jsonc .yaml .yml .toml` | T4 |
+| `.json .jsonc .yaml .yml .toml .ini .cfg` and `.env` files | T4 |
 | `.ts .tsx .js .jsx .mjs .cjs` | T5 |
-| `.py` | T5 |
-| `.rs` | T5 |
-| `.go` | T5 |
+| `.py .rs .go` | T5 |
+| `.c .cpp .java .rb .php .swift .kt .cs .scala .lua .sh .bash .zsh` | T5 |
 
 Extension-based classification is the first cut; the content sniff is the backstop. A `.txt` file that is actually minified JSON still gets a T2 word-level diff. That is acceptable, because the tier below can take over.
 

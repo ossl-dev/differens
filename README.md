@@ -131,6 +131,10 @@ differens a.json b.json --format=llm
 | `--format=json` | Raw SemanticChange array, for tooling |
 | `--format=markdown` | Rolled-up summary, for PR descriptions |
 | `--format=llm` | Dense line format for AI tools: one line per change, with source line numbers. Roughly 15x smaller than the `git diff` it replaces |
+| `--format=ndjson` | One JSON object per changed file, streamed in input order as results land |
+
+`differens.toml` or `.differensrc.json` in the repo root sets the default
+format and the git driver extension list; flags override it.
 
 LLM format is line-oriented, one file heading then one line per change.
 Unnamed churn (comments, prose lines, bare expressions) collapses into a count,
@@ -160,7 +164,7 @@ On this repo's own 14-file changeset that format is 6.5KB against 100KB of
 
 ```bash
 differens languages              # what's supported: semantic vs generic per language
-differens install-git-driver     # register as a git difftool
+differens install-git-driver     # register as a git diff driver, writes .gitattributes
 differens --help                 # usage
 differens --version              # version number
 ```
@@ -190,11 +194,15 @@ differens/
 ## Status
 
 Milestone 0 shipped: GumTree-lineage matching core (53-bit Merkle hashing, postorder
-index, Dice bottom-up, LIS-minimised moves), JSON/YAML/TOML adapters, tree-sitter code
-adapter with TypeScript/Python/Rust/Go extractors, git integration (working tree, commit
-ranges, commit pairs, batched blob reads), directory diffing, a cross-file correlator, and
+index, Dice bottom-up, LIS-minimised moves, full content verification behind every hash
+match), JSON/YAML/TOML/INI/env adapters, tree-sitter code adapter with extractors for
+sixteen languages (TypeScript/JavaScript, Python, Rust, Go, C, C++, Java, Ruby, PHP,
+Swift, Kotlin, C#, Scala, Lua, shell), git integration (working tree, commit ranges,
+commit pairs, batched blob reads, self-writing .gitattributes), directory diffing with
+cross-directory rename detection, a cross-file correlator, streaming ndjson output, and
 the narration engine with terminal/markdown/json/llm output. Per-file diffs run on a
-process pool. 292 tests, zero failures. Published on npm as
+process pool, and a content-addressed parse cache reuses trees within a run.
+420 tests, zero failures. Published on npm as
 [`differens`](https://www.npmjs.com/package/differens), runs on Node.
 
 ## Prior art worth reading before contributing

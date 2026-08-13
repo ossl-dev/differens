@@ -14,11 +14,11 @@ import {
   getHeadContent,
   getWorkingTreeContent,
   installGitDriver,
-  writeGitAttributes,
   isDirectory,
   isGitRepo,
   readFilePair,
   resolveRef,
+  writeGitAttributes,
 } from "./index";
 
 let repoDir: string;

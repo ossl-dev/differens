@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { diffTrees } from "./index";
 import type { MatchOptions } from "./actions";
 import { DEFAULT_OPTIONS } from "./actions";
+import { diffTrees } from "./index";
 import {
   Matching,
   bottomUpMatch,

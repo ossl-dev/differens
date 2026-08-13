@@ -5,7 +5,7 @@ description: "The differens command: all flags, formats, and modes"
 
 # CLI Reference
 
-The `differens` command is a single binary. It runs in five modes and prints four output formats.
+The `differens` command is a single binary. It runs in five modes and prints five output formats.
 
 ```
 differens [options] [args]
@@ -26,7 +26,7 @@ differens [options] [args]
 
 | Flag | Description |
 | --- | --- |
-| `--format=terminal\|json\|markdown\|llm` | Output format (default `terminal`) |
+| `--format=terminal\|json\|markdown\|llm\|ndjson` | Output format (default `terminal`, or the config file's `format`) |
 | `--json`, `-j` | Shorthand for `--format=json` |
 | `--markdown`, `--md` | Shorthand for `--format=markdown` |
 | `--llm`, `-l` | Shorthand for `--format=llm` |
@@ -39,7 +39,19 @@ differens [options] [args]
 | --- | --- |
 | `diff` | Explicit diff mode; takes the same inputs as bare invocation |
 | `languages` | List supported languages with their level (L6 semantic / L5 generic) and extensions |
-| `install-git-driver` | Register Differens as the git diff driver and print the `.gitattributes` lines to add |
+| `install-git-driver` | Register Differens as the git diff driver and write the `.gitattributes` rules itself |
+
+## Config file
+
+`differens.toml` (or `.differensrc.json`) in the working directory, or the nearest ancestor that has one, changes the defaults:
+
+```toml
+# differens.toml
+format = "json"                      # default output format
+driverExtensions = ["ts", "tsx"]     # extensions install-git-driver registers
+```
+
+Flags override the config. Unknown keys and malformed values are ignored, and an unparseable config file is skipped rather than fatal.
 
 ## Examples
 
@@ -68,6 +80,12 @@ differens 8f3a1c2 5b0e9d7
 differens main..feature --format=json
 differens main..feature --json
 ```
+
+```bash Streaming ndjson output
+differens main..feature --format=ndjson
+```
+
+`--format=ndjson` prints one JSON object per changed file as its diff finishes, always in input order, so a long changeset streams instead of buffering. Cross-file moves trail as one final object with a `crossFileMoves` key when any exist.
 
 ```bash List languages
 differens languages

@@ -20,7 +20,7 @@ Pick an unchecked box, open an issue saying you're working on it, send a PR. One
 - [x] Cross-file correlator: structure hash buckets, content hash exact matches, Jaccard similarity for modified moves
 - [x] Git integration: shell-out difftool, working tree diff, commit range diff, diff driver registration
 - [x] CLI: `differens diff`, `differens languages`, `differens install-git-driver`, `--format=json|markdown`, `--help`
-- [x] Tests: 292 unit, integration, and CLI e2e tests (real temp git repos) across 6 packages, zero failures, 96% line coverage gated in CI
+- [x] Tests: 420 unit, integration, and CLI e2e tests (real temp git repos) across 6 packages, zero failures, 95% line coverage gated in CI
 - [x] README, development guide, roadmap
 
 **CI / infra**
@@ -40,23 +40,23 @@ Pick an unchecked box, open an issue saying you're working on it, send a PR. One
 
 ## Phase 2 -- Breadth and hardening
 
-- [ ] Expand semantic extractor coverage: C, C++, Java, Ruby, PHP, Swift, Kotlin, C#, Scala, Lua, shell
-- [ ] L5 generic fallback: structural tree-sitter CST diff for any language with a grammar but no extractor
-- [ ] Binary tier plugin interface (image perceptual diff, EXIF diff, ELF/PE symbol diff)
-- [ ] JSON output mode in CLI (done at core level, needs CLI integration work)
-- [ ] Git diff driver auto-registration (`differens install-git-driver` writes `.gitattributes`)
-- [ ] Config file support (`.differensrc` or `differens.toml`): thresholds, AI on/off, default format
-- [ ] Non-git directory diff mode: recursive walk, cross-directory rename detection
-- [ ] Add remaining format detectors to content router: CSV/TSV, INI, ENV, GraphQL, Dockerfile
+- [x] Expand semantic extractor coverage: C, C++, Java, Ruby, PHP, Swift, Kotlin, C#, Scala, Lua, shell
+- [x] L5 generic fallback: structural tree-sitter CST diff for any language with a grammar but no extractor (every listed language has an extractor now; the generic path is exercised by any future grammar-only registration)
+- [x] Binary tier plugin interface (in-process registry; format plugins answer or decline, byte-delta report stays the default)
+- [x] JSON output mode in CLI (`--format=json`)
+- [x] Git diff driver auto-registration (`differens install-git-driver` writes `.gitattributes`, preserving existing rules)
+- [x] Config file support (`differens.toml` or `.differensrc.json`): default format, driver extensions
+- [x] Non-git directory diff mode: recursive walk, cross-directory rename detection (whole-file renames and rename-plus-edit report as one move)
+- [x] Add remaining format detectors to content router: CSV/TSV (raw), INI (data), ENV (data, key-path diff), GraphQL (raw), Dockerfile (raw)
 
 **Performance**
 - [x] Iterative tree traversal (matcher and CST conversion walk with explicit stacks; 200k-deep chains verified)
 - [x] Benchmark suite: parse + match + narrate across sizes, worst cases, and large inputs (`apps/cli/bench/bench.ts`)
 - [x] Worker pool for parallel parsing (child processes; NAPI grammars cannot share threads)
-- [ ] 64-bit hash collision safety: optional content verification on hash match
-- [ ] Content-addressed parse cache (keyed by blob hash)
-- [ ] Streaming output for large diffs (SSE / chunked JSON)
-- [ ] Regression test corpus (small/medium/large repo snapshots)
+- [x] Hash collision safety: every content-hash match is verified against the full subtree (kinds, labels, values), in the matcher and the cross-file correlator
+- [x] Content-addressed parse cache (64-entry LRU keyed by content hash and extension; per-run, per-process by design)
+- [x] Streaming output for large diffs (`--format=ndjson`: one JSON object per file as results land, in input order; SSE skipped as over-engineered for a CLI)
+- [x] Regression test corpus (refactor corpus, seeded pipeline fuzz, and a 150-file mixed-tier repo snapshot pinned to the exact changed-file set)
 
 **Testing**
 - [x] Myers diff fuzz-tested against a reference LCS (optimality + alignment validity on random inputs)
@@ -69,9 +69,9 @@ Pick an unchecked box, open an issue saying you're working on it, send a PR. One
 ## Phase 3 -- The actual differentiator
 
 - [ ] Repository-level changeset summaries: one paragraph per commit/PR ("extracted validation into validators.ts")
-- [ ] Markdown output mode optimized for PR descriptions and changelogs
-- [ ] PR/commit range mode: `differens diff main..feature` with cross-file move narration
-- [ ] File-level rename detection via git's `--find-renames` for directory and range diff modes
+- [x] Markdown output mode optimized for PR descriptions and changelogs (`--format=markdown`)
+- [x] PR/commit range mode: `differens diff main..feature` with cross-file move narration
+- [x] File-level rename detection for directory and range diff modes (content matching in the correlator, no `--find-renames` needed)
 - [ ] Changeset grouping: cluster related changes (all the moves from one refactor, all the renames from another)
 - [ ] Configurable AST canonicalization: normalize whitespace/comments, canonicalize identifiers (behind `--normalize` flag, conservative by default)
 
@@ -132,7 +132,7 @@ Pick an unchecked box, open an issue saying you're working on it, send a PR. One
 - #6 Change-level metadata → Phase 3 changeset summaries
 - #7 Natural-language summaries → Phase 4 `--ai` flag
 - #8 Deterministic anchors → Phase 4 per-change metadata
-- #9 Incremental cache → Phase 2 content-addressed parse cache
+- #9 Incremental cache → Phase 2 content-addressed parse cache (per-run; a persistent cross-run cache remains an open idea)
 - #11 Lazy parsing → Tier fallback system
 - #16 ML-enhancements → Phase 4 optional local LLM
 - #19 Integration features → Phase 2 git driver, Phase 5 editor extensions

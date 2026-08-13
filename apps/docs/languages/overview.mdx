@@ -9,9 +9,9 @@ Differens parses code with tree-sitter and diffs the resulting trees. Any langua
 
 ## Two levels of support
 
-**Semantic extractors (T5, L6).** Four languages ship a per-language extractor: TypeScript/JavaScript, Python, Rust, and Go. An extractor maps tree-sitter node types to canonical concepts like `Function`, `Class`, `Method`, `Import`, `Export`, `Variable`, `Type`, `Enum`, `Struct`, and `Trait`, then pulls the declaration name out of the tree. With an extractor, a rename is a *rename* and a move is a *move*. Narration can say "renamed `computeTotal` to `calculateTotalAmount`".
+**Semantic extractors (T5, L6).** Sixteen languages ship a per-language extractor. An extractor maps tree-sitter node types to canonical concepts like `Function`, `Class`, `Method`, `Import`, `Export`, `Variable`, `Type`, `Enum`, `Struct`, and `Trait`, then pulls the declaration name out of the tree. With an extractor, a rename is a *rename* and a move is a *move*. Narration can say "renamed `computeTotal` to `calculateTotalAmount`".
 
-**Generic structural diff (T5, L5).** Every other language with a tree-sitter grammar still gets structural diffing. The CST is parsed into a tree and matched structurally, but nodes keep their raw tree-sitter type names instead of canonical concepts, and labels come from the generic `name`-field rule. Reformatting and restructure are caught. Semantic narration is not.
+**Generic structural diff (T5, L5).** A grammar registered without an extractor still gets structural diffing. The CST is parsed into a tree and matched structurally, but nodes keep their raw tree-sitter type names instead of canonical concepts, and labels come from the generic `name`-field rule. Reformatting and restructure are caught. Semantic narration is not.
 
 ## Languages with full extractors
 
@@ -21,6 +21,16 @@ Differens parses code with tree-sitter and diffs the resulting trees. Any langua
 | Python | T5 (L6) | `PythonExtractor` | functions (including async), classes, imports, decorators, assignments, comprehensions, type annotations, control flow |
 | Rust | T5 (L6) | `RustExtractor` | functions, structs, enums, traits, impls, macros, `use` imports, modules, types |
 | Go | T5 (L6) | `GoExtractor` | functions, methods, structs, interfaces, imports, variables, constants, goroutines |
+| C / C++ | T5 (L6) | `CExtractor` / `CppExtractor` | functions, structs, classes, namespaces, templates, preprocessor includes, fields |
+| Java | T5 (L6) | `JavaExtractor` | classes, interfaces, enums, methods, constructors, packages, imports, control flow |
+| Ruby | T5 (L6) | `RubyExtractor` | classes, modules, methods, calls, instance variables, blocks, control flow |
+| PHP | T5 (L6) | `PhpExtractor` | classes, interfaces, traits, enums, methods, namespaces, use declarations, properties |
+| Swift | T5 (L6) | `SwiftExtractor` | classes, protocols, functions, properties, typealiases, closures, control flow |
+| Kotlin | T5 (L6) | `KotlinExtractor` | classes, functions, properties, typealiases, imports, control flow |
+| C# | T5 (L6) | `CSharpExtractor` | classes, namespaces, methods, using directives, fields, properties |
+| Scala | T5 (L6) | `ScalaExtractor` | classes, traits, objects, definitions, package clauses, imports |
+| Lua | T5 (L6) | `LuaExtractor` | functions, variables, assignments, table constructors, calls |
+| Shell | T5 (L6) | `BashExtractor` | function definitions, commands, variable assignments, expansions, control flow |
 | Any other tree-sitter grammar | T5 (L5) | n/a | structural diff with raw tree-sitter node type labels |
 
 Anything tree-sitter has a grammar for falls back to the generic structural level (T5, L5). No extractor needed. If no grammar is registered at all, the file falls down the tier ladder to a line diff.

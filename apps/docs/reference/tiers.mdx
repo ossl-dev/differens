@@ -35,6 +35,7 @@ npm install @ossl-dev/differens-tiers
 | `getExtractors` | function | List available language extractors |
 | `parseCode` / `parseData` | function | Parse a single side into a `Node` tree |
 | `hasGrammar` | function | Is a grammar loaded for an extension? |
+| `registerBinaryPlugin` / `unregisterBinaryPlugin` | function | Add / remove a T0 format plugin |
 | `Tier` | enum | Tier identifiers above |
 
 ## classifyFile
@@ -44,7 +45,7 @@ classifyFile(filePath: string): FileInfo
 // FileInfo: { path, extension, tier }
 ```
 
-Extension-based routing, with a binary sniff (NUL bytes or failed UTF-8 decode) on top. Markdown goes to `Tier.Raw`, not prose. Lines are structure in docs.
+Extension-based routing, with a binary sniff (NUL bytes or failed UTF-8 decode) on top. Markdown goes to `Tier.Raw`, not prose: lines are structure in docs. CSV, TSV, GraphQL, and Dockerfiles are line-structured the same way, so they route to `Tier.Raw` too. Environment files (`.env`, `.env.local`) route to `Tier.Data`: `KEY=VALUE` lines parse as the TOML subset, so a changed value reports with its key path.
 
 ## diffWithTier
 
@@ -78,7 +79,24 @@ interface LanguageExtractor {
 }
 ```
 
-`getExtractors()` reports them as `ExtractorInfo { language, level: "L6" | "L5", extensions }`, where L6 extractors have semantic mappings and L5 are generic.
+`getExtractors()` reports them as `ExtractorInfo { language, level: "L6" | "L5", extensions }`, where L6 extractors have semantic mappings and L5 are generic. Sixteen languages register extractors: TypeScript/JavaScript, Python, Rust, Go, C, C++, Java, Ruby, PHP, Swift, Kotlin, C#, Scala, Lua, and shell. A grammar registered without an extractor reports as L5.
+
+`parseCode` keeps a content-addressed cache (64-entry LRU, keyed by content hash and extension), so the same file content reappearing in one run parses once. The cache is per-run and per-process by design; worker children build their own.
+
+## BinaryDiffPlugin
+
+T0 format plugins upgrade binary files from the byte-delta report to a real diff:
+
+```ts
+interface BinaryDiffPlugin {
+  id: string;                                  // unique, for unregistering
+  extensions: string[];                        // lowercase, no dot
+  diff(oldBytes: Uint8Array, newBytes: Uint8Array): EditAction[] | undefined;
+  // return actions to answer, undefined to decline and let the next plugin try
+}
+```
+
+Plugins register in-process with `registerBinaryPlugin`. The first non-declining answer wins; a throwing plugin is skipped; the default byte-delta report always remains as the floor. Dynamic plugin loading from disk is deliberately not included: that belongs to an ecosystem layer, not the diff pipeline.
 
 ## Usage
 

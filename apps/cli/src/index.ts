@@ -133,7 +133,7 @@ async function handleDiff(args: string[], defaultFormat: OutputFormat = "termina
     }
     await handleFileDiff(oldArg, newArg, format);
   } else {
-    console.error("usage: differens diff [<old> <new>] [--format=json|md|llm]");
+    console.error("usage: differens diff [<old> <new>] [--format=json|markdown|llm|ndjson]");
     process.exit(1);
   }
 }
@@ -251,7 +251,7 @@ usage:
   differens install-git-driver          register as git difftool
 
 options:
-  --format=json|markdown|llm           output format (default: terminal)
+  --format=json|markdown|llm|ndjson   output format (default: terminal)
   --help, -h                           show this help
   --version, -v                        show version number
 

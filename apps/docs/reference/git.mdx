@@ -24,6 +24,7 @@ npm install @ossl-dev/differens-git
 | `installGitDriver` | function | Register `diff.differens.command` in local git config |
 | `diffDriverCommand` | function | Render runtime + args into the shell-quoted command git config wants |
 | `generateGitAttributes` | function | `.gitattributes` lines (`*.ts diff=differens`) |
+| `writeGitAttributes` | function | Write the driver rules into the repo's `.gitattributes`, preserving existing lines (idempotent) |
 | `DRIVER_FLAG` | const | `"--git-diff-driver"`, the flag that prefixes the args git appends |
 | `isGitRepo` | function | Are we inside a git repository? |
 | `resolveRef` | function | Ref → commit SHA, or `null` if invalid |

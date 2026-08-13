@@ -5,7 +5,7 @@ description: "JSON, LLM, and streaming formats for tooling and AI"
 
 # Machine Outputs
 
-Three machine-readable formats, one flag: `--format=json`, `--format=llm`, and `--format=markdown`. All are stable and deterministic. Same input, same output.
+Four machine-readable formats, one flag: `--format=json`, `--format=llm`, `--format=markdown`, and `--format=ndjson`. All are stable and deterministic. Same input, same output.
 
 ## JSON
 
@@ -98,6 +98,28 @@ src/new/utils.ts with minor edits.
 
 Empty changesets render as `_no logical changes_`.
 
-## Streaming (future)
+## NDJSON (streaming)
 
-ndjson streaming output is on the roadmap. It will emit one change per line as trees finish matching, for long-running diffs over large changesets. Track it in the repo's open issues.
+`--format=ndjson` is the streaming format: one JSON object per changed file, printed the moment that file's diff finishes, always in input order. A long changeset starts producing output while the later files are still matching.
+
+```json
+{"filePath":"src/checkout.ts","changes":[{"description":"renamed function `computeTotal` to `calculateTotalAmount`","action":{...}}]}
+```
+
+Per-line shape:
+
+- `filePath`: which file this object covers.
+- `changes`: narrated changes for that file, `description` plus the typed `action`, same shape as the `perFile` entries in the JSON format.
+- Unchanged files produce no line, matching the other formats.
+
+Cross-file moves need the whole changeset, so when any exist they trail as one final object:
+
+```json
+{"crossFileMoves":[{"kind":"function","name":"formatPrice","fromFile":"src/old/utils.ts","toFile":"src/new/utils.ts","modified":false}]}
+```
+
+Consumers filter per-file lines with `select(.filePath)` and read the trailer with `select(.crossFileMoves)`.
+
+```bash
+differens main..feature --format=ndjson | jq -c 'select(.filePath) | .filePath'
+```

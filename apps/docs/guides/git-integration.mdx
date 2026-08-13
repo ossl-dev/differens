@@ -9,7 +9,7 @@ Differens plugs into your normal `git diff` workflow. Instead of line hunks, it 
 
 ## Install the driver
 
-One command registers Differens as a git diff driver in your repo's local config, then prints the `.gitattributes` lines you need to opt files in:
+One command registers Differens as a git diff driver in your repo's local config and writes the `.gitattributes` rules itself:
 
 <CodeGroup>
 ```bash Register the driver
@@ -18,20 +18,12 @@ differens install-git-driver
 
 ```text Output
 git diff driver installed.
-add to .gitattributes:
-  *.ts diff=differens
-  *.tsx diff=differens
-  *.js diff=differens
-  *.jsx diff=differens
-  *.py diff=differens
-  *.rs diff=differens
-  *.go diff=differens
-
-then `git diff` narrates those files instead of printing hunks.
+wrote /your/repo/.gitattributes: 22 extensions now use the differens driver.
+`git diff` narrates those files instead of printing hunks.
 ```
 </CodeGroup>
 
-Add the `diff=differens` lines to `.gitattributes` (repo root or per-directory) for every extension you want covered. Files without the attribute keep normal `git diff` output.
+The command registers every extension with a working grammar, or the subset pinned in the config file's `driverExtensions`. Existing `.gitattributes` lines are preserved: a line already matching an extension keeps its other attributes and gains the driver, every other line passes through, and running the command twice changes nothing. To cover fewer extensions, list them in `differens.toml`. Files without the attribute keep normal `git diff` output.
 
 Now `git diff` on a `.ts` file shows the change instead of a hunk:
 
@@ -67,7 +59,7 @@ With no arguments, `differens` diffs the working tree against HEAD and correlate
 differens
 ```
 
-This is `git diff HEAD` in semantic form. It picks up unstaged and staged changes. Untracked files are excluded.
+This is `git diff HEAD` in semantic form. It picks up unstaged and staged changes, plus untracked files: a brand-new file is the most important change to report, so it is merged in from `git ls-files --others`.
 
 ### Commit ranges
 
@@ -103,7 +95,7 @@ If both arguments are directories, Differens walks each one and diffs matching r
 differens release/1.0/ release/1.1/
 ```
 
-Files present on only one side are whole-file additions or removals. Generated and vendor directories (`node_modules`, `dist`, `.git`, …) are skipped. Files over 2 MiB are treated as whole-file additions or removals.
+Files present on only one side are whole-file additions or removals, and a file that moved to a different relative path reports as a rename (or a rename plus edit) rather than a delete and an add. Generated and vendor directories (`node_modules`, `dist`, `.git`, …) are skipped. There is no size cap: every file is read and diffed for real.
 
 ## How it compares to git diff
 

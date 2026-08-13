@@ -9,7 +9,7 @@ The diff core runs one algorithm, in the GumTree lineage, across three phases: t
 
 ## Phase 1: top-down isomorphic matching
 
-The algorithm walks both trees top-down and pairs subtrees that are structurally identical. Two subtrees are isomorphic when their structure hashes match exactly: same kind, same children, same shape, with labels and values ignored.
+The algorithm walks both trees top-down and pairs subtrees that are structurally identical. Two subtrees are isomorphic when their content hashes match exactly: same kind, same children, same shape. The hash is a candidate, not a verdict: before a pair is trusted, the matcher walks the subtree and compares every kind, label, and value directly, so even a forged hash collision cannot weld two different subtrees together.
 
 Take these two small ASTs. `a.ts`:
 
@@ -84,13 +84,13 @@ Every node carries two hashes, 53-bit-safe folds of two 32-bit FNV-1a streams, b
 - **Content hash**: kind + label + value + the children's content hashes. Two nodes with the same content hash are the same code. Renaming `greet` changes the label and therefore the content hash.
 - **Structure hash**: kind + the children's structure hashes. Labels and values are ignored, so `function greet(...)` and `function farewell(...)` with identical bodies share a structure hash. This is what phase 1 matches on.
 
-Structure hashes find *where things are*; content hashes find *what things are*. The correlator uses both.
+Structure hashes find *where things are*; content hashes find *what things are*. The correlator uses both, and it verifies exact content matches with the same full-subtree comparison as the matcher.
 
 ## FNV-1a hashing
 
 Hashes use FNV-1a over two independent 32-bit streams, folded into one 53-bit-safe JavaScript number. Each node's hash combines its own fields with its children's hashes, so a change anywhere in a subtree changes every ancestor's hash. That Merkle property makes subtree equality a single comparison.
 
-The collision bound follows from the birthday problem: at one million nodes the chance of any two nodes colliding is about 0.006%, and at ten million about 0.6%. There is no node-count cap, so this bound applies at every realistic tree size.
+The collision bound follows from the birthday problem: at one million nodes the chance of any two nodes colliding is about 0.006%, and at ten million about 0.6%. That bound now describes wasted comparisons, not wrong matches: every hash-equal pair is verified against the real subtree content, so a collision degrades to "no match" and the change still gets reported through the next matching phase. There is no node-count cap, so this applies at every realistic tree size.
 
 <Info>
 Hashes are JavaScript numbers, not full 64-bit integers, so no `BigInt` handling is involved. The JSON formatter serializes them as regular integers. See [Output](/guides/machine-outputs).

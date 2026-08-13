@@ -48,7 +48,10 @@ differens a.json b.json --format=llm
 | `--format=llm` | Default choice for agents. ~15x smaller than the git diff it replaces |
 | `--format=json` | Structured output for tooling |
 | `--format=markdown` | Rolled-up summary for PR descriptions |
+| `--format=ndjson` | One JSON object per file, streamed as results land |
 | (none) | Terminal, one sentence per change, icons `~` changed `+` added `-` removed `→` moved |
+
+`differens.toml` or `.differensrc.json` in the repo root sets the default format (`format = "llm"`) and the git driver extension list. Flags override it.
 
 ### LLM format
 
@@ -99,7 +102,7 @@ One object per change: `type` (Insert, Delete, Update, Move), `node` (kind, labe
 | Config change | `changed database.pool.max from 10 to 25` |
 | Whitespace only | `reformatted only, no logical changes` |
 
-Semantic extractors: TypeScript/JavaScript, Python, Rust, Go. Other languages: structural diff with raw tree-sitter type names. JSON/YAML/TOML: key-path diff. HTML/XML: lenient markup diff. Prose and logs: word-level diff. Binary: hash comparison. Unparseable input: line diff fallback, never fails.
+Semantic extractors: TypeScript/JavaScript, Python, Rust, Go, C, C++, Java, Ruby, PHP, Swift, Kotlin, C#, Scala, Lua, shell. Other languages: structural diff with raw tree-sitter type names. JSON/YAML/TOML/INI/env: key-path diff. HTML/XML: lenient markup diff. Prose and logs: word-level diff with paragraph moves. Binary: hash comparison, upgradable via format plugins. Unparseable input: line diff fallback, never fails.
 
 ## Limits
 

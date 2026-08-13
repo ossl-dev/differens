@@ -13,17 +13,19 @@ Measured on an M-series MacBook with `bun run apps/cli/bench/bench.ts`. Each cas
 
 | Input | Scale | Time |
 | --- | --- | --- |
-| Small file, one rename | ~4k nodes (50 functions) | ~27 ms; the first grammar parse dominates |
-| Large file, one rename | ~70k nodes (800 functions) | ~283 ms |
+| Small file, one rename | ~4k nodes (50 functions) | ~19 ms; the first grammar parse dominates |
+| Large file, one rename | ~70k nodes (800 functions) | ~161 ms |
 | 10k siblings, one changed | Flat tree | ~4 ms |
 | 100k-line file, one line edit | Raw tier | ~9 ms, one change |
-| 60k-word document, one word edit | Prose tier | ~30 ms, one change |
-| 20k-line file, fully rewritten | Raw tier | ~6 ms, one whole-file Update |
+| 60k-word document, one word edit | Prose tier | ~27 ms, one change |
+| 20k-line file, fully rewritten | Raw tier | ~7 ms, one whole-file Update |
 | 200k-node deep chain, full match | Core | ~82 ms |
-| 3 MiB file, one edit | Raw tier | ~8 ms, one change |
-| Monorepo changesets | Hundreds of files | Per-file diffs run on a worker pool sized to your core count; blob reads are batched through one `git cat-file --batch` |
+| 3 MiB file, one edit | Raw tier | ~6 ms, one change |
+| Monorepo changesets | Hundreds of files | Per-file diffs run on a worker pool sized to your core count; blob reads are batched through one `git cat-file --batch`; `--format=ndjson` streams per-file results as they land |
 
 Matching is linear in node count: top-down anchors, bottom-up containers, leaf recovery, all over flat typed arrays. There is no node-count cap and no file-size cap: every input is matched for real. Large text files use a linear-space Myers diff, so a one-line edit in a 100k-line file costs ~9 ms instead of degrading to a whole-file update.
+
+Two caches keep repeat work off the hot path. A content-addressed parse cache (64-entry LRU, keyed by content hash and extension) reuses the parse tree whenever the same file content reappears in a run. Repeated identical content short-circuits before any parsing at all.
 
 ## How to run benchmarks
 
@@ -35,10 +37,12 @@ bun run apps/cli/bench/bench.ts
 ```
 
 ```text Sample output
-matching 350k nodes ................. ~70ms
-parse 1000-line ts file ............. ~8ms
-100k-line file, one line edit ....... ~9ms
-200-file changeset, warm cache ...... ~1.2s
+parse + diff, one small edit (800 functions) .. ~161ms
+reorder: first function moved to the end ...... ~39ms
+100k-line file, one edit (raw tier) ........... ~9ms
+60k-word document, one edit (prose tier) ...... ~27ms
+200k-node deep chain, full match .............. ~82ms
+3 MiB file, one edit .......................... ~6ms
 ```
 </CodeGroup>
 
@@ -57,6 +61,6 @@ For line-level changes on unparseable files, both engines use the same algorithm
 
 ## Fast, slow, being worked on
 
-- **Fast**: structural matching on code and data files, whole-file adds/removals (one action, no tree), same-file moves, batched blob reads, large text files (linear-space Myers), fully rewritten files (one Update).
+- **Fast**: structural matching on code and data files, whole-file adds/removals (one action, no tree), same-file moves, batched blob reads, large text files (linear-space Myers), fully rewritten files (one Update), repeat content within a run (parse cache).
 - **Slow**: the first parse of a huge file on a cold grammar cache; binary comparisons (hash only, so rarely worth it).
-- **Being worked on**: streaming ndjson output for long changesets, incremental matching across repeated runs.
+- **Noted, not needed yet**: a persistent cross-run parse cache, SSE output (ndjson covers streaming already).
