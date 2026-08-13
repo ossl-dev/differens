@@ -3,7 +3,13 @@ import { createRequire } from "node:module";
 import type { Node } from "@ossl-dev/differens-core";
 import Parser from "tree-sitter";
 import { GoExtractor } from "./go";
-import { hasGrammar, listExtractors, parseCacheStats, parseCode, resetParseCacheForTest } from "./index";
+import {
+  hasGrammar,
+  listExtractors,
+  parseCacheStats,
+  parseCode,
+  resetParseCacheForTest,
+} from "./index";
 import { PythonExtractor } from "./python";
 import { RustExtractor } from "./rust";
 import { TypeScriptExtractor } from "./typescript";
@@ -154,9 +160,9 @@ describe("grammar registry", () => {
     }
   });
 
-  it("reports working grammars for every registered L5 language", () => {
-    const l5 = ["c", "cpp", "java", "rb", "php", "swift", "kt", "cs", "scala", "lua", "sh"];
-    for (const ext of l5) expect(hasGrammar(ext)).toBe(true);
+  it("reports working grammars for every registered language", () => {
+    const exts = ["c", "cpp", "java", "rb", "php", "swift", "kt", "cs", "scala", "lua", "sh"];
+    for (const ext of exts) expect(hasGrammar(ext)).toBe(true);
   });
 
   it("reports no grammar for unregistered extensions", () => {
@@ -164,7 +170,7 @@ describe("grammar registry", () => {
     expect(hasGrammar("unknown")).toBe(false);
   });
 
-  it("lists one entry per language with its extensions", () => {
+  it("lists one entry per language at L6 with its extensions", () => {
     const extractors = listExtractors();
     expect(extractors.length).toBe(16);
     const byLang = new Map(extractors.map((e) => [e.language, e]));
@@ -175,51 +181,41 @@ describe("grammar registry", () => {
     expect(byLang.get("rust")!.extensions).toEqual(["rs"]);
     expect(byLang.get("bash")!.extensions).toEqual(["sh", "bash", "zsh"]);
     expect(byLang.get("csharp")!.extensions).toEqual(["cs"]);
-    const l5 = [
-      "c",
-      "cpp",
-      "java",
-      "ruby",
-      "php",
-      "swift",
-      "kotlin",
-      "csharp",
-      "scala",
-      "lua",
-      "bash",
-    ];
-    for (const lang of l5) expect(byLang.get(lang)!.level).toBe("L5");
-    for (const lang of ["javascript", "typescript", "python", "go", "rust"]) {
-      expect(byLang.get(lang)!.level).toBe("L6");
-    }
+    for (const e of extractors) expect(e.level).toBe("L6");
   });
 });
 
-describe("L5 generic fallback", () => {
-  it("parses java into raw tree-sitter kinds with name-field labels", () => {
+describe("extractor-backed languages end to end", () => {
+  it("maps java to canonical concepts with labels", () => {
     const src = "class Foo { void bar() {} }";
-    expect(hasKind(src, "java", "program")).toBe(true);
-    expect(hasKind(src, "java", "class_declaration", "Foo")).toBe(true);
-    expect(hasKind(src, "java", "method_declaration", "bar")).toBe(true);
+    expect(hasKind(src, "java", "file")).toBe(true);
+    expect(hasKind(src, "java", "Class", "Foo")).toBe(true);
+    expect(hasKind(src, "java", "Method", "bar")).toBe(true);
   });
 
-  it("parses C and C++", () => {
-    expect(hasKind("int main() { return 0; }", "c", "translation_unit")).toBe(true);
-    expect(hasKind("class Foo { public: int bar(); };", "cpp", "translation_unit")).toBe(true);
+  it("maps C and C++ constructs", () => {
+    expect(hasKind("int main() { return 0; }", "c", "Function", "main")).toBe(true);
+    expect(hasKind("class Foo { public: int bar(); };", "cpp", "Class", "Foo")).toBe(true);
   });
 
-  it("parses ruby, php, swift, scala, bash, and lua", () => {
-    expect(hasKind("class Foo\n  def bar\n  end\nend", "rb", "program")).toBe(true);
-    expect(hasKind("<?php class Foo { function bar() {} }", "php", "program")).toBe(true);
-    expect(hasKind("class Foo { func bar() {} }", "swift", "source_file")).toBe(true);
-    expect(hasKind("class Foo { def bar() = 1 }", "scala", "compilation_unit")).toBe(true);
-    expect(hasKind("foo() { echo hi; }", "sh", "program")).toBe(true);
-    expect(hasKind("function foo() return 1 end", "lua", "chunk")).toBe(true);
+  it("maps ruby, php, swift, scala, bash, and lua constructs", () => {
+    expect(hasKind("class Foo\n  def bar\n  end\nend", "rb", "Class", "Foo")).toBe(true);
+    expect(hasKind("class Foo\n  def bar\n  end\nend", "rb", "Method", "bar")).toBe(true);
+    expect(hasKind("<?php class Foo { function bar() {} }", "php", "Class", "Foo")).toBe(true);
+    expect(hasKind("<?php class Foo { function bar() {} }", "php", "Method", "bar")).toBe(true);
+    expect(hasKind("class Foo { func bar() {} }", "swift", "Class", "Foo")).toBe(true);
+    expect(hasKind("class Foo { func bar() {} }", "swift", "Function", "bar")).toBe(true);
+    expect(hasKind("class Foo { def bar() = 1 }", "scala", "Class", "Foo")).toBe(true);
+    expect(hasKind("class Foo { def bar() = 1 }", "scala", "Function", "bar")).toBe(true);
+    expect(hasKind("foo() { echo hi; }", "sh", "Function", "foo")).toBe(true);
+    expect(hasKind("function foo() return 1 end", "lua", "Function", "foo")).toBe(true);
   });
 
-  it("parses C# and Kotlin through their dlopen-loaded bindings", () => {
-    expect(hasKind("class Foo { void Bar() {} }", "cs", "compilation_unit")).toBe(true);
-    expect(hasKind("class Foo { fun bar() {} }", "kt", "source_file")).toBe(true);
+  it("maps C# and Kotlin through their dlopen-loaded bindings", () => {
+    expect(hasKind("class Foo { void Bar() {} }", "cs", "Class", "Foo")).toBe(true);
+    expect(hasKind("class Foo { void Bar() {} }", "cs", "Method", "Bar")).toBe(true);
+    expect(hasKind("class Foo { fun bar() {} }", "kt", "Class", "Foo")).toBe(true);
+    expect(hasKind("class Foo { fun bar() {} }", "kt", "Function", "bar")).toBe(true);
   });
 
   it("recovers from garbage input in a grammar-less fallback extension", () => {

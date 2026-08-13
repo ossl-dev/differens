@@ -14,10 +14,21 @@ import { createRequire } from "node:module";
 import { createNode, hashText } from "@ossl-dev/differens-core";
 import type { Node } from "@ossl-dev/differens-core";
 import Parser from "tree-sitter";
+import { BashExtractor } from "./bash";
+import { CExtractor } from "./c";
+import { CppExtractor } from "./cpp";
+import { CSharpExtractor } from "./csharp";
 import type { LanguageExtractor } from "./extractor";
 import { GoExtractor } from "./go";
+import { JavaExtractor } from "./java";
+import { KotlinExtractor } from "./kotlin";
+import { LuaExtractor } from "./lua";
+import { PhpExtractor } from "./php";
 import { PythonExtractor } from "./python";
+import { RubyExtractor } from "./ruby";
 import { RustExtractor } from "./rust";
+import { ScalaExtractor } from "./scala";
+import { SwiftExtractor } from "./swift";
 import { TypeScriptExtractor } from "./typescript";
 
 /**
@@ -80,21 +91,33 @@ const LANGUAGES: Record<string, LanguageSpec> = {
   py: { name: "python", module: "tree-sitter-python", extractor: () => new PythonExtractor() },
   rs: { name: "rust", module: "tree-sitter-rust", extractor: () => new RustExtractor() },
   go: { name: "go", module: "tree-sitter-go", extractor: () => new GoExtractor() },
-  // L5 generic fallback: grammars without extractors diff as raw tree-sitter
-  // CSTs. Node types and standard field names carry the semantics.
-  c: { name: "c", module: "tree-sitter-c" },
-  cpp: { name: "cpp", module: "tree-sitter-cpp" },
-  java: { name: "java", module: "tree-sitter-java" },
-  rb: { name: "ruby", module: "tree-sitter-ruby" },
-  php: { name: "php", module: "tree-sitter-php", pick: "php" },
-  swift: { name: "swift", module: "tree-sitter-swift" },
-  kt: { name: "kotlin", module: "tree-sitter-kotlin" },
-  cs: { name: "csharp", module: "tree-sitter-c-sharp", esm: true },
-  scala: { name: "scala", module: "tree-sitter-scala" },
-  lua: { name: "lua", module: "@tree-sitter-grammars/tree-sitter-lua", esm: true },
-  sh: { name: "bash", module: "tree-sitter-bash" },
-  bash: { name: "bash", module: "tree-sitter-bash" },
-  zsh: { name: "bash", module: "tree-sitter-bash" },
+  // Extractor-backed languages: raw tree-sitter kinds are mapped to the
+  // canonical concept vocabulary (Function, Class, Method, ...) shared with
+  // every other language. A language with a grammar but no extractor would
+  // diff as a raw CST instead; every listed language has one.
+  c: { name: "c", module: "tree-sitter-c", extractor: () => new CExtractor() },
+  cpp: { name: "cpp", module: "tree-sitter-cpp", extractor: () => new CppExtractor() },
+  java: { name: "java", module: "tree-sitter-java", extractor: () => new JavaExtractor() },
+  rb: { name: "ruby", module: "tree-sitter-ruby", extractor: () => new RubyExtractor() },
+  php: { name: "php", module: "tree-sitter-php", pick: "php", extractor: () => new PhpExtractor() },
+  swift: { name: "swift", module: "tree-sitter-swift", extractor: () => new SwiftExtractor() },
+  kt: { name: "kotlin", module: "tree-sitter-kotlin", extractor: () => new KotlinExtractor() },
+  cs: {
+    name: "csharp",
+    module: "tree-sitter-c-sharp",
+    esm: true,
+    extractor: () => new CSharpExtractor(),
+  },
+  scala: { name: "scala", module: "tree-sitter-scala", extractor: () => new ScalaExtractor() },
+  lua: {
+    name: "lua",
+    module: "@tree-sitter-grammars/tree-sitter-lua",
+    esm: true,
+    extractor: () => new LuaExtractor(),
+  },
+  sh: { name: "bash", module: "tree-sitter-bash", extractor: () => new BashExtractor() },
+  bash: { name: "bash", module: "tree-sitter-bash", extractor: () => new BashExtractor() },
+  zsh: { name: "bash", module: "tree-sitter-bash", extractor: () => new BashExtractor() },
 };
 
 interface LoadedLanguage {

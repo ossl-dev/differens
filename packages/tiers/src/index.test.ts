@@ -450,15 +450,29 @@ describe("isParseable", () => {
 });
 
 describe("extractor listing", () => {
-  it("lists L6 extractor languages and L5 generic grammars", () => {
+  it("lists every registered language at L6", () => {
     const extractors = getExtractors();
     expect(extractors).toHaveLength(16);
-    const byLang = new Map(extractors.map((e) => [e.language, e]));
-    const l6 = ["go", "javascript", "python", "rust", "typescript"];
-    for (const name of l6) expect(byLang.get(name)!.level).toBe("L6");
-    for (const e of extractors) {
-      if (!l6.includes(e.language)) expect(e.level).toBe("L5");
-    }
+    for (const e of extractors) expect(e.level).toBe("L6");
+    const names = extractors.map((e) => e.language).sort();
+    expect(names).toEqual([
+      "bash",
+      "c",
+      "cpp",
+      "csharp",
+      "go",
+      "java",
+      "javascript",
+      "kotlin",
+      "lua",
+      "php",
+      "python",
+      "ruby",
+      "rust",
+      "scala",
+      "swift",
+      "typescript",
+    ]);
   });
 
   it("resolves initExtractors", async () => {
