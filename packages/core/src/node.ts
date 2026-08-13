@@ -128,6 +128,26 @@ export function createNode(opts: BuildNodeOptions): Node {
   };
 }
 /**
+ * Exact subtree equality: kind, label, value and every child.
+ *
+ * The equality check hashes optimise for: when hashes agree, this decides
+ * whether the content actually does. Hashes are FNV-1a folded to 53 bits, so
+ * agreement is a candidate, not a verdict. Used by the matcher and the
+ * cross-file correlator wherever a contentHash match is claimed.
+ */
+export function treesEqual(a: Node, b: Node): boolean {
+  if (a.kind !== b.kind || a.label !== b.label || a.value !== b.value) return false;
+  if (a.children.length !== b.children.length) return false;
+  for (let i = 0; i < a.children.length; i++) {
+    const ca = a.children[i]!;
+    const cb = b.children[i]!;
+    if (ca.contentHash !== cb.contentHash) return false;
+    if (!treesEqual(ca, cb)) return false;
+  }
+  return true;
+}
+
+/**
  * Build a simple tree from a flat key-value object.
  * Used by T4 (config/data tier) for JSON/YAML value trees.
  */

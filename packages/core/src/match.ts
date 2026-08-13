@@ -204,14 +204,25 @@ function affinity(oldIdx: TreeIndex, newIdx: TreeIndex, m: Matching, i: number, 
   return score - Math.min(8, Math.abs(oldIdx.pos[i]! - newIdx.pos[j]!)) * 0.1;
 }
 
-/** Same shape and same kinds throughout: the check behind an equal hash. */
+/**
+ * Full content equality of two subtrees: the check behind an equal hash.
+ *
+ * The content hash is 53 bits of FNV-1a, so an equal hash is a candidate, not
+ * a verdict. A forged collision would weld two different subtrees together
+ * and silently swallow a real change, so every position in the subtree must
+ * agree: kind, label, and value. The hash did the heavy lifting already; this
+ * pass is linear in the subtree with string compares only where the hash
+ * agreed.
+ */
 function isomorphic(oldIdx: TreeIndex, newIdx: TreeIndex, i: number, j: number): boolean {
   const size = oldIdx.size[i]!;
   if (newIdx.size[j] !== size) return false;
   const oi = lo(oldIdx, i);
   const oj = lo(newIdx, j);
   for (let k = 0; k < size; k++) {
-    if (oldIdx.nodes[oi + k]!.kind !== newIdx.nodes[oj + k]!.kind) return false;
+    const a = oldIdx.nodes[oi + k]!;
+    const b = newIdx.nodes[oj + k]!;
+    if (a.kind !== b.kind || a.label !== b.label || a.value !== b.value) return false;
   }
   return true;
 }

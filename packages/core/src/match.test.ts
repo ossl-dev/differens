@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { diffTrees } from "./index";
 import type { MatchOptions } from "./actions";
 import { DEFAULT_OPTIONS } from "./actions";
 import {
@@ -242,5 +243,59 @@ describe("recoverLeaves", () => {
     // Containers pair via Dice, not the leaf-recovery positional zip.
     expect(partner).toBeGreaterThanOrEqual(0);
     expect(newIdx.nodes[partner]!.kind).toBe("inner");
+  });
+});
+
+describe("hash collision safety", () => {
+  it("refuses to weld subtrees that only share a forged content hash", () => {
+    // FNV-1a folded to 53 bits is not collision-free: an equal hash is a
+    // candidate, not a verdict. Forge a collision on the one changed leaf:
+    // same kind, same size, different content, identical contentHash. Without
+    // content verification the whole fn subtree pairs as identical and the
+    // change vanishes; with it, the edit surfaces as a Renamed leaf.
+    const a = tree("root", [tree("fn", [leaf("name", "x"), leaf("arg", "1")])]);
+    const b = tree("root", [tree("fn", [leaf("name", "x"), leaf("arg", "2")])]);
+    b.children[0]!.children[1]!.contentHash = a.children[0]!.children[1]!.contentHash;
+
+    const result = diffTrees(a, b);
+    expect(result.changes).toHaveLength(1);
+    const change = result.changes[0]!;
+    expect(change.type).toBe("Update");
+    if (change.type === "Update" && change.detail.kind === "Renamed") {
+      expect(change.detail.from).toBe("1");
+      expect(change.detail.to).toBe("2");
+    }
+  });
+
+  it("verifies values, not just kinds, on hash-equal subtrees", () => {
+    const a = tree("root", [tree("fn", [leaf("name", "x"), leaf("arg", undefined, "1")])]);
+    const b = tree("root", [tree("fn", [leaf("name", "x"), leaf("arg", undefined, "2")])]);
+    b.children[0]!.children[1]!.contentHash = a.children[0]!.children[1]!.contentHash;
+
+    const result = diffTrees(a, b);
+    expect(result.changes).toHaveLength(1);
+    const change = result.changes[0]!;
+    expect(change.type).toBe("Update");
+    if (change.type === "Update" && change.detail.kind === "ValueChanged") {
+      expect(change.detail.from).toBe("1");
+      expect(change.detail.to).toBe("2");
+    }
+  });
+
+  it("verifies labels, not just kinds, on hash-equal subtrees", () => {
+    // Same shape and kinds throughout, but a different label: a hash
+    // collision on the label must not pair `add` with `sub`.
+    const a = tree("root", [tree("fn", [leaf("name", "add"), leaf("arg", "1")])]);
+    const b = tree("root", [tree("fn", [leaf("name", "sub"), leaf("arg", "1")])]);
+    b.children[0]!.children[0]!.contentHash = a.children[0]!.children[0]!.contentHash;
+
+    const result = diffTrees(a, b);
+    expect(result.changes).toHaveLength(1);
+    const change = result.changes[0]!;
+    expect(change.type).toBe("Update");
+    if (change.type === "Update" && change.detail.kind === "Renamed") {
+      expect(change.detail.from).toBe("add");
+      expect(change.detail.to).toBe("sub");
+    }
   });
 });

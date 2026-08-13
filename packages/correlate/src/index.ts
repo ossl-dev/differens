@@ -13,6 +13,7 @@
  */
 
 import type { EditAction, Node } from "@ossl-dev/differens-core";
+import { treesEqual } from "@ossl-dev/differens-core";
 
 export interface CrossFileMatch {
   /** The moved node */
@@ -108,11 +109,13 @@ export function correlate(
         if (matchedInsertions.has(ins)) continue;
         if (del.file === ins.file) continue; // skip same-file
 
-        // Identical value counts as exact too: a renamed file carries its
-        // path in the label, so its contentHash differs on both sides even
-        // when not one byte of the content changed.
+        // Exact means exact: an equal contentHash is a candidate, not a
+        // verdict (FNV is not collision-free), so the subtrees are compared
+        // for real. Identical value counts as exact too: a renamed file
+        // carries its path in the label, so its contentHash differs on both
+        // sides even when not one byte of the content changed.
         const exact =
-          del.action.node.contentHash === ins.action.node.contentHash ||
+          treesEqual(del.action.node, ins.action.node) ||
           (del.action.node.value !== undefined && del.action.node.value === ins.action.node.value);
         if (exact) {
           moves.push({

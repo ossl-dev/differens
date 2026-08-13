@@ -269,3 +269,56 @@ describe("correlate: modified and value-based moves", () => {
     expect(result.moves).toHaveLength(0);
   });
 });
+
+describe("correlate: forged hash collisions", () => {
+  it("does not report a move for two nodes that only share a forged hash", () => {
+    // Dissimilar content, forced identical hashes: without exact content
+    // verification this becomes a bogus "moved unmodified" report.
+    const del = createNode({
+      kind: "Function",
+      label: "alpha",
+      value: "AAAA1111",
+      byteRange: [0, 8],
+    });
+    const ins = createNode({
+      kind: "Function",
+      label: "beta",
+      value: "BBBB2222",
+      byteRange: [0, 8],
+    });
+    ins.contentHash = del.contentHash;
+
+    const fileChanges: FileChanges[] = [
+      { filePath: "a.ts", actions: [{ type: "Delete", context: [], node: del }] },
+      { filePath: "b.ts", actions: [{ type: "Insert", context: [], node: ins }] },
+    ];
+
+    const result = correlate(fileChanges);
+    // Similarity scoring also finds nothing: the token bags are disjoint.
+    expect(result.moves).toHaveLength(0);
+  });
+
+  it("still reports a genuine exact move after verification", () => {
+    const del = createNode({
+      kind: "Function",
+      label: "worker",
+      value: "same content",
+      byteRange: [0, 12],
+    });
+    const ins = createNode({
+      kind: "Function",
+      label: "worker",
+      value: "same content",
+      byteRange: [0, 12],
+    });
+
+    const fileChanges: FileChanges[] = [
+      { filePath: "a.ts", actions: [{ type: "Delete", context: [], node: del }] },
+      { filePath: "b.ts", actions: [{ type: "Insert", context: [], node: ins }] },
+    ];
+
+    const result = correlate(fileChanges);
+    expect(result.moves).toHaveLength(1);
+    expect(result.moves[0]!.modified).toBe(false);
+  });
+});
