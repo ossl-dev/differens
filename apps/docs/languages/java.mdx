@@ -1,0 +1,50 @@
+---
+title: "Java"
+description: "Semantic diffing for Java"
+---
+
+## Java extractor
+
+The Java extractor maps tree-sitter Java CST nodes to canonical concepts. Class and method names come from the standard `name` field; variable names are recovered from the declarator.
+
+### Detected concepts
+
+| tree-sitter node type | Canonical concept |
+|---|---|
+| `class_declaration` | Class |
+| `interface_declaration` | Interface |
+| `enum_declaration` | Enum |
+| `method_declaration` | Method |
+| `constructor_declaration` | Constructor |
+| `package_declaration` | Namespace |
+| `import_declaration` | Import |
+| `field_declaration` | Variable |
+| `local_variable_declaration` | Variable |
+| `formal_parameters` | Parameters |
+| `decimal_integer_literal` | integer_literal |
+| `method_invocation` | CallExpression |
+
+### Example
+
+Renaming a method:
+
+```java
+// old.java
+class Counter { int total(int n) { return n + 1; } }
+```
+
+```java
+// new.java
+class Counter { int sum(int n) { return n + 1; } }
+```
+
+Running `differens old.java new.java`:
+
+```
+~ renamed method `total` to `sum` in class `Counter`
+```
+
+### Known limitations
+
+- Lambda bodies are diffed structurally; a lambda extracted to a named method reports as an addition plus a body change, not an extraction.
+- Annotations are structure: adding an annotation reports as an insert, not an "annotated" action.

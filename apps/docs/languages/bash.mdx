@@ -1,0 +1,50 @@
+---
+title: "Shell"
+description: "Semantic diffing for shell scripts"
+---
+
+## Shell extractor
+
+The Shell extractor (tree-sitter-bash) maps CST nodes to canonical concepts for `sh`, `bash`, and `zsh`. Function names come from the `name` field on the function's word; variable assignments and commands label the same way, so no fallback rules are needed.
+
+### Detected concepts
+
+| tree-sitter node type | Canonical concept |
+|---|---|
+| `function_definition` | Function |
+| `command` | CallExpression |
+| `command_name` | identifier |
+| `variable_assignment` | Variable |
+| `simple_expansion` | Variable |
+| `declaration_command` | Variable |
+| `if_statement` | IfBlock |
+| `for_statement` | ForLoop |
+| `while_statement` | WhileLoop |
+| `case_statement` | SwitchBlock |
+| `string` | string_literal |
+| `number` | number_literal |
+
+### Example
+
+Renaming a function:
+
+```bash
+# old.sh
+total() { echo hi; }
+```
+
+```bash
+# new.sh
+sum() { echo hi; }
+```
+
+Running `differens old.sh new.sh`:
+
+```
+~ renamed function `total` to `sum`
+```
+
+### Known limitations
+
+- Heredoc bodies are strings; edits inside them report as value changes.
+- Command substitutions and pipelines are structure: a pipeline reordering reports as a reorder of call expressions.

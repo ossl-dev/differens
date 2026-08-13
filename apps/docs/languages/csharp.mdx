@@ -1,0 +1,50 @@
+---
+title: "C#"
+description: "Semantic diffing for C#"
+---
+
+## C# extractor
+
+The C# extractor maps tree-sitter C# CST nodes to canonical concepts. Class, method, and namespace names come from the standard `name` field; variable names come from the declarator.
+
+### Detected concepts
+
+| tree-sitter node type | Canonical concept |
+|---|---|
+| `class_declaration` | Class |
+| `namespace_declaration` | Namespace |
+| `using_directive` | Import |
+| `method_declaration` | Method |
+| `variable_declaration` | Variable |
+| `parameter_list` | Parameters |
+| `invocation_expression` | CallExpression |
+| `member_access_expression` | MemberAccess |
+| `conditional_expression` | TernaryOp |
+| `predefined_type` | TypeIdentifier |
+| `string_literal` | string_literal |
+| `integer_literal` | integer_literal |
+
+### Example
+
+Renaming a method:
+
+```csharp
+// old.cs
+class Counter { int Total(int n) { return n + 1; } }
+```
+
+```csharp
+// new.cs
+class Counter { int Sum(int n) { return n + 1; } }
+```
+
+Running `differens old.cs new.cs`:
+
+```
+~ renamed method `Total` to `Sum` in class `Counter`
+```
+
+### Known limitations
+
+- Partial classes across files are correlated per file; the cross-file correlator pairs moved members when the whole changeset is diffed at once.
+- LINQ query syntax reports as call expressions, not query clauses.

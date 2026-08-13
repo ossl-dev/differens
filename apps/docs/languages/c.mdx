@@ -1,0 +1,48 @@
+---
+title: "C"
+description: "Semantic diffing for C"
+---
+
+## C extractor
+
+The C extractor maps tree-sitter C CST nodes to canonical concepts. C has no `name` fields in its grammar, so every declaration name is recovered through the declarator chain: `function_definition` → `function_declarator` → identifier.
+
+### Detected concepts
+
+| tree-sitter node type | Canonical concept |
+|---|---|
+| `function_definition` | Function |
+| `declaration` / `init_declarator` | Variable |
+| `field_declaration` | Variable |
+| `struct_specifier` | Struct |
+| `enum_specifier` | Enum |
+| `parameter_declaration` | Parameter |
+| `preproc_include` | PreprocInclude |
+| `return_statement` | Return |
+| `if_statement` | IfBlock |
+| `number_literal` | number_literal |
+
+### Example
+
+Renaming a function:
+
+```c
+// old.c
+int total(int a, int b) { return a + b; }
+```
+
+```c
+// new.c
+int sum(int a, int b) { return a + b; }
+```
+
+Running `differens old.c new.c`:
+
+```
+~ renamed function `total` to `sum`
+```
+
+### Known limitations
+
+- Preprocessor macros are tokens, not structure: a macro that generates code does not expand before diffing.
+- Function prototypes and definitions are matched structurally; a prototype moving between headers reports as a move, not a signature change.

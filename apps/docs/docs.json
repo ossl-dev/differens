@@ -53,7 +53,18 @@
               "languages/typescript",
               "languages/python",
               "languages/rust",
-              "languages/go"
+              "languages/go",
+              "languages/c",
+              "languages/cpp",
+              "languages/java",
+              "languages/ruby",
+              "languages/php",
+              "languages/swift",
+              "languages/kotlin",
+              "languages/csharp",
+              "languages/scala",
+              "languages/lua",
+              "languages/bash"
             ]
           },
           {

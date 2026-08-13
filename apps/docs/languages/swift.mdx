@@ -1,0 +1,50 @@
+---
+title: "Swift"
+description: "Semantic diffing for Swift"
+---
+
+## Swift extractor
+
+The Swift extractor maps tree-sitter Swift CST nodes to canonical concepts. Class, protocol, and function names come from the standard `name` field; property names come from the binding pattern.
+
+### Detected concepts
+
+| tree-sitter node type | Canonical concept |
+|---|---|
+| `class_declaration` | Class |
+| `protocol_declaration` | Interface |
+| `function_declaration` | Function |
+| `property_declaration` | Variable |
+| `import_declaration` | Import |
+| `typealias_declaration` | TypeDef |
+| `enum_entry` | Enum |
+| `call_expression` | CallExpression |
+| `assignment` | Assignment |
+| `lambda_literal` | Closure |
+| `line_string_literal` | string_literal |
+| `integer_literal` | integer_literal |
+
+### Example
+
+Renaming a function:
+
+```swift
+// old.swift
+class Counter { func total(n: Int) -> Int { return n + 1 } }
+```
+
+```swift
+// new.swift
+class Counter { func sum(n: Int) -> Int { return n + 1 } }
+```
+
+Running `differens old.swift new.swift`:
+
+```
+~ renamed function `total` to `sum` in class `Counter`
+```
+
+### Known limitations
+
+- Property observers (`didSet`, `willSet`) are bodies; their edits report as body changes on the property.
+- Computed property getters and setters are not labeled as accessor kinds; they diff as blocks inside the property.

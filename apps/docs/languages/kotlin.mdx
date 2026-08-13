@@ -1,0 +1,51 @@
+---
+title: "Kotlin"
+description: "Semantic diffing for Kotlin"
+---
+
+## Kotlin extractor
+
+The Kotlin extractor maps tree-sitter Kotlin CST nodes to canonical concepts. The Kotlin grammar declares no field names at all, so every name is recovered from the first identifier-like child: class names from `type_identifier`, function and variable names from `simple_identifier`.
+
+### Detected concepts
+
+| tree-sitter node type | Canonical concept |
+|---|---|
+| `class_declaration` | Class |
+| `function_declaration` | Function |
+| `property_declaration` | Variable |
+| `variable_declaration` | Variable |
+| `type_alias` | TypeDef |
+| `import_header` | Import |
+| `package_header` | Namespace |
+| `call_expression` | CallExpression |
+| `assignment` | Assignment |
+| `jump_expression` | Return |
+| `if_expression` | IfBlock |
+| `when_expression` | SwitchBlock |
+| `string_literal` | string_literal |
+
+### Example
+
+Renaming a function:
+
+```kotlin
+// old.kt
+class Counter { fun total(n: Int): Int { return n + 1 } }
+```
+
+```kotlin
+// new.kt
+class Counter { fun sum(n: Int): Int { return n + 1 } }
+```
+
+Running `differens old.kt new.kt`:
+
+```
+~ renamed function `total` to `sum` in class `Counter`
+```
+
+### Known limitations
+
+- The grammar's missing field names mean label recovery is positional: a declaration with two identifier children can mislabel in exotic syntax.
+- Extension functions report as functions; the receiver type is part of the structure, not the name.
