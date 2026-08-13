@@ -9,16 +9,21 @@ Differens compares code structurally instead of line by line. Parsing and matchi
 
 ## Typical numbers
 
-| Input | Scale | Behavior |
+Measured on an M-series MacBook with `bun run apps/cli/bench/bench.ts`. Each case runs end to end: parse, match, narrate.
+
+| Input | Scale | Time |
 | --- | --- | --- |
-| Small files (a few hundred lines) | ~1k nodes | Tree diff in well under a millisecond of matching; parse dominates |
-| Large files (a few thousand lines) | ~100k+ nodes | Matching is linear: 350k nodes in roughly 70 ms; parse and I/O dominate |
-| Monorepo changesets | Hundreds of files | Per-file diffs run on a worker pool sized to your core count; 200-file changesets add ~400 git spawns before any diffing unless blobs are batched (they are) |
-| Files over 2 MiB | n/a | Read as empty; whole-file additions or removals, not line-diffed |
+| Small file, one rename | ~4k nodes (50 functions) | ~27 ms; the first grammar parse dominates |
+| Large file, one rename | ~70k nodes (800 functions) | ~283 ms |
+| 10k siblings, one changed | Flat tree | ~4 ms |
+| 100k-line file, one line edit | Raw tier | ~9 ms, one change |
+| 60k-word document, one word edit | Prose tier | ~10 ms, one change |
+| 20k-line file, fully rewritten | Raw tier | ~6 ms, one whole-file Update |
+| 200k-node deep chain, full match | Core | ~82 ms |
+| 3 MiB file, one edit | Raw tier | ~8 ms, one change |
+| Monorepo changesets | Hundreds of files | Per-file diffs run on a worker pool sized to your core count; blob reads are batched through one `git cat-file --batch` |
 
-Matching is linear in node count: top-down anchors, bottom-up containers, leaf recovery. The worst-case bottom-up bound is quadratic in container pairs. That is why the engine has a `maxNodes` valve: trees above the limit fall back to a line diff instead of risking a slow match.
-
-The valve defaults to `250,000` nodes. It was raised from the original `50,000` once matching became linear. The old ceiling was sending ordinary large files to line diffing for no reason. The current limit is about memory, not time. It is configurable per call via `MatchOptions.maxNodes`.
+Matching is linear in node count: top-down anchors, bottom-up containers, leaf recovery, all over flat typed arrays. There is no node-count cap and no file-size cap: every input is matched for real. Large text files use a linear-space Myers diff, so a one-line edit in a 100k-line file costs ~9 ms instead of degrading to a whole-file update.
 
 ## How to run benchmarks
 
@@ -32,6 +37,7 @@ bun run apps/cli/bench/bench.ts
 ```text Sample output
 matching 350k nodes ................. ~70ms
 parse 1000-line ts file ............. ~8ms
+100k-line file, one line edit ....... ~9ms
 200-file changeset, warm cache ...... ~1.2s
 ```
 </CodeGroup>
@@ -41,15 +47,16 @@ parse 1000-line ts file ............. ~8ms
 | Situation | `git diff` | `differens` |
 | --- | --- | --- |
 | One-line change in a 5k-line file | Instant | Slightly slower (parse + match), but reports the actual change |
+| One-line change in a 100k-line file | Instant | ~9 ms, one change |
 | Reformat / whitespace churn | Long noisy hunk | Nothing: no semantic change, no output |
 | Rename of a function | Whole function looks rewritten | One `renamed` action |
 | Function moved between files | Delete + insert | One cross-file `Move` |
-| Generated bundles, lockfiles, vendor blobs | Same hunk cost as anything else | Skipped (over 2 MiB) or line-diffed |
+| Generated bundles, lockfiles, vendor blobs | Same hunk cost as anything else | Line-diffed at full size, or one Update when rewritten |
 
 For line-level changes on unparseable files, both engines use the same algorithm: a line diff. Differens is the same order of speed.
 
 ## Fast, slow, being worked on
 
-- **Fast**: structural matching on code and data files, whole-file adds/removals (one action, no tree), same-file moves, batched blob reads.
-- **Slow**: the first parse of a huge file on a cold cache; enormous trees that trip the `maxNodes` valve and fall back to lines; very large binary comparisons (hash only, so rarely worth it).
-- **Being worked on**: streaming ndjson output for long changesets, incremental matching across repeated runs, and faster prose/word diffing on big documents.
+- **Fast**: structural matching on code and data files, whole-file adds/removals (one action, no tree), same-file moves, batched blob reads, large text files (linear-space Myers), fully rewritten files (one Update).
+- **Slow**: the first parse of a huge file on a cold grammar cache; binary comparisons (hash only, so rarely worth it).
+- **Being worked on**: streaming ndjson output for long changesets, incremental matching across repeated runs.

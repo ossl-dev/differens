@@ -5,7 +5,7 @@ description: "How non-code file formats are diffed"
 
 ## Tier system
 
-Every file that Differens processes goes through a tier adapter. The content router classifies files by extension and dispatches them to the right tier. Each tier can fall back to the tier below it. If the code parser fails, the line diff catches it. If the file is too large for the line diff, the hash fallback catches it.
+Every file that Differens processes goes through a tier adapter. The content router classifies files by extension and dispatches them to the right tier. Each tier can fall back to the tier below it. If the code parser fails, the line diff catches it. The line diff is the floor: it handles text of any size.
 
 ### Tier reference
 
@@ -15,7 +15,7 @@ Every file that Differens processes goes through a tier adapter. The content rou
 | T4 | Data | `.json`, `.yaml`, `.yml`, `.toml` | Key additions, removals, value changes, nesting changes | T1 |
 | T3 | Markup | `.html`, `.htm`, `.xml`, `.svg` | Element additions, removals, attribute changes, tree restructuring | T1 |
 | T2 | Prose | `.txt`, `.log`, `LICENSE`, `README`, `CHANGELOG` | Word-level additions, deletions | T1 |
-| T1 | Raw | All text files, markdown (`.md`, `.mdx`), reST, AsciiDoc | Line-level additions, deletions | T0 |
+| T1 | Raw | All text files, markdown (`.md`, `.mdx`), reST, AsciiDoc | Line-level additions, deletions | (floor) |
 | T0 | Binary | All binary files (terminal) | File-level hash comparison, byte-size delta | (none) |
 
 ### Classification rules

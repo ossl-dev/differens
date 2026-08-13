@@ -33,7 +33,7 @@ npm install @ossl-dev/differens-core
 diffTrees(oldRoot: Node, newRoot: Node, options?: Partial<MatchOptions>): DiffResult
 ```
 
-Returns `{ changes: EditAction[], nodeCount: number, fallback?: "lines" }`. When either tree exceeds `maxNodes`, `fallback` is `"lines"` and the change list is empty. Line-diff instead in that case.
+Returns `{ changes: EditAction[], nodeCount: number, fallback?: "lines" }`. `fallback` appears only when the caller set `maxNodes` and a tree exceeds it; the default is `Infinity`, so trees of any size are matched for real. When a fallback is requested, the change list is empty. Line-diff instead in that case.
 
 ### MatchOptions
 
@@ -41,7 +41,7 @@ Returns `{ changes: EditAction[], nodeCount: number, fallback?: "lines" }`. When
 | --- | --- | --- |
 | `minHeight` | `2` | Below this height an ambiguous subtree only matches when its parent already did |
 | `bottomUpRatio` | `0.5` | Minimum Dice coefficient of matched descendants to pair two containers |
-| `maxNodes` | `250_000` | Node-count valve: larger inputs fall back to a line diff |
+| `maxNodes` | `Infinity` | Opt-in node-count valve; when set, larger inputs fall back to a line diff |
 
 ## Node
 

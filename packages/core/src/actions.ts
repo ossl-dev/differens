@@ -73,15 +73,17 @@ export interface MatchOptions {
   minHeight: number;
   /** Minimum Dice coefficient of matched descendants to pair two containers (default 0.5) */
   bottomUpRatio: number;
-  /** Maximum node count before falling back to line diff (default 250_000) */
+  /**
+   * Node count beyond which diffTrees refuses to match and asks the caller
+   * to line-diff instead. Defaults to Infinity: matching is linear in
+   * practice and every tree size is matched for real. Embedders who know
+   * their trees can be degenerate (a 1M-node chain) may set a bound here.
+   */
   maxNodes: number;
 }
 
 export const DEFAULT_OPTIONS: MatchOptions = {
   minHeight: 2,
   bottomUpRatio: 0.5,
-  // Matching is linear now (350k nodes in ~70ms), so the old 50k ceiling was
-  // sending ordinary large files to a line diff for no reason. This limit is
-  // about memory, not time.
-  maxNodes: 250_000,
+  maxNodes: Number.POSITIVE_INFINITY,
 };

@@ -11,21 +11,17 @@ Most inputs diff quickly, but some are slow, and some edge cases produce results
 
 **Symptom:** Diffing a large tree or monorepo takes much longer than expected.
 
-**Cause:** Container matching at the bottom of the tree is O(n²) in the worst case. A 250,000-node safety valve (`maxNodes`) caps the tree size, so very large inputs are truncated rather than diffed exhaustively.
+**Cause:** Usually parsing, not matching. Tree matching is linear in node count (350k nodes in roughly 70 ms), and container matching at the bottom of the tree is O(n²) only in degenerate worst cases. The first parse of a huge file on a cold grammar cache dominates.
 
-**Workaround:** Check the file sizes involved, and diff specific files instead of whole directories. On a large repository, diffing one file is much faster than diffing a directory or the whole working tree.
+**Workaround:** Diff specific files instead of whole directories. On a large repository, diffing one file is much faster than diffing a directory or the whole working tree.
 
 <Info>
-The 250k `maxNodes` limit is intentional, not a bug. It keeps diffs bounded on pathological inputs. Improvements to bottom-up container matching scaling are tracked in the roadmap.
+There is no node-count cap: every tree size is matched for real. If a pathological input is slow, it is slow on the parser side, not because matching gave up.
 </Info>
 
-## Deep nesting causes a crash
+## Deep nesting
 
-**Symptom:** A stack overflow or crash when diffing heavily nested structures, such as generated JSON or deeply nested code.
-
-**Cause:** Recursion depth in the matcher. Content nested deeper than roughly 10,000 levels can exhaust the call stack.
-
-**Workaround:** A fix is in progress: the matcher will use iterative stacks instead of recursive tree walks. In the meantime, split the input into smaller pieces, or diff at a coarser level. For example, diff a subtree instead of the whole file.
+The matcher walks trees with explicit stacks, not recursion. A 200,000-level-deep chain matches in about 100 ms with no stack overflow, and deeply nested JSON, HTML, and TypeScript all diff normally. If a runtime still crashes on some pathological nesting, the recursion is in a parser or the runtime itself (for example `JSON.parse`). Open an issue with the input that broke.
 
 ## YAML diffs are wrong
 

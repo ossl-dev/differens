@@ -90,7 +90,7 @@ Structure hashes find *where things are*; content hashes find *what things are*.
 
 Hashes use FNV-1a over two independent 32-bit streams, folded into one 53-bit-safe JavaScript number. Each node's hash combines its own fields with its children's hashes, so a change anywhere in a subtree changes every ancestor's hash. That Merkle property makes subtree equality a single comparison.
 
-The collision bound follows from the birthday problem: at the 250,000-node cap, the chance of any two nodes colliding is about 0.0003%.
+The collision bound follows from the birthday problem: at one million nodes the chance of any two nodes colliding is about 0.006%, and at ten million about 0.6%. There is no node-count cap, so this bound applies at every realistic tree size.
 
 <Info>
 Hashes are JavaScript numbers, not full 64-bit integers, so no `BigInt` handling is involved. The JSON formatter serializes them as regular integers. See [Output](/guides/machine-outputs).
@@ -98,9 +98,7 @@ Hashes are JavaScript numbers, not full 64-bit integers, so no `BigInt` handling
 
 ## Safety valves
 
-Tree matching is inherently super-linear, so the core enforces two bounds:
+Tree matching runs on flat typed arrays and is linear in node count, so there is no node-count cap: every tree size is matched for real. Two bounds keep the worst case sane without rejecting any input:
 
-- **`maxNodes` = 250,000**: trees larger than this make `diffTrees` return a `lines` fallback, and the caller falls back to a line diff, which keeps the birthday bound quoted above honest.
-- **O(n²) bottom-up matching**: the bottom-up phase is bounded to quadratic worst-case work; candidate pairs are only considered inside already-matched parents, which keeps typical runs far below the bound.
-
-The valves fail soft: exceeding a bound triggers a line-diff fallback instead of aborting.
+- **`maxNodes` (opt-in)**: embedders may set a node count beyond which `diffTrees` returns a `lines` fallback instead of matching. The default is `Infinity`.
+- **Bottom-up candidate caps**: the bottom-up phase compares a container against at most four candidates and zips leaf alignments past 64 siblings by position. Candidate pairs are only considered inside already-matched parents, which keeps typical runs far below the quadratic worst case.

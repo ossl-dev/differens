@@ -13,9 +13,9 @@ Differens parses files at six levels of abstraction, T0 through T5. Each tier is
 
 Byte-level hash comparison. Used for images, fonts, archives, and anything else that fails the text sniff. Output is a single `Update` when the hash changes, with the byte-size delta as context. T0 never attempts to parse.
 
-### T1: raw (LCS line diff)
+### T1: raw (line diff)
 
-The safety net: a line-level longest-common-subsequence diff over the raw text. It is the fallback for every tier above it. It is capped at 2,000 lines. Beyond that, T1 returns a whole-file `Update` action instead of running an unbounded LCS.
+The safety net: a line-level diff over the raw text. It is the fallback for every tier above it. Small inputs get an exact longest-common-subsequence diff; large inputs get a linear-space Myers diff, so a 100,000-line file with a one-line edit reports exactly that one edit. There is no size cap. A file that shares no lines with the other side at all reports as a single rewrite.
 
 ### T2: prose (word-level)
 
@@ -41,9 +41,8 @@ The tiers form a chain. Each tier can hand off to the tier below it:
 
 1. **T5 parse fails** (syntax error, unsupported construct) → fall back to a generic tree-sitter CST diff, still structural.
 2. **Generic CST fails** (no tree-sitter grammar, garbage input) → T1 line diff.
-3. **T1 hits the 2,000-line cap** → returns a whole-file `Update` action.
 
-The worst case for text is a line diff. It is less informative than a structural diff, but it still runs.
+The worst case for text is a line diff. It is less informative than a structural diff, but it still runs, at any size.
 
 ```mermaid
 flowchart TD
@@ -76,7 +75,7 @@ Extension-based classification is the first cut; the content sniff is the backst
 | Tier | Handles | Fallback |
 | --- | --- | --- |
 | T0 | Binary files, hash-only comparison | (floor) |
-| T1 | Raw text, LCS line diff, 2,000-line cap | Whole-file `Update` |
+| T1 | Raw text, LCS for small inputs, linear-space Myers for large | (floor) |
 | T2 | Prose (plain text, logs), word-level diff | T1 line diff |
 | T3 | HTML/XML, lenient tokenizer | T1 line diff |
 | T4 | JSON/YAML/TOML, key-path diff | T1 line diff |

@@ -62,7 +62,7 @@ One diff core, many adapters. Adding a new language or format is a parser, not a
 - Matching quality is identical across all tiers: a rename in TypeScript, a reorder in YAML, and a paragraph move in Markdown all go through the same algorithm.
 - A broken or missing adapter degrades to a lower tier instead of failing the whole diff.
 
-The tradeoff is that every format pays the tree-matching cost. Safety valves keep that cost bounded: the 2,000-line cap at T1 and the 250k-node cap in the matcher.
+The tradeoff is that every format pays the tree-matching cost, which is linear in node count. There are no input-size caps: a 100k-line file diffs one line at a time, a 3 MiB file is read in full, and trees of any node count are matched for real.
 
 <Info>
 The `Node` interface lives in `packages/core/src/index.ts`. Each tier adapter produces that shape, and the diff core consumes it. See [Tree Matching](/how-it-works/tree-matching) for the algorithm and [Tier Pipeline](/how-it-works/tier-pipeline) for the adapters.

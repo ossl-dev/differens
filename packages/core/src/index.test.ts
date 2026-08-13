@@ -169,8 +169,8 @@ describe("diffTrees: safety valve", () => {
 
     const t = deepTree(100); // 101 nodes (depth 0..100)
     const result = diffTrees(t, t, { maxNodes: 50 });
-    // Should still work with 101 nodes (< 50000)
     expect(result.nodeCount).toBe(202);
+    expect(result.fallback).toBe("lines");
   });
 
   it("respects maxNodes limit", () => {
@@ -185,6 +185,22 @@ describe("diffTrees: safety valve", () => {
     const t = wideTree(100);
     const result = diffTrees(t, t, { maxNodes: 50 });
     expect(result.fallback).toBe("lines");
+  });
+
+  it("matches trees far above the old 250k cap by default", () => {
+    function wideTree(width: number): Node {
+      const leaves: Node[] = [];
+      for (let i = 0; i < width; i++) {
+        leaves.push(leaf("leaf", `l${i}`));
+      }
+      return tree("root", leaves);
+    }
+
+    const t = wideTree(300_000);
+    const result = diffTrees(t, t);
+    expect(result.fallback).toBeUndefined();
+    expect(result.nodeCount).toBe(600_002);
+    expect(result.changes.length).toBe(0);
   });
 });
 

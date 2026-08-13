@@ -74,12 +74,13 @@ interface DiffResult {
 Every action also carries `context`, the chain of enclosing named nodes, so a
 change can be reported as "in class `RetryPolicy`" without a second traversal.
 
-`fallback: "lines"` means the input exceeded `maxNodes` (250k by default) and
-nothing was matched. Treat it as "too big, diff this some other way" rather
+`fallback: "lines"` only appears when the caller sets `maxNodes` and one of
+the trees exceeds it. The default is `Infinity`: every tree size is matched
+for real. Treat an explicit `fallback` as "diff this some other way" rather
 than as "no changes" -- an empty `changes` array means both things otherwise.
 
 ```ts
-diffTrees(before, after, { maxNodes: 500_000, minHeight: 2, bottomUpRatio: 0.5 });
+diffTrees(before, after, { minHeight: 2, bottomUpRatio: 0.5 });
 ```
 
 ## How it matches

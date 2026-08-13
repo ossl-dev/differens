@@ -25,7 +25,6 @@ npm install @ossl-dev/differens-git
 | `diffDriverCommand` | function | Render runtime + args into the shell-quoted command git config wants |
 | `generateGitAttributes` | function | `.gitattributes` lines (`*.ts diff=differens`) |
 | `DRIVER_FLAG` | const | `"--git-diff-driver"`, the flag that prefixes the args git appends |
-| `MAX_DIFF_BYTES` | const | `2 MiB`. Files above this are read but not tree-parsed |
 | `isGitRepo` | function | Are we inside a git repository? |
 | `resolveRef` | function | Ref → commit SHA, or `null` if invalid |
 

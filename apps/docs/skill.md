@@ -103,11 +103,13 @@ Semantic extractors: TypeScript/JavaScript, Python, Rust, Go. Other languages: s
 
 ## Limits
 
-| Limit | Behavior |
+None. Any file size, line count, or node count diffs for real.
+
+| Situation | Behavior |
 | --- | --- |
-| 2,000 lines | Line-diff tier returns a whole-file Update |
-| 250,000 nodes | Tree matching falls back to a line diff |
-| 2 MiB or larger file | Read as empty, whole-file add or remove |
+| Huge text file, small edit | Exact line or word diff, linear memory |
+| Huge code file | Full tree match, no node cap |
+| File rewritten, no shared lines | One whole-file Update |
 | Determinism | Same inputs, same output. Re-running is safe but wasteful |
 
 ## Cost-efficient workflow

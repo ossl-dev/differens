@@ -84,6 +84,67 @@ console.log("\n== wide sibling list (10k flat children) ==");
   console.log(`  ${" ".repeat(40)} -> ${r.changes.length} changes`);
 }
 
+console.log("\n== large raw file (100k lines), one line edit ==");
+{
+  const lines: string[] = [];
+  for (let i = 0; i < 100_000; i++) lines.push(`line ${i} some content here`);
+  const oldSrc = lines.join("\n");
+  const newSrc = lines.toSpliced(50_000, 1, "line 50000 EDITED content here").join("\n");
+  const r = time("100k-line file, one edit (raw tier)", () =>
+    diffWithTier(oldSrc, newSrc, "a.md", "a.md"),
+  );
+  console.log(`  ${" ".repeat(40)} -> ${r.changes.length} changes`);
+}
+
+console.log("\n== large prose document (60k words), one word edit ==");
+{
+  const words: string[] = [];
+  for (let i = 0; i < 60_000; i++) words.push(`word${i}`);
+  const oldSrc = words.join(" ");
+  const newSrc = words.toSpliced(30_000, 1, "changed").join(" ");
+  const r = time("60k-word document, one edit (prose tier)", () =>
+    diffWithTier(oldSrc, newSrc, "a.txt", "a.txt"),
+  );
+  console.log(`  ${" ".repeat(40)} -> ${r.changes.length} changes`);
+}
+
+console.log("\n== rewritten large file (20k lines, nothing shared) ==");
+{
+  const a: string[] = [];
+  const b: string[] = [];
+  for (let i = 0; i < 20_000; i++) a.push(`aaa ${i}`);
+  for (let i = 0; i < 20_000; i++) b.push(`bbb ${i}`);
+  const r = time("20k-line file, fully rewritten", () =>
+    diffWithTier(a.join("\n"), b.join("\n"), "a.md", "a.md"),
+  );
+  console.log(`  ${" ".repeat(40)} -> ${r.changes.length} changes`);
+}
+
+console.log("\n== deep chain (200k nodes) ==");
+{
+  const { createNode } = require("@ossl-dev/differens-core");
+  const chain = (depth: number) => {
+    let n = createNode({ kind: "leaf", label: "x", byteRange: [0, 0] });
+    for (let i = 0; i < depth; i++)
+      n = createNode({ kind: "node", byteRange: [0, 0], children: [n] });
+    return n;
+  };
+  const a = chain(200_000);
+  const b = chain(200_000);
+  const r = time("200k-node deep chain, full match", () => diffTrees(a, b));
+  console.log(`  ${" ".repeat(40)} -> ${r.changes.length} changes`);
+}
+
+console.log("\n== 3 MiB text file, one edit ==");
+{
+  const chunk = "const value = 42; // padded line for a big generated file\n".repeat(2048);
+  const big = chunk.repeat(48); // ~3 MiB
+  const t0 = performance.now();
+  const r = diffWithTier(big, big.replace("const value = 42", "const value = 43"), "a.md", "a.md");
+  const ms = performance.now() - t0;
+  console.log(`  3 MiB file, one edit ${" ".repeat(15)} ${ms.toFixed(1)} ms -> ${r.changes.length} changes`);
+}
+
 function countNodes(n: { children: unknown[] }): number {
   let c = 0;
   const stack = [n];

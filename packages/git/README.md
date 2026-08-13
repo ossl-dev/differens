@@ -35,8 +35,8 @@ inserted lines.
 
 Blobs are read through a single `git cat-file --batch` process. A 200-file
 changeset used to pay 400 process spawns before any diffing started, which on a
-warm cache cost more than the diff. Files over 2MB come back empty: they are
-generated bundles and lockfiles, and parsing them into a tree helps nobody.
+warm cache cost more than the diff. Every blob is read in full: large files
+(generated bundles, lockfiles) diff for real instead of being skipped.
 
 ## The diff driver
 
@@ -62,8 +62,7 @@ rendering of a source file that makes a semantic diff fall out of that.
 ## Also exported
 
 `isGitRepo()`, `resolveRef(ref)`, `getChangedFiles()`, `getHeadContent(path)`,
-`getWorkingTreeContent(path)`, `readFilePair(a, b)`, `isDirectory(path)`,
-`MAX_DIFF_BYTES`.
+`getWorkingTreeContent(path)`, `readFilePair(a, b)`, `isDirectory(path)`.
 
 `resolveRef` returns `null` rather than throwing for anything that is not a
 ref, which is how `differens a.ts b.ts` and `differens main feature` are told

@@ -13,13 +13,6 @@ import { spawn } from "node:child_process";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 
-/**
- * Files above this are not worth parsing into a tree: they are generated
- * bundles, lockfiles or vendored blobs, and the tier ladder line-diffs them
- * anyway. Reading them still happens, parsing them does not.
- */
-export const MAX_DIFF_BYTES = 2 * 1024 * 1024;
-
 /** Directories never worth walking when diffing two trees. */
 const SKIP_DIRS = new Set([
   ".git",
@@ -148,7 +141,7 @@ async function readBlobs(specs: string[]): Promise<string[]> {
       continue;
     }
     const start = nl + 1;
-    results.push(size > MAX_DIFF_BYTES ? "" : decoder.decode(out.subarray(start, start + size)));
+    results.push(decoder.decode(out.subarray(start, start + size)));
     pos = start + size + 1; // trailing newline that git appends per record
   }
 
@@ -333,15 +326,14 @@ export async function diffDirectories(oldDir: string, newDir: string): Promise<G
   return mapWithConcurrency(paths, 32, async (rel) => ({
     oldPath: rel,
     newPath: rel,
-    oldSource: oldSet.has(rel) ? await readCapped(join(oldDir, rel)) : "",
-    newSource: newSet.has(rel) ? await readCapped(join(newDir, rel)) : "",
+    oldSource: oldSet.has(rel) ? await readMaybe(join(oldDir, rel)) : "",
+    newSource: newSet.has(rel) ? await readMaybe(join(newDir, rel)) : "",
   }));
 }
 
-async function readCapped(path: string): Promise<string> {
+async function readMaybe(path: string): Promise<string> {
   try {
-    const { size } = await stat(path);
-    return size > MAX_DIFF_BYTES ? "" : await readFile(path, "utf8");
+    return await readFile(path, "utf8");
   } catch {
     return "";
   }

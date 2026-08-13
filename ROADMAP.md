@@ -10,7 +10,7 @@ Pick an unchecked box, open an issue saying you're working on it, send a PR. One
 - [x] Diff core: 64-bit FNV-1a hashing, top-down isomorphic matching, bottom-up container matching, Chawathe edit scripts with Move actions
 - [x] Content router: extension-based file classification (binary, raw, prose, markup, data, code)
 - [x] T0 binary adapter: hash-only with byte-size delta reporting
-- [x] T1 raw fallback: LCS line diff with 10k-line safety cap and O(n) backtrack
+- [x] T1 raw fallback: exact LCS line diff for small inputs, linear-space Myers for large, no size cap
 - [x] T2 prose adapter: word-level diff for plain text, markdown, logs
 - [x] T3 markup adapter: HTML/XML tree parser (lenient, fault-tolerant tokenizer)
 - [x] T4 data adapter: JSON/YAML subset/TOML subset parser with key-path diff
