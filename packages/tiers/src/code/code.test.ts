@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import type { Node } from "@ossl-dev/differens-core";
 import Parser from "tree-sitter";
 import { GoExtractor } from "./go";
-import { hasGrammar, listExtractors, parseCode } from "./index";
+import { hasGrammar, listExtractors, parseCacheStats, parseCode, resetParseCacheForTest } from "./index";
 import { PythonExtractor } from "./python";
 import { RustExtractor } from "./rust";
 import { TypeScriptExtractor } from "./typescript";
@@ -288,5 +288,29 @@ describe("extractor label rules", () => {
     const root = parseWith("tree-sitter-typescript", "typescript", "const timeout = 5;");
     const decl = root.namedChildren.find((c) => c.type === "lexical_declaration")!;
     expect(new TypeScriptExtractor().extractLabel(decl, "const timeout = 5;")).toBe("timeout");
+  });
+});
+
+describe("parse cache", () => {
+  it("reuses the tree for identical content and extension", () => {
+    resetParseCacheForTest();
+    const a = parseCode("class A { void m() {} }", "java");
+    const b = parseCode("class A { void m() {} }", "java");
+    expect(b).toBe(a);
+    expect(parseCacheStats()).toMatchObject({ hits: 1, misses: 1 });
+  });
+
+  it("keeps entries separate per extension", () => {
+    resetParseCacheForTest();
+    const a = parseCode("class A {}", "java");
+    const b = parseCode("class A {}", "cs");
+    expect(b).not.toBe(a);
+    expect(parseCacheStats().size).toBe(2);
+  });
+
+  it("evicts the oldest entry past the cap", () => {
+    resetParseCacheForTest();
+    for (let i = 0; i < 70; i++) parseCode(`class A${i} {}`, "java");
+    expect(parseCacheStats().size).toBeLessThanOrEqual(64);
   });
 });

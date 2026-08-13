@@ -128,6 +128,15 @@ export function createNode(opts: BuildNodeOptions): Node {
   };
 }
 /**
+ * Hash a raw text string with the same two-stream FNV fold the node hashes
+ * use. Content-addressed caches key on this: one pass, no BigInt, and the
+ * 53-bit result matches the rest of the engine's hash space.
+ */
+export function hashText(text: string): number {
+  return fold(hashStr(FNV_SEED_A, text), hashStr(FNV_SEED_B, text));
+}
+
+/**
  * Exact subtree equality: kind, label, value and every child.
  *
  * The equality check hashes optimise for: when hashes agree, this decides

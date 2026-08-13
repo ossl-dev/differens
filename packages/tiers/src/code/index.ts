@@ -11,7 +11,7 @@
 
 import { readdirSync } from "node:fs";
 import { createRequire } from "node:module";
-import { createNode } from "@ossl-dev/differens-core";
+import { createNode, hashText } from "@ossl-dev/differens-core";
 import type { Node } from "@ossl-dev/differens-core";
 import Parser from "tree-sitter";
 import type { LanguageExtractor } from "./extractor";
@@ -348,6 +348,31 @@ export function hasGrammar(extension: string): boolean {
   return loadLanguage(extension) !== null;
 }
 
+/**
+ * Content-addressed parse cache: parsing dominates the cost of a diff, and
+ * the same file content reappears constantly across a changeset (a file in
+ * two commits, duplicated vendored sources, the two sides of a cross-file
+ * move). Keyed by a hash of the content plus the extension -- the same bytes
+ * are a different tree in a different language. The cap keeps a long-running
+ * process from pinning one tree per file it has ever seen.
+ */
+const PARSE_CACHE_CAP = 64;
+const parseCache = new Map<string, Node>();
+let cacheHits = 0;
+let cacheMisses = 0;
+
+/** Test hook: empty the parse cache and reset the counters. */
+export function resetParseCacheForTest(): void {
+  parseCache.clear();
+  cacheHits = 0;
+  cacheMisses = 0;
+}
+
+/** Test hook: parse-cache counters. */
+export function parseCacheStats(): { hits: number; misses: number; size: number } {
+  return { hits: cacheHits, misses: cacheMisses, size: parseCache.size };
+}
+
 /** Parse source code into a Node tree */
 export function parseCode(source: string, extension: string): Node {
   const lang = loadLanguage(extension);
@@ -368,7 +393,22 @@ export function parseCode(source: string, extension: string): Node {
     });
   }
 
-  return cstToNode(lang.parser.parse(source), source, lang.extractor);
+  const key = `${hashText(source)}:${extension}`;
+  const cached = parseCache.get(key);
+  if (cached !== undefined) {
+    cacheHits++;
+    parseCache.delete(key); // refresh LRU position
+    parseCache.set(key, cached);
+    return cached;
+  }
+  cacheMisses++;
+
+  const tree = cstToNode(lang.parser.parse(source), source, lang.extractor);
+  parseCache.set(key, tree);
+  if (parseCache.size > PARSE_CACHE_CAP) {
+    parseCache.delete(parseCache.keys().next().value!);
+  }
+  return tree;
 }
 
 /**
