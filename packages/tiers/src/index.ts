@@ -47,6 +47,12 @@ export function classifyFile(filePath: string): FileInfo {
     return { path: filePath, extension: ext, tier: Tier.Data };
   }
 
+  // Environment files: KEY=VALUE lines parse as the TOML subset, so a
+  // changed value reports with its key path instead of a raw line swap.
+  if (ext === "env" || path.endsWith(".env") || path.endsWith(".env.local")) {
+    return { path: filePath, extension: ext, tier: Tier.Data };
+  }
+
   // Markup
   if (["html", "htm", "xml", "svg", "xaml", "plist"].includes(ext)) {
     return { path: filePath, extension: ext, tier: Tier.Markup };
@@ -54,7 +60,9 @@ export function classifyFile(filePath: string): FileInfo {
 
   // Markdown and doc formats: line diff, not word diff.
   // Lines are structure in these files; word-level churn floods the output.
-  if (["md", "mdx", "rst", "adoc", "org"].includes(ext)) {
+  // CSV/TSV rows and GraphQL/Dockerfile directives are line-structured the
+  // same way: a line diff names the changed row, a word diff floods it.
+  if (["md", "mdx", "rst", "adoc", "org", "csv", "tsv", "graphql", "dockerfile"].includes(ext)) {
     return { path: filePath, extension: ext, tier: Tier.Raw };
   }
 

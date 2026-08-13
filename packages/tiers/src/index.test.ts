@@ -45,6 +45,34 @@ describe("classifyFile", () => {
     const info = classifyFile("data.xyz");
     expect(info.tier).toBe(Tier.Raw);
   });
+
+  it("classifies env files as Data tier", () => {
+    expect(classifyFile(".env").tier).toBe(Tier.Data);
+    expect(classifyFile(".env.local").tier).toBe(Tier.Data);
+  });
+
+  it("classifies CSV, TSV, GraphQL, and Dockerfile as Raw tier", () => {
+    for (const path of ["data.csv", "data.tsv", "query.graphql", "Dockerfile"]) {
+      expect(classifyFile(path).tier).toBe(Tier.Raw);
+    }
+  });
+});
+
+describe("env files through the data tier", () => {
+  it("reports a value change with the key path as context", () => {
+    const oldSource = "PORT=3000\nHOST=localhost\n";
+    const newSource = "PORT=8080\nHOST=localhost\n";
+    const result = diffWithTier(oldSource, newSource, ".env", ".env");
+    expect(result.tier).toBe(Tier.Data);
+    expect(result.fallback).toBeUndefined();
+    expect(result.changes).toHaveLength(1);
+    const change = result.changes[0]!;
+    expect(change.type).toBe("Update");
+    if (change.type === "Update" && change.detail.kind === "ValueChanged") {
+      expect(change.detail.from).toBe("3000");
+      expect(change.detail.to).toBe("8080");
+    }
+  });
 });
 
 // ============================================================
