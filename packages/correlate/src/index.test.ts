@@ -290,7 +290,18 @@ describe("correlate: forged hash collisions", () => {
 
     const fileChanges: FileChanges[] = [
       { filePath: "a.ts", actions: [{ type: "Delete", context: [], node: del }] },
-      { filePath: "b.ts", actions: [{ type: "Insert", context: [], node: ins }] },
+      {
+        filePath: "b.ts",
+        actions: [
+          {
+            type: "Insert",
+            context: [],
+            node: ins,
+            parent: createNode({ kind: "file", byteRange: [0, 10] }),
+            position: 0,
+          },
+        ],
+      },
     ];
 
     const result = correlate(fileChanges);
@@ -314,11 +325,61 @@ describe("correlate: forged hash collisions", () => {
 
     const fileChanges: FileChanges[] = [
       { filePath: "a.ts", actions: [{ type: "Delete", context: [], node: del }] },
-      { filePath: "b.ts", actions: [{ type: "Insert", context: [], node: ins }] },
+      {
+        filePath: "b.ts",
+        actions: [
+          {
+            type: "Insert",
+            context: [],
+            node: ins,
+            parent: createNode({ kind: "file", byteRange: [0, 10] }),
+            position: 0,
+          },
+        ],
+      },
     ];
 
     const result = correlate(fileChanges);
     expect(result.moves).toHaveLength(1);
     expect(result.moves[0]!.modified).toBe(false);
+  });
+});
+
+describe("correlate: whole-file renames with edits", () => {
+  it("scores a rename plus edit by content, not path tokens", () => {
+    const del = createNode({
+      kind: "file",
+      label: "src/helpers.ts",
+      value: "export function helper(x: number): number { return x * 2; }",
+      byteRange: [0, 10],
+    });
+    const ins = createNode({
+      kind: "file",
+      label: "lib/util.ts",
+      value: "export function helper(x: number): number { return x * 3; }",
+      byteRange: [0, 10],
+    });
+
+    const fileChanges: FileChanges[] = [
+      { filePath: "src/helpers.ts", actions: [{ type: "Delete", context: [], node: del }] },
+      {
+        filePath: "lib/util.ts",
+        actions: [
+          {
+            type: "Insert",
+            context: [],
+            node: ins,
+            parent: createNode({ kind: "file", byteRange: [0, 10] }),
+            position: 0,
+          },
+        ],
+      },
+    ];
+
+    const result = correlate(fileChanges);
+    expect(result.moves).toHaveLength(1);
+    expect(result.moves[0]!.modified).toBe(true);
+    expect(result.moves[0]!.fromFile).toBe("src/helpers.ts");
+    expect(result.moves[0]!.toFile).toBe("lib/util.ts");
   });
 });

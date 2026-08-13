@@ -321,3 +321,35 @@ describe("CLI: ndjson streaming output", () => {
     expect(trailer.crossFileMoves.some((m: { name: string }) => m.name === "validate")).toBe(true);
   });
 });
+
+describe("CLI: cross-directory rename detection", () => {
+  it("reports a whole-file rename between different directories", () => {
+    const other = mkdtempSync(join(tmpdir(), "differens-e2e-ren-"));
+    mkdirSync(join(other, "lib"), { recursive: true });
+    write("src/helpers.ts", "export function helper(x: number): number { return x * 2; }\n");
+    writeFileSync(
+      join(other, "lib", "util.ts"),
+      "export function helper(x: number): number { return x * 2; }\n",
+    );
+    const { stdout, status } = runCli([dir, other]);
+    expect(status).toBe(0);
+    expect(stdout).toContain("renamed file");
+    expect(stdout).toContain("src/helpers.ts");
+    expect(stdout).toContain("lib/util.ts");
+    rmSync(other, { recursive: true, force: true });
+  });
+
+  it("reports a rename plus edit across directories", () => {
+    const other = mkdtempSync(join(tmpdir(), "differens-e2e-ren2-"));
+    mkdirSync(join(other, "lib"), { recursive: true });
+    write("src/helpers.ts", "export function helper(x: number): number { return x * 2; }\n");
+    writeFileSync(
+      join(other, "lib", "util.ts"),
+      "export function helper(x: number): number { return x * 3; }\n",
+    );
+    const { stdout, status } = runCli([dir, other]);
+    expect(status).toBe(0);
+    expect(stdout).toContain("renamed and edited file");
+    rmSync(other, { recursive: true, force: true });
+  });
+});

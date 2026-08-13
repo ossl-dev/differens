@@ -173,8 +173,14 @@ export function correlate(
  * the intersection/union ratio.
  */
 function nodeSimilarity(a: Node, b: Node): number {
-  const tokensA = tokenize(nodeText(a));
-  const tokensB = tokenize(nodeText(b));
+  // A whole-file node's label is its path, and a renamed file's two paths
+  // differ by definition. Scoring path tokens against each other dilutes
+  // the content similarity that decides whether the file was also edited:
+  // a one-token edit plus a rename scored 0.54 and fell under the threshold,
+  // reporting the file as deleted and re-added.
+  const fileToFile = a.kind === "file" && b.kind === "file";
+  const tokensA = tokenize(nodeText(a, !fileToFile));
+  const tokensB = tokenize(nodeText(b, !fileToFile));
 
   if (tokensA.length === 0 && tokensB.length === 0) return 0;
 
@@ -191,12 +197,12 @@ function nodeSimilarity(a: Node, b: Node): number {
 }
 
 /** Extract all text from a node tree (flattened) */
-function nodeText(node: Node): string {
+function nodeText(node: Node, includeLabel = true): string {
   const parts: string[] = [];
-  if (node.label) parts.push(node.label);
+  if (includeLabel && node.label) parts.push(node.label);
   if (node.value) parts.push(node.value);
   for (const child of node.children) {
-    parts.push(nodeText(child));
+    parts.push(nodeText(child, includeLabel));
   }
   return parts.join(" ");
 }
