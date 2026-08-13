@@ -249,6 +249,12 @@ describe("diffWords edge cases", () => {
     expect(result.changes).toEqual([]);
   });
 
+  it("routes a word removal through the prose tier as a Delete", () => {
+    const result = diffWithTier("hello world", "hello", "note.txt", "note.txt");
+    expect(result.tier).toBe(Tier.Prose);
+    expect(result.changes.filter((c) => c.type === "Delete")).toHaveLength(2);
+  });
+
   it("routes whitespace-only changes through the prose tier", () => {
     const result = diffWithTier("hello world", "hello  world", "note.txt", "note.txt");
     expect(result.tier).toBe(Tier.Prose);
@@ -329,7 +335,11 @@ describe("diffWithTier fallback behavior", () => {
       "page.html",
     );
     expect(result.tier).toBe(Tier.Markup);
-    expect(result.changes.length).toBeGreaterThan(0);
+    // The unclosed <p> pairs with the closed one and reports the content
+    // change as one Update.
+    expect(result.changes).toHaveLength(1);
+    expect(result.changes[0]!.type).toBe("Update");
+    expect(result.changes[0]!.node.kind).toBe("p");
   });
 });
 

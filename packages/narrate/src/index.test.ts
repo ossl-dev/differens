@@ -329,7 +329,7 @@ describe("narrate: redundant update dedup", () => {
 });
 
 describe("formatChanges: groups and empties", () => {
-  const ins = (filePath: string, name: string): SemanticChange => ({
+  const ins = (filePath: string | undefined, name: string): SemanticChange => ({
     filePath,
     description: `added function \`${name}\``,
     action: {
@@ -351,6 +351,13 @@ describe("formatChanges: groups and empties", () => {
     const out = formatChanges([ins("a.ts", "one"), ins("b.ts", "two")], { format: "terminal" });
     expect(out).toContain("a.ts\n  + added function `one`");
     expect(out).toContain("b.ts\n  + added function `two`");
+  });
+
+  it("labels a group without a file path as unknown", () => {
+    const out = formatChanges([ins("a.ts", "one"), ins(undefined, "two")], {
+      format: "terminal",
+    });
+    expect(out).toContain("(unknown file)");
   });
 
   it("groups markdown output by file", () => {

@@ -29,22 +29,12 @@ export function parseData(source: string): Node {
 
   // Try YAML (simple subset: key-value pairs, basic nesting)
   if (trimmed.includes(":")) {
-    try {
-      const value = parseYaml(trimmed);
-      return treeFromValue(value);
-    } catch {
-      // Fall through to TOML
-    }
+    return treeFromValue(parseYaml(trimmed));
   }
 
   // Try TOML (simple subset: [sections] and key = value)
   if (trimmed.includes("=") || trimmed.includes("[")) {
-    try {
-      const value = parseToml(trimmed);
-      return treeFromValue(value);
-    } catch {
-      // Fall through
-    }
+    return treeFromValue(parseToml(trimmed));
   }
 
   // Last resort: treat as raw value
@@ -94,16 +84,10 @@ function parseYamlLines(lines: string[], startIdx: number, baseIndent: number): 
           i++;
           continue;
         }
-        const val = l.trim().slice(2).trim();
-        if (val === "") {
-          // Nested object under sequence item
-          const [nested, nextIdx] = parseYamlLines(lines, i + 1, baseIndent + 2);
-          arr.push(nested);
-          i = nextIdx;
-        } else {
-          arr.push(parseYamlValue(val));
-          i++;
-        }
+        // l.trim() starts with "- " here, so the value is never empty;
+        // a nested object under a sequence item is outside the subset.
+        arr.push(parseYamlValue(l.trim().slice(2).trim()));
+        i++;
       }
       return [arr, i];
     }

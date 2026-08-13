@@ -79,9 +79,27 @@ describe("parseData: YAML", () => {
     ]);
   });
 
+  it("treats a bare sequence item as a skipped line, not a nested object", () => {
+    // "-" alone does not start with "- ", and the keys underneath sit at
+    // 4-space indent, past the 2-space subset: both are ignored and the
+    // parent key holds an empty object.
+    const tree = parseData("items:\n  -\n    name: a\n");
+    const items = tree.children.find((c) => c.label === "items")!;
+    expect(items.kind).toBe("object");
+    expect(items.children).toHaveLength(0);
+  });
+
   it("skips comment lines", () => {
     const tree = parseData("# comment\nport: 8080\n");
     expect(leafValues(tree)).toEqual([{ label: "port", value: "8080" }]);
+  });
+
+  it("skips a stray line indented deeper than its parent", () => {
+    const tree = parseData("a: 1\n  stray: x\nb: 2\n");
+    expect(leafValues(tree)).toEqual([
+      { label: "a", value: "1" },
+      { label: "b", value: "2" },
+    ]);
   });
 
   it("treats an empty nested value without children as null", () => {

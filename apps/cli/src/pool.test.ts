@@ -1,5 +1,14 @@
 import { describe, expect, it } from "bun:test";
-import { WORKER_FLAG, diffInline, diffWithWorkers, selfInvocation } from "./pool";
+import { Readable } from "node:stream";
+import { WORKER_FLAG, diffInline, diffWithWorkers, runWorker, selfInvocation } from "./pool";
+
+// diffWithWorkers re-invokes process.argv[1] as the worker entry. Under the
+// test runner that is this file, so when the flag is present this module IS
+// the worker: run the protocol and stop before any describe() registers.
+if (process.argv.includes(WORKER_FLAG)) {
+  await runWorker();
+  process.exit(0);
+}
 
 const OLD = "export function parseConfig(raw: string) { return JSON.parse(raw); }\n";
 const NEW = "export function loadConfig(raw: string) { return JSON.parse(raw); }\n";
@@ -56,5 +65,68 @@ describe("diffWithWorkers", () => {
     expect(results).toHaveLength(5);
     expect(results.map((r) => r.filePath)).toEqual(["f0.ts", "f1.ts", "f2.ts", "f3.ts", "f4.ts"]);
     expect(results[2]!.descriptions.some((d) => d.includes("renamed"))).toBe(true);
+  });
+});
+
+describe("diffWithWorkers: process pool", () => {
+  it("spawns worker children for a large parseable changeset", async () => {
+    // 25+ parseable files crosses WORKER_THRESHOLD, so the parent process
+    // spawns children, collects their replies, and preserves order.
+    const pairs = Array.from({ length: 25 }, (_, i) => ({
+      oldPath: `src/f${i}.ts`,
+      newPath: `src/f${i}.ts`,
+      oldSource: `export function f${i}(): number { return ${i}; }\n`,
+      newSource: `export function f${i}(): number { return ${i + 1}; }\n`,
+    }));
+    const results = await diffWithWorkers(pairs);
+    expect(results).toHaveLength(25);
+    expect(results.map((r) => r.filePath)).toEqual(
+      Array.from({ length: 25 }, (_, i) => `src/f${i}.ts`),
+    );
+    expect(results[0]!.descriptions.some((d) => d.includes("changed"))).toBe(true);
+  });
+
+  it("falls back to inline diffing for a changeset with no parseable files", async () => {
+    const pairs = Array.from({ length: 25 }, (_, i) => ({
+      oldPath: `note${i}.txt`,
+      newPath: `note${i}.txt`,
+      oldSource: `text ${i}\n`,
+      newSource: `text ${i} changed\n`,
+    }));
+    const results = await diffWithWorkers(pairs);
+    expect(results).toHaveLength(25);
+    expect(results.every((r) => r.descriptions.length === 2)).toBe(true);
+    expect(results.every((r) => r.descriptions.every((d) => d.includes("added")))).toBe(true);
+  });
+});
+
+describe("runWorker", () => {
+  it("reads jobs from stdin and writes replies to stdout", async () => {
+    const logs: string[] = [];
+    const origLog = console.log;
+    console.log = (...args: unknown[]) => logs.push(args.map(String).join(" "));
+
+    const jobs = JSON.stringify([
+      {
+        index: 0,
+        pair: {
+          oldPath: "a.ts",
+          newPath: "a.ts",
+          oldSource: "const x = 1;\n",
+          newSource: "const x = 2;\n",
+        },
+      },
+    ]);
+    try {
+      await runWorker(Readable.from([Buffer.from(jobs)]));
+    } finally {
+      console.log = origLog;
+    }
+
+    const replies = JSON.parse(logs[0]!);
+    expect(replies).toHaveLength(1);
+    expect(replies[0].index).toBe(0);
+    expect(replies[0].filePath).toBe("a.ts");
+    expect(replies[0].descriptions[0]).toContain("changed");
   });
 });

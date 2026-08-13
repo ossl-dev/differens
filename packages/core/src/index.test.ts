@@ -119,10 +119,15 @@ describe("diffTrees: rename", () => {
     const newTree = tree("function", [newChild]);
 
     const result = diffTrees(oldTree, newTree, { minHeight: 1 });
-    const updates = result.changes.filter((a) => a.type === "Update");
-    // May or may not detect as Update depending on matching
-    // At minimum, changes exist
-    expect(result.changes.length).toBeGreaterThan(0);
+    // The parents pair on structure hashes and the identifier leaf recovers,
+    // so the label change is exactly one Renamed update.
+    const updates = ofType(result.changes, "Update");
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.detail.kind).toBe("Renamed");
+    if (updates[0]!.detail.kind === "Renamed") {
+      expect(updates[0]!.detail.from).toBe("foo");
+      expect(updates[0]!.detail.to).toBe("bar");
+    }
   });
 });
 
@@ -156,8 +161,15 @@ describe("diffTrees: structure", () => {
     const newTree = tree("program", [leaf("class", "Bar")]);
 
     const result = diffTrees(oldTree, newTree, { minHeight: 1 });
-    // Should produce some changes
-    expect(result.changes.length).toBeGreaterThan(0);
+    // Nothing matches: the old root is deleted as a unit and the new class
+    // is inserted as a unit.
+    const deletes = ofType(result.changes, "Delete");
+    const inserts = ofType(result.changes, "Insert");
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0]!.node).toBe(oldTree);
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0]!.node.kind).toBe("class");
+    expect(inserts[0]!.node.label).toBe("Bar");
   });
 });
 

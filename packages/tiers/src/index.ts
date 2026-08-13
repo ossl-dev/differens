@@ -14,7 +14,7 @@ import { isBinaryExtension } from "./binary";
 import { awaitGrammars, hasGrammar, listExtractors, parseCode } from "./code/index";
 import { parseData } from "./data";
 import { type MarkupNode, parseMarkup } from "./markup";
-import { diffWords } from "./prose";
+import { diffProseActions } from "./prose";
 import { diffLines } from "./raw";
 
 export enum Tier {
@@ -290,38 +290,10 @@ function diffRaw(oldSource: string, newSource: string): TierDiffResult {
 }
 
 function diffProse(oldSource: string, newSource: string): TierDiffResult {
-  const wordDiffs = diffWords(oldSource, newSource);
+  const changes = diffProseActions(oldSource, newSource);
   return {
-    changes: wordDiffs.map((d, i) => {
-      const node = createNode({
-        kind: "word",
-        value: d.text,
-        byteRange: [0, d.text.length],
-      });
-      if (d.type === "Insert") {
-        return {
-          type: "Insert" as const,
-          context: [],
-          node,
-          parent: createNode({ kind: "paragraph", byteRange: [0, 0] }),
-          position: i,
-        };
-      }
-      if (d.type === "Update") {
-        return {
-          type: "Update" as const,
-          context: [],
-          node,
-          detail: {
-            kind: "ValueChanged" as const,
-            from: d.oldText,
-            to: d.newText,
-          },
-        };
-      }
-      return { type: "Delete" as const, context: [], node };
-    }),
-    nodeCount: wordDiffs.length,
+    changes,
+    nodeCount: changes.length,
     tier: Tier.Prose,
   };
 }

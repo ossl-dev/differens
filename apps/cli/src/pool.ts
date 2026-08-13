@@ -145,9 +145,9 @@ interface WorkerJob {
 type WorkerReply = FileDiff & { index: number };
 
 /** Worker mode: read a slice of jobs from stdin, write the diffs to stdout. */
-export async function runWorker(): Promise<void> {
+export async function runWorker(input: AsyncIterable<Buffer> = process.stdin): Promise<void> {
   const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+  for await (const chunk of input) chunks.push(chunk as Buffer);
   const jobs = JSON.parse(Buffer.concat(chunks).toString()) as WorkerJob[];
   const replies: WorkerReply[] = jobs.map(({ index, pair }) => ({
     index,

@@ -98,6 +98,14 @@ describe("repo detection", () => {
     process.chdir(repoDir);
   });
 
+  it("returns an empty file list outside a repo", async () => {
+    const outside = mkdtempSync(join(tmpdir(), "differens-none-"));
+    process.chdir(outside);
+    expect(await getChangedFiles()).toEqual([]);
+    rmSync(outside, { recursive: true, force: true });
+    process.chdir(repoDir);
+  });
+
   it("resolves refs and rejects garbage", async () => {
     expect(await resolveRef("HEAD")).toMatch(/^[0-9a-f]{40}$/);
     expect(await resolveRef("no-such-ref")).toBeNull();

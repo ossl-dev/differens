@@ -24,7 +24,7 @@ Pick an unchecked box, open an issue saying you're working on it, send a PR. One
 - [x] README, development guide, roadmap
 
 **CI / infra**
-- [x] GitHub Actions: test matrix on Bun latest, lint, typecheck, coverage gate (90% lines / 85% functions)
+- [x] GitHub Actions: test matrix on Bun latest, lint, typecheck, coverage gate (95% lines / 90% functions)
 - [x] Biome check in CI (format + lint gates)
 - [x] README badges (build status, license)
 - [x] npm publishing: all six packages plus the CLI under `differens` and `@ossl-dev/differens-cli`
@@ -60,9 +60,9 @@ Pick an unchecked box, open an issue saying you're working on it, send a PR. One
 
 **Testing**
 - [x] Myers diff fuzz-tested against a reference LCS (optimality + alignment validity on random inputs)
-- [x] Unit, integration, and CLI e2e suites; coverage gate in CI (90% lines / 85% functions)
-- [ ] Corpus tests against known refactors (extract method, rename, move file, reformat)
-- [ ] Fuzz test the parser pipeline with random edits
+- [x] Unit, integration, and CLI e2e suites; coverage gate in CI (95% lines / 90% functions)
+- [x] Corpus tests against known refactors (extract method, rename, move file, reformat, paragraph moves)
+- [x] Seeded fuzz of the parser pipeline (random edits to code and config never crash, changes stay well-formed)
 
 ---
 

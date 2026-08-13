@@ -29,8 +29,6 @@ import { TypeScriptExtractor } from "./typescript";
  * its extension is seen also means diffing a Python changeset never pays for
  * the Rust and Go grammars.
  */
-const require = createRequire(import.meta.url);
-
 interface LanguageSpec {
   name: string;
   module: string;
@@ -87,7 +85,22 @@ interface LoadedLanguage {
 
 const loaded = new Map<string, LoadedLanguage | null>();
 
-function loadLanguage(extension: string): LoadedLanguage | null {
+/** Test hook: forget every loaded grammar so failure paths can be exercised. */
+export function resetLanguagesForTest(): void {
+  loaded.clear();
+}
+
+type GrammarLoader = (module: string) => Record<string, unknown>;
+
+/**
+ * Load and cache a grammar. The loader is a parameter so the failure paths
+ * (missing or unbuildable native grammar) are testable without uninstalling
+ * the real grammars.
+ */
+export function loadLanguage(
+  extension: string,
+  loader: GrammarLoader = (m) => requireGrammar(m),
+): LoadedLanguage | null {
   const cached = loaded.get(extension);
   if (cached !== undefined) return cached;
 
@@ -99,7 +112,7 @@ function loadLanguage(extension: string): LoadedLanguage | null {
 
   let entry: LoadedLanguage | null = null;
   try {
-    const mod = requireGrammar(spec.module);
+    const mod = loader(spec.module);
     const root = (mod?.default ?? mod) as Record<string, unknown>;
     const grammar = (spec.pick ? root[spec.pick] : (root.language ?? root)) as Parser.Language;
     const parser = new Parser();
@@ -118,23 +131,33 @@ function loadLanguage(extension: string): LoadedLanguage | null {
   return entry;
 }
 
+/** Resolve a module from a base URL, or report the error. */
+function tryRequire(
+  module: string,
+  from: string,
+): { ok: true; value: Record<string, unknown> } | { ok: false; error: unknown } {
+  try {
+    return { ok: true, value: createRequire(from)(module) as Record<string, unknown> };
+  } catch (error) {
+    return { ok: false, error };
+  }
+}
+
 /**
  * Grammars are native addons, so a `--compile`d executable cannot embed them:
  * its own module root is the virtual /$bunfs/ tree with no node_modules. Try
  * the working directory as well, which recovers semantic diffs whenever the
  * binary is run inside a project that has the grammars installed.
  */
-function requireGrammar(module: string): Record<string, unknown> {
-  try {
-    return require(module) as Record<string, unknown>;
-  } catch (err) {
-    const local = createRequire(`${process.cwd()}/package.json`);
-    try {
-      return local(module) as Record<string, unknown>;
-    } catch {
-      throw err;
-    }
-  }
+export function requireGrammar(
+  module: string,
+  from: string = import.meta.url,
+): Record<string, unknown> {
+  const first = tryRequire(module, from);
+  if (first.ok) return first.value;
+  const second = tryRequire(module, `${process.cwd()}/package.json`);
+  if (second.ok) return second.value;
+  throw first.error;
 }
 
 const warned = new Set<string>();
