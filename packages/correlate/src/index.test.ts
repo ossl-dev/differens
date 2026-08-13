@@ -383,3 +383,54 @@ describe("correlate: whole-file renames with edits", () => {
     expect(result.moves[0]!.toFile).toBe("lib/util.ts");
   });
 });
+
+describe("correlate: exported functions moving as Export wrappers", () => {
+  it("correlates a move through an unlabeled Export wrapper", () => {
+    const del = createNode({
+      kind: "Export",
+      children: [
+        createNode({
+          kind: "Function",
+          label: "fn79",
+          value: "return x + 79;",
+          byteRange: [0, 10],
+        }),
+      ],
+      byteRange: [0, 10],
+    });
+    const ins = createNode({
+      kind: "Export",
+      children: [
+        createNode({
+          kind: "Function",
+          label: "fn79",
+          value: "return x + 79;",
+          byteRange: [0, 10],
+        }),
+      ],
+      byteRange: [0, 10],
+    });
+
+    const fileChanges: FileChanges[] = [
+      { filePath: "a.ts", actions: [{ type: "Delete", context: [], node: del }] },
+      {
+        filePath: "b.ts",
+        actions: [
+          {
+            type: "Insert",
+            context: [],
+            node: ins,
+            parent: createNode({ kind: "file", byteRange: [0, 10] }),
+            position: 0,
+          },
+        ],
+      },
+    ];
+
+    const result = correlate(fileChanges);
+    expect(result.moves).toHaveLength(1);
+    expect(result.moves[0]!.node.kind).toBe("Function");
+    expect(result.moves[0]!.node.label).toBe("fn79");
+    expect(result.moves[0]!.modified).toBe(false);
+  });
+});

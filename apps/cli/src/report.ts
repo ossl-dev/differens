@@ -114,6 +114,8 @@ export async function report(
 async function reportNdjson(filePairs: FilePair[]): Promise<void> {
   const allFileChanges: FileChanges[] = [];
   for await (const result of diffFilePairsStream(filePairs)) {
+    // Unchanged files contribute nothing; the batch formats skip them too.
+    if (result.actions.length === 0) continue;
     console.log(
       JSON.stringify({
         filePath: result.filePath,

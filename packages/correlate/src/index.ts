@@ -65,7 +65,9 @@ export function correlate(
       // happens to be structurally identical in two files is not a move any
       // reader recognises -- "template_substitution moved from a.ts to b.ts"
       // is noise -- and a cross-file move is always reported by name.
-      if (action.node.label === undefined) continue;
+      // An exported top-level function moves as an unlabeled Export wrapper
+      // around the labeled Function; the name is one level down.
+      if (namedNode(action.node).label === undefined) continue;
       if (action.type === "Delete") {
         deletions.push({ action, file: fc.filePath });
       } else if (action.type === "Insert") {
@@ -119,7 +121,7 @@ export function correlate(
           (del.action.node.value !== undefined && del.action.node.value === ins.action.node.value);
         if (exact) {
           moves.push({
-            node: ins.action.node,
+            node: namedNode(ins.action.node),
             fromFile: del.file,
             toFile: ins.file,
             modified: false,
@@ -149,7 +151,7 @@ export function correlate(
 
         if (bestIns && bestScore >= opts.renameSimilarityThreshold) {
           moves.push({
-            node: bestIns.action.node,
+            node: namedNode(bestIns.action.node),
             fromFile: del.file,
             toFile: bestIns.file,
             modified: bestScore < 1.0,
@@ -165,6 +167,14 @@ export function correlate(
   // Whatever stayed unmatched is a real delete or insert, and the per-file
   // diff already reported it as one.
   return { moves };
+}
+
+/** The node a move should be reported as: the labeled child when the
+ * matched node itself is an unlabeled wrapper (Export around a Function). */
+function namedNode(node: Node): Node {
+  if (node.label !== undefined) return node;
+  const labeled = node.children.find((c) => c.label !== undefined);
+  return labeled ?? node;
 }
 
 /**

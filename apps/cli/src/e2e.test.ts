@@ -353,3 +353,124 @@ describe("CLI: cross-directory rename detection", () => {
     rmSync(other, { recursive: true, force: true });
   });
 });
+
+describe("CLI: medium synthetic repo regression corpus", () => {
+  /**
+   * Build a 150-file mixed-tier repo snapshot. Covers every tier: code (ts,
+   * py), data (json), raw (md), prose (txt). Edit kinds: function renames,
+   * config value changes, doc line edits, prose word edits, whole-file
+   * deletes and adds, and cross-file function moves.
+   */
+  function buildRepo(root: string): void {
+    for (let i = 0; i <= 80; i++) {
+      mkdirSync(join(root, "src"), { recursive: true });
+      // f80 stays function-free in both snapshots: it is the move target, so
+      // the incoming functions must insert rather than rename over an
+      // existing same-shaped function.
+      const body =
+        i === 80
+          ? "export const keep80 = 80;\n"
+          : `export function fn${i}(x: number): number { return x + ${i}; }\nexport const keep${i} = ${i};\n`;
+      writeFileSync(join(root, "src", `f${i}.ts`), body);
+    }
+    for (let i = 0; i < 30; i++) {
+      mkdirSync(join(root, "config"), { recursive: true });
+      writeFileSync(
+        join(root, "config", `c${i}.json`),
+        JSON.stringify({ name: `svc${i}`, port: 3000 + i, host: "localhost" }, null, 2),
+      );
+    }
+    for (let i = 0; i < 20; i++) {
+      mkdirSync(join(root, "docs"), { recursive: true });
+      writeFileSync(
+        join(root, "docs", `d${i}.md`),
+        `# Doc ${i}\n\nStatic line one.\nStatic line two.\n`,
+      );
+    }
+    for (let i = 0; i < 10; i++) {
+      mkdirSync(join(root, "notes"), { recursive: true });
+      writeFileSync(join(root, "notes", `n${i}.txt`), `note ${i} body text.\n`);
+    }
+    for (let i = 0; i < 10; i++) {
+      mkdirSync(join(root, "py"), { recursive: true });
+      writeFileSync(join(root, "py", `p${i}.py`), `def py_fn_${i}(x):\n    return x + ${i}\n`);
+    }
+  }
+
+  it("pins the exact changed-file set and reports cross-file moves", () => {
+    const oldDir = mkdtempSync(join(tmpdir(), "differens-corpus-old-"));
+    const newDir = mkdtempSync(join(tmpdir(), "differens-corpus-new-"));
+    buildRepo(oldDir);
+    buildRepo(newDir);
+
+    // 5 function renames, 10 config value edits, 5 doc line edits, 5 prose
+    // word edits, 3 deletions, 3 additions, 2 cross-file moves = 33 files.
+    for (let i = 0; i < 5; i++) {
+      writeFileSync(
+        join(newDir, "src", `f${i}.ts`),
+        `export function renamed${i}(x: number): number { return x + ${i}; }\nexport const keep${i} = ${i};\n`,
+      );
+    }
+    for (let i = 0; i < 10; i++) {
+      writeFileSync(
+        join(newDir, "config", `c${i}.json`),
+        JSON.stringify({ name: `svc${i}`, port: 4000 + i, host: "localhost" }, null, 2),
+      );
+    }
+    for (let i = 0; i < 5; i++) {
+      writeFileSync(
+        join(newDir, "docs", `d${i}.md`),
+        `# Doc ${i}\n\nEdited line one.\nStatic line two.\n`,
+      );
+    }
+    for (let i = 0; i < 5; i++) {
+      writeFileSync(join(newDir, "notes", `n${i}.txt`), `note ${i} body edited text.\n`);
+    }
+    for (const f of ["src/f70.ts", "config/c20.json", "docs/d10.md"]) {
+      rmSync(join(newDir, f));
+    }
+    for (let i = 0; i < 3; i++) {
+      writeFileSync(
+        join(newDir, "src", `added${i}.ts`),
+        `export function added${i}(): number { return ${i}; }\n`,
+      );
+    }
+    // Move two functions across files: fn79 leaves f79 for f80 verbatim
+    // (exact move), fn78 leaves f78 for f80 with its body edited (modified
+    // move). Real moves, not swaps: a swap would pair up as in-file renames.
+    writeFileSync(join(newDir, "src", "f79.ts"), "export const keep79 = 79;\n");
+    writeFileSync(join(newDir, "src", "f78.ts"), "export const keep78 = 78;\n");
+    writeFileSync(
+      join(newDir, "src", "f80.ts"),
+      [
+        "export function fn79(x: number): number { return x + 79; }",
+        "export function fn78(x: number): number { return x + 780; }",
+        "export const keep80 = 80;",
+        "",
+      ].join("\n"),
+    );
+
+    const { stdout, status } = runCli([oldDir, newDir, "--format=ndjson"]);
+    expect(status).toBe(0);
+    const lines = stdout.trim().split("\n");
+    const docs = lines.map(
+      (l) => JSON.parse(l) as { filePath?: string; crossFileMoves?: unknown[] },
+    );
+
+    // 5 renames, 10 json, 5 md, 5 txt, 3 deletions, 3 additions, and the
+    // three files the two moves touched.
+    const fileLines = docs.filter((d) => d.filePath !== undefined);
+    expect(fileLines).toHaveLength(34);
+
+    const trailer = docs.find((d) => d.crossFileMoves !== undefined);
+    expect(trailer).toBeDefined();
+    expect(trailer!.crossFileMoves).toHaveLength(2);
+    const moves = trailer!.crossFileMoves!.map((m) => m as { name: string; modified: boolean });
+    expect(moves.map((m) => m.name).sort()).toEqual(["fn78", "fn79"]);
+    expect(moves.find((m) => m.name === "fn79")!.modified).toBe(false);
+    expect(moves.find((m) => m.name === "fn78")!.modified).toBe(true);
+
+    rmSync(oldDir, { recursive: true, force: true });
+    rmSync(newDir, { recursive: true, force: true });
+  });
+});
