@@ -10,7 +10,7 @@
  */
 
 import { spawn } from "node:child_process";
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 
 /** Directories never worth walking when diffing two trees. */
@@ -49,8 +49,13 @@ export interface GitDiffInput {
  * which is how the callers below tell "no such ref" from an empty result.
  */
 function git(args: string[], input?: string): Promise<Buffer> {
+  return gitIn(undefined, args, input);
+}
+
+function gitIn(cwd: string | undefined, args: string[], input?: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const child = spawn("git", args, {
+      cwd,
       stdio: [input === undefined ? "ignore" : "pipe", "pipe", "ignore"],
     });
     const chunks: Buffer[] = [];
@@ -243,6 +248,45 @@ async function mapWithConcurrency<T, R>(
 /** Generate .gitattributes entry for the diff driver */
 export function generateGitAttributes(extensions: string[]): string {
   return extensions.map((ext) => `*.${ext} diff=differens`).join("\n");
+}
+
+/**
+ * Ensure .gitattributes registers the differens diff driver for `extensions`.
+ *
+ * install-git-driver used to print the lines and ask the human to paste
+ * them; now it writes them. Existing lines are preserved: a line already
+ * matching an extension keeps its other attributes and gains the driver,
+ * and every other line passes through untouched. Runs twice, the file does
+ * not change.
+ */
+export async function writeGitAttributes(extensions: string[], root?: string): Promise<string> {
+  const top = (await gitIn(root, ["rev-parse", "--show-toplevel"])).toString().trim();
+  const path = join(top, ".gitattributes");
+  let content = "";
+  try {
+    content = await readFile(path, "utf8");
+  } catch {
+    // No file yet  --  created below.
+  }
+
+  const out: string[] = [];
+  const handled = new Set<string>();
+  for (const line of content.split("\n").filter((l) => l.length > 0)) {
+    const match = /^\*\.([A-Za-z0-9]+)\s+(.*)$/.exec(line);
+    if (match && extensions.includes(match[1]!)) {
+      const attrs = match[2]!;
+      out.push(/\bdiff=differens\b/.test(attrs) ? line : `*.${match[1]} ${attrs} diff=differens`);
+      handled.add(match[1]!);
+    } else {
+      out.push(line);
+    }
+  }
+  for (const ext of extensions) {
+    if (!handled.has(ext)) out.push(`*.${ext} diff=differens`);
+  }
+
+  await writeFile(path, `${out.join("\n")}\n`);
+  return path;
 }
 
 /**

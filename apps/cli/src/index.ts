@@ -18,12 +18,12 @@ import {
   diffDirectories,
   diffDriverCommand,
   diffWorkingTree,
-  generateGitAttributes,
   installGitDriver,
   isDirectory,
   isGitRepo,
   readFilePair,
   resolveRef,
+  writeGitAttributes,
 } from "@ossl-dev/differens-git";
 import { formatChanges, narrate } from "@ossl-dev/differens-narrate";
 import type { OutputFormat } from "@ossl-dev/differens-narrate";
@@ -220,12 +220,12 @@ async function handleInstallGitDriver(configuredExtensions?: string[]): Promise<
       .flatMap((e) => e.extensions)
       .sort();
 
+  const attributesPath = await writeGitAttributes(extensions);
   console.log("git diff driver installed.");
-  console.log("add to .gitattributes:");
-  for (const line of generateGitAttributes(extensions).split("\n")) {
-    console.log(`  ${line}`);
-  }
-  console.log("\nthen `git diff` narrates those files instead of printing hunks.");
+  console.log(
+    `wrote ${attributesPath}: ${extensions.length} extensions now use the differens driver.`,
+  );
+  console.log("`git diff` narrates those files instead of printing hunks.");
 }
 
 function parseFormat(args: string[], fallback: OutputFormat): OutputFormat {

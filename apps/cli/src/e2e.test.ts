@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -258,5 +258,29 @@ describe("CLI: config file", () => {
     const { stdout, status } = runCli([], { cwd: join(dir, "sub") });
     expect(status).toBe(0);
     expect(stdout).toContain("# a.ts");
+  });
+});
+
+describe("CLI: install-git-driver", () => {
+  it("registers the driver and writes .gitattributes", () => {
+    write("a.ts", "export const a = 1;\n");
+    commit();
+    const { status } = runCli(["install-git-driver"]);
+    expect(status).toBe(0);
+    expect(git(["config", "--get", "diff.differens.command"])).toContain("--git-diff-driver");
+    const attrs = readFileSync(join(dir, ".gitattributes"), "utf8");
+    expect(attrs).toContain("*.ts diff=differens");
+    expect(attrs).toContain("*.py diff=differens");
+  });
+
+  it("preserves existing .gitattributes lines", () => {
+    write(".gitattributes", "*.md linguist-detectable=true\n");
+    write("a.ts", "export const a = 1;\n");
+    commit();
+    const { status } = runCli(["install-git-driver"]);
+    expect(status).toBe(0);
+    const attrs = readFileSync(join(dir, ".gitattributes"), "utf8");
+    expect(attrs).toContain("*.md linguist-detectable=true");
+    expect(attrs).toContain("*.ts diff=differens");
   });
 });

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -14,6 +14,7 @@ import {
   getHeadContent,
   getWorkingTreeContent,
   installGitDriver,
+  writeGitAttributes,
   isDirectory,
   isGitRepo,
   readFilePair,
@@ -284,5 +285,36 @@ describe("installGitDriver", () => {
 describe("DRIVER_FLAG", () => {
   it("is the flag git appends its driver arguments to", () => {
     expect(DRIVER_FLAG).toBe("--git-diff-driver");
+  });
+});
+
+describe("writeGitAttributes", () => {
+  it("creates .gitattributes with the driver attribute per extension", async () => {
+    const path = await writeGitAttributes(["ts", "py"]);
+    expect(realpathSync(path)).toBe(realpathSync(join(repoDir, ".gitattributes")));
+    expect(readFileSync(join(repoDir, ".gitattributes"), "utf8")).toBe(
+      "*.ts diff=differens\n*.py diff=differens\n",
+    );
+  });
+
+  it("preserves unrelated rules and appends the driver to related ones", async () => {
+    write(".gitattributes", "*.ts linguist-language=TypeScript\n*.md linguist-detectable=true\n");
+    await writeGitAttributes(["ts", "go"]);
+    expect(readFileSync(join(repoDir, ".gitattributes"), "utf8")).toBe(
+      "*.ts linguist-language=TypeScript diff=differens\n*.md linguist-detectable=true\n*.go diff=differens\n",
+    );
+  });
+
+  it("is idempotent across repeated runs", async () => {
+    await writeGitAttributes(["ts"]);
+    const first = readFileSync(join(repoDir, ".gitattributes"), "utf8");
+    await writeGitAttributes(["ts"]);
+    expect(readFileSync(join(repoDir, ".gitattributes"), "utf8")).toBe(first);
+  });
+
+  it("throws outside a git repository", async () => {
+    const bare = mkdtempSync(join(tmpdir(), "differens-norepo-"));
+    await expect(writeGitAttributes(["ts"], bare)).rejects.toThrow();
+    rmSync(bare, { recursive: true, force: true });
   });
 });
