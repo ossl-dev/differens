@@ -1,18 +1,20 @@
 {
   "name": "differens",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "author": "Mohammed Aman Khan",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ossl-dev/differens.git",
     "directory": "apps/cli"
   },
-  "devDependencies": {
+  "dependencies": {
     "@ossl-dev/differens-core": "workspace:*",
     "@ossl-dev/differens-correlate": "workspace:*",
     "@ossl-dev/differens-git": "workspace:*",
     "@ossl-dev/differens-narrate": "workspace:*",
-    "@ossl-dev/differens-tiers": "workspace:*",
+    "@ossl-dev/differens-tiers": "workspace:*"
+  },
+  "devDependencies": {
     "@ossl-dev/differens-tsconfig": "workspace:*"
   },
   "bin": {
@@ -49,7 +51,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target node --external tree-sitter --external 'tree-sitter-*' && chmod +x dist/index.js",
+    "build": "bun build src/index.ts --outdir dist --target node --external '@ossl-dev/*' && chmod +x dist/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src/",
     "test": "bun test",

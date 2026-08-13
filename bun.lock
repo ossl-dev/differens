@@ -13,29 +13,31 @@
     },
     "apps/cli": {
       "name": "differens",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "bin": {
         "differens": "dist/index.js",
       },
-      "devDependencies": {
+      "dependencies": {
         "@ossl-dev/differens-core": "workspace:*",
         "@ossl-dev/differens-correlate": "workspace:*",
         "@ossl-dev/differens-git": "workspace:*",
         "@ossl-dev/differens-narrate": "workspace:*",
         "@ossl-dev/differens-tiers": "workspace:*",
+      },
+      "devDependencies": {
         "@ossl-dev/differens-tsconfig": "workspace:*",
       },
     },
     "packages/core": {
       "name": "@ossl-dev/differens-core",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "devDependencies": {
         "@ossl-dev/differens-tsconfig": "workspace:*",
       },
     },
     "packages/correlate": {
       "name": "@ossl-dev/differens-correlate",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "dependencies": {
         "@ossl-dev/differens-core": "workspace:*",
       },
@@ -45,7 +47,7 @@
     },
     "packages/git": {
       "name": "@ossl-dev/differens-git",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "dependencies": {
         "@ossl-dev/differens-core": "workspace:*",
       },
@@ -55,7 +57,7 @@
     },
     "packages/narrate": {
       "name": "@ossl-dev/differens-narrate",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "dependencies": {
         "@ossl-dev/differens-core": "workspace:*",
       },
@@ -65,7 +67,7 @@
     },
     "packages/tiers": {
       "name": "@ossl-dev/differens-tiers",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "dependencies": {
         "@ossl-dev/differens-core": "workspace:*",
         "@tree-sitter-grammars/tree-sitter-lua": "^0.4.1",
@@ -92,7 +94,7 @@
     },
     "packages/tsconfig": {
       "name": "@ossl-dev/differens-tsconfig",
-      "version": "0.1.0",
+      "version": "0.2.0",
     },
   },
   "packages": {

@@ -5,7 +5,7 @@ license: MIT
 compatibility: Requires Node 18.17+. Install: npm install -g differens, or run without installing: npx differens.
 metadata:
   author: ossl-dev
-  version: "0.1.0"
+  version: "0.2.0"
 ---
 
 # Differens
