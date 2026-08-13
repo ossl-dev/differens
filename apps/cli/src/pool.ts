@@ -162,7 +162,9 @@ export async function* diffFilePairsStream(filePairs: FilePair[]): AsyncGenerato
 
   const pending = filePairs.map(() => {
     let resolve!: (r: FileDiff) => void;
-    const promise = new Promise<FileDiff>((res) => (resolve = res));
+    const promise = new Promise<FileDiff>((res) => {
+      resolve = res;
+    });
     return { promise, resolve };
   });
 

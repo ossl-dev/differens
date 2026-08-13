@@ -10,7 +10,7 @@
 
 import type { Node } from "@ossl-dev/differens-core";
 import { createNode, diffTrees } from "@ossl-dev/differens-core";
-import { isBinaryExtension } from "./binary";
+import { binaryPluginsFor, isBinaryExtension } from "./binary";
 import { awaitGrammars, hasGrammar, listExtractors, parseCode } from "./code/index";
 import { parseData } from "./data";
 import { type MarkupNode, parseMarkup } from "./markup";
@@ -161,7 +161,7 @@ export function diffWithTier(
       oldSource.includes("�") ||
       newSource.includes("�"))
   ) {
-    return diffBinary(oldSource, newSource);
+    return diffBinary(oldSource, newSource, info.extension);
   }
 
   // A tier is used only if it both parses AND produces a usable tree diff.
@@ -180,7 +180,7 @@ export function diffWithTier(
   let result: TierDiffResult | undefined;
   switch (info.tier) {
     case Tier.Binary:
-      return diffBinary(oldSource, newSource);
+      return diffBinary(oldSource, newSource, info.extension);
     case Tier.Data:
       result = attempt(() => diffData(oldSource, newSource));
       break;
@@ -241,7 +241,24 @@ function hasNullByte(source: string): boolean {
   return false;
 }
 
-function diffBinary(oldSource: string, newSource: string): TierDiffResult {
+function diffBinary(oldSource: string, newSource: string, extension: string): TierDiffResult {
+  // Format plugins claim the extension first and may decline; the first real
+  // answer wins. A throwing plugin is skipped, not fatal: the default
+  // byte-delta report below is always there.
+  for (const plugin of binaryPluginsFor(extension)) {
+    try {
+      const actions = plugin.diff(
+        new TextEncoder().encode(oldSource),
+        new TextEncoder().encode(newSource),
+      );
+      if (actions && actions.length > 0) {
+        return { changes: actions, nodeCount: 0, tier: Tier.Binary };
+      }
+    } catch {
+      // Try the next plugin.
+    }
+  }
+
   return {
     changes: [
       {
@@ -371,6 +388,8 @@ export function getExtractors(): ExtractorInfo[] {
 
 /** Re-export for convenience */
 export { parseData, treeFromValue } from "./data";
+export { isBinaryExtension, registerBinaryPlugin, unregisterBinaryPlugin } from "./binary";
+export type { BinaryDiffPlugin } from "./binary";
 export { parseCode, hasGrammar } from "./code/index";
 
 /** Will this file actually be parsed into a tree, or only line-diffed? */
