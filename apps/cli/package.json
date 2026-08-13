@@ -1,7 +1,36 @@
 {
   "name": "differens",
   "version": "0.1.1",
+  "author": "Mohammed Aman Khan",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ossl-dev/differens.git",
+    "directory": "apps/cli"
+  },
+  "devDependencies": {
+    "@ossl-dev/differens-core": "workspace:*",
+    "@ossl-dev/differens-correlate": "workspace:*",
+    "@ossl-dev/differens-git": "workspace:*",
+    "@ossl-dev/differens-narrate": "workspace:*",
+    "@ossl-dev/differens-tiers": "workspace:*",
+    "@ossl-dev/differens-tsconfig": "workspace:*"
+  },
+  "bin": {
+    "differens": "dist/index.js"
+  },
+  "bugs": {
+    "url": "https://github.com/ossl-dev/differens/issues"
+  },
   "description": "Semantic diffing: what actually happened to your code, not which lines changed",
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "homepage": "https://github.com/ossl-dev/differens#readme",
   "keywords": [
     "diff",
     "semantic-diff",
@@ -15,29 +44,7 @@
     "llm",
     "cli"
   ],
-  "homepage": "https://github.com/ossl-dev/differens#readme",
-  "bugs": {
-    "url": "https://github.com/ossl-dev/differens/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/ossl-dev/differens.git",
-    "directory": "apps/cli"
-  },
   "license": "MIT",
-  "author": "Mohammed Aman Khan",
-  "type": "module",
-  "bin": {
-    "differens": "dist/index.js"
-  },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
-  "engines": {
-    "node": ">=18.17.0"
-  },
   "publishConfig": {
     "access": "public"
   },
@@ -48,20 +55,5 @@
     "test": "bun test",
     "clean": "rm -rf dist/"
   },
-  "dependencies": {
-    "tree-sitter": "^0.25.1",
-    "tree-sitter-go": "^0.25.0",
-    "tree-sitter-javascript": "^0.25.0",
-    "tree-sitter-python": "^0.25.0",
-    "tree-sitter-rust": "^0.24.0",
-    "tree-sitter-typescript": "^0.23.2"
-  },
-  "devDependencies": {
-    "@ossl-dev/differens-core": "workspace:*",
-    "@ossl-dev/differens-correlate": "workspace:*",
-    "@ossl-dev/differens-git": "workspace:*",
-    "@ossl-dev/differens-narrate": "workspace:*",
-    "@ossl-dev/differens-tiers": "workspace:*",
-    "@ossl-dev/differens-tsconfig": "workspace:*"
-  }
+  "type": "module"
 }

@@ -154,34 +154,84 @@ describe("grammar registry", () => {
     }
   });
 
+  it("reports working grammars for every registered L5 language", () => {
+    const l5 = ["c", "cpp", "java", "rb", "php", "swift", "kt", "cs", "scala", "lua", "sh"];
+    for (const ext of l5) expect(hasGrammar(ext)).toBe(true);
+  });
+
   it("reports no grammar for unregistered extensions", () => {
-    expect(hasGrammar("java")).toBe(false);
+    expect(hasGrammar("css")).toBe(false);
     expect(hasGrammar("unknown")).toBe(false);
   });
 
   it("lists one entry per language with its extensions", () => {
     const extractors = listExtractors();
-    expect(extractors.length).toBe(5);
+    expect(extractors.length).toBe(16);
     const byLang = new Map(extractors.map((e) => [e.language, e]));
     expect(byLang.get("javascript")!.extensions).toEqual(["js", "mjs", "cjs", "jsx"]);
     expect(byLang.get("typescript")!.extensions).toEqual(["ts", "tsx"]);
     expect(byLang.get("python")!.extensions).toEqual(["py"]);
     expect(byLang.get("go")!.extensions).toEqual(["go"]);
     expect(byLang.get("rust")!.extensions).toEqual(["rs"]);
-    for (const e of extractors) expect(e.level).toBe("L6");
+    expect(byLang.get("bash")!.extensions).toEqual(["sh", "bash", "zsh"]);
+    expect(byLang.get("csharp")!.extensions).toEqual(["cs"]);
+    const l5 = [
+      "c",
+      "cpp",
+      "java",
+      "ruby",
+      "php",
+      "swift",
+      "kotlin",
+      "csharp",
+      "scala",
+      "lua",
+      "bash",
+    ];
+    for (const lang of l5) expect(byLang.get(lang)!.level).toBe("L5");
+    for (const lang of ["javascript", "typescript", "python", "go", "rust"]) {
+      expect(byLang.get(lang)!.level).toBe("L6");
+    }
+  });
+});
+
+describe("L5 generic fallback", () => {
+  it("parses java into raw tree-sitter kinds with name-field labels", () => {
+    const src = "class Foo { void bar() {} }";
+    expect(hasKind(src, "java", "program")).toBe(true);
+    expect(hasKind(src, "java", "class_declaration", "Foo")).toBe(true);
+    expect(hasKind(src, "java", "method_declaration", "bar")).toBe(true);
+  });
+
+  it("parses C and C++", () => {
+    expect(hasKind("int main() { return 0; }", "c", "translation_unit")).toBe(true);
+    expect(hasKind("class Foo { public: int bar(); };", "cpp", "translation_unit")).toBe(true);
+  });
+
+  it("parses ruby, php, swift, scala, bash, and lua", () => {
+    expect(hasKind("class Foo\n  def bar\n  end\nend", "rb", "program")).toBe(true);
+    expect(hasKind("<?php class Foo { function bar() {} }", "php", "program")).toBe(true);
+    expect(hasKind("class Foo { func bar() {} }", "swift", "source_file")).toBe(true);
+    expect(hasKind("class Foo { def bar() = 1 }", "scala", "compilation_unit")).toBe(true);
+    expect(hasKind("foo() { echo hi; }", "sh", "program")).toBe(true);
+    expect(hasKind("function foo() return 1 end", "lua", "chunk")).toBe(true);
+  });
+
+  it("parses C# and Kotlin through their dlopen-loaded bindings", () => {
+    expect(hasKind("class Foo { void Bar() {} }", "cs", "compilation_unit")).toBe(true);
+    expect(hasKind("class Foo { fun bar() {} }", "kt", "source_file")).toBe(true);
+  });
+
+  it("recovers from garbage input in a grammar-less fallback extension", () => {
+    const tree = parseCode("p { color: red }", "css");
+    expect(tree.kind).toBe("file");
+    expect(tree.label).toBe("css");
+    expect(tree.children[0]!.kind).toBe("line");
+    expect(tree.children[0]!.value).toBe("p { color: red }");
   });
 });
 
 describe("parseCode fallbacks", () => {
-  it("wraps grammar-less extensions as line nodes", () => {
-    const tree = parseCode("public class A {}", "java");
-    expect(tree.kind).toBe("file");
-    expect(tree.label).toBe("java");
-    expect(tree.children.length).toBe(1);
-    expect(tree.children[0]!.kind).toBe("line");
-    expect(tree.children[0]!.value).toBe("public class A {}");
-  });
-
   it("recovers from garbage input with error nodes", () => {
     const tree = parseCode("\u0000\u0001 not code at all", "ts");
     // The root survives as a file node and the unparseable bytes surface as

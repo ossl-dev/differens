@@ -9,6 +9,7 @@
  * node types). Languages with extractors get L6 (semantic labels).
  */
 
+import { readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { createNode } from "@ossl-dev/differens-core";
 import type { Node } from "@ossl-dev/differens-core";
@@ -34,6 +35,12 @@ interface LanguageSpec {
   module: string;
   /** Grammar modules export either `.language`, a named dialect, or the grammar itself */
   pick?: string;
+  /**
+   * ESM-only wrappers (top-level await) cannot be require()d; attempting to
+   * runs them far enough to print their own failure noise. Load the raw
+   * binding instead. See requireBinding.
+   */
+  esm?: boolean;
   extractor?: () => LanguageExtractor;
 }
 
@@ -73,6 +80,21 @@ const LANGUAGES: Record<string, LanguageSpec> = {
   py: { name: "python", module: "tree-sitter-python", extractor: () => new PythonExtractor() },
   rs: { name: "rust", module: "tree-sitter-rust", extractor: () => new RustExtractor() },
   go: { name: "go", module: "tree-sitter-go", extractor: () => new GoExtractor() },
+  // L5 generic fallback: grammars without extractors diff as raw tree-sitter
+  // CSTs. Node types and standard field names carry the semantics.
+  c: { name: "c", module: "tree-sitter-c" },
+  cpp: { name: "cpp", module: "tree-sitter-cpp" },
+  java: { name: "java", module: "tree-sitter-java" },
+  rb: { name: "ruby", module: "tree-sitter-ruby" },
+  php: { name: "php", module: "tree-sitter-php", pick: "php" },
+  swift: { name: "swift", module: "tree-sitter-swift" },
+  kt: { name: "kotlin", module: "tree-sitter-kotlin" },
+  cs: { name: "csharp", module: "tree-sitter-c-sharp", esm: true },
+  scala: { name: "scala", module: "tree-sitter-scala" },
+  lua: { name: "lua", module: "@tree-sitter-grammars/tree-sitter-lua", esm: true },
+  sh: { name: "bash", module: "tree-sitter-bash" },
+  bash: { name: "bash", module: "tree-sitter-bash" },
+  zsh: { name: "bash", module: "tree-sitter-bash" },
 };
 
 interface LoadedLanguage {
@@ -97,10 +119,7 @@ type GrammarLoader = (module: string) => Record<string, unknown>;
  * (missing or unbuildable native grammar) are testable without uninstalling
  * the real grammars.
  */
-export function loadLanguage(
-  extension: string,
-  loader: GrammarLoader = (m) => requireGrammar(m),
-): LoadedLanguage | null {
+export function loadLanguage(extension: string, loader?: GrammarLoader): LoadedLanguage | null {
   const cached = loaded.get(extension);
   if (cached !== undefined) return cached;
 
@@ -112,7 +131,7 @@ export function loadLanguage(
 
   let entry: LoadedLanguage | null = null;
   try {
-    const mod = loader(spec.module);
+    const mod = (loader ?? (spec.esm ? requireBinding : requireGrammar))(spec.module);
     const root = (mod?.default ?? mod) as Record<string, unknown>;
     const grammar = (spec.pick ? root[spec.pick] : (root.language ?? root)) as Parser.Language;
     const parser = new Parser();
@@ -157,7 +176,66 @@ export function requireGrammar(
   if (first.ok) return first.value;
   const second = tryRequire(module, `${process.cwd()}/package.json`);
   if (second.ok) return second.value;
+  const binding =
+    tryLoadBinding(module, from) ?? tryLoadBinding(module, `${process.cwd()}/package.json`);
+  if (binding.ok) return binding.value;
   throw first.error;
+}
+
+/**
+ * Load a grammar that ships only as an ESM wrapper, skipping require entirely.
+ *
+ * require() of a module with top-level await throws after running the wrapper
+ * far enough to print its own nested import failure, which is noise on stderr
+ * for a load we recover from. The binding is a plain .node file: load it
+ * directly. See tryLoadBinding for how the file is found.
+ */
+export function requireBinding(
+  module: string,
+  from: string = import.meta.url,
+): Record<string, unknown> {
+  const first = tryLoadBinding(module, from);
+  if (first.ok) return first.value;
+  const second = tryLoadBinding(module, `${process.cwd()}/package.json`);
+  if (second.ok) return second.value;
+  throw new Error(`cannot load native binding for ${module}`);
+}
+
+/**
+ * Load a grammar binding that only ships as an ESM wrapper.
+ *
+ * A few grammar packages wrap their native binding in a module with top-level
+ * await, which `require` cannot load. The binding itself is a plain .node file
+ * next to that wrapper, so load it directly with dlopen. tree-sitter must be
+ * imported before the binding loads; it is, at the top of this module.
+ *
+ * Bun renames .node files inside its module store, so the directory is scanned
+ * rather than the filename guessed. The build/Release path covers grammars
+ * that ship source-only and compile on install.
+ */
+function tryLoadBinding(
+  module: string,
+  from: string,
+): { ok: true; value: Record<string, unknown> } | { ok: false } {
+  try {
+    const pkg = createRequire(from).resolve(`${module}/package.json`);
+    const root = pkg.slice(0, -"package.json".length);
+    const dirs = [`${root}prebuilds/${process.platform}-${process.arch}/`, `${root}build/Release/`];
+    for (const dir of dirs) {
+      try {
+        const file = readdirSync(dir).find((f) => f.endsWith(".node"));
+        if (!file) continue;
+        const mod = { exports: {} as Record<string, unknown> };
+        process.dlopen(mod, dir + file);
+        return { ok: true, value: mod.exports };
+      } catch {
+        // Try the next candidate directory.
+      }
+    }
+  } catch {
+    // Package not resolvable from here; the caller tries the cwd next.
+  }
+  return { ok: false };
 }
 
 const warned = new Set<string>();

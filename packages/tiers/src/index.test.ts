@@ -415,19 +415,22 @@ describe("isParseable", () => {
   });
 
   it("is false for grammar-less code and plain text", () => {
-    expect(isParseable("Main.java")).toBe(false);
+    expect(isParseable("main.css")).toBe(false);
     expect(isParseable("notes.txt")).toBe(false);
     expect(isParseable("README.md")).toBe(false);
   });
 });
 
 describe("extractor listing", () => {
-  it("lists all five languages at L6 with their extensions", () => {
+  it("lists L6 extractor languages and L5 generic grammars", () => {
     const extractors = getExtractors();
-    expect(extractors).toHaveLength(5);
-    const names = extractors.map((e) => e.language).sort();
-    expect(names).toEqual(["go", "javascript", "python", "rust", "typescript"].sort());
-    for (const e of extractors) expect(e.level).toBe("L6");
+    expect(extractors).toHaveLength(16);
+    const byLang = new Map(extractors.map((e) => [e.language, e]));
+    const l6 = ["go", "javascript", "python", "rust", "typescript"];
+    for (const name of l6) expect(byLang.get(name)!.level).toBe("L6");
+    for (const e of extractors) {
+      if (!l6.includes(e.language)) expect(e.level).toBe("L5");
+    }
   });
 
   it("resolves initExtractors", async () => {
