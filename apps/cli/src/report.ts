@@ -8,7 +8,7 @@ import type { FileChanges } from "@ossl-dev/differens-correlate";
 import type { GitDiffInput as FilePair } from "@ossl-dev/differens-git";
 import { formatChanges, humanizeKind, summarize } from "@ossl-dev/differens-narrate";
 import type { OutputFormat } from "@ossl-dev/differens-narrate";
-import { diffWithWorkers } from "./pool";
+import { diffFilePairsStream, diffWithWorkers } from "./pool";
 
 /**
  * Diff a set of file pairs and print the result.
@@ -24,6 +24,11 @@ export async function report(
 ): Promise<void> {
   if (filePairs.length === 0) {
     console.log(emptyMessage);
+    return;
+  }
+
+  if (format === "ndjson") {
+    await reportNdjson(filePairs);
     return;
   }
 
@@ -98,4 +103,41 @@ export async function report(
   }
 
   console.log(`\n${summarize(allNarratives)}`);
+}
+
+/**
+ * Newline-delimited JSON: one self-contained object per file, printed the
+ * moment that file's diff finishes, so a long changeset streams instead of
+ * buffering. Cross-file moves need the whole set, so they trail as one final
+ * object with a `crossFileMoves` key when any exist.
+ */
+async function reportNdjson(filePairs: FilePair[]): Promise<void> {
+  const allFileChanges: FileChanges[] = [];
+  for await (const result of diffFilePairsStream(filePairs)) {
+    console.log(
+      JSON.stringify({
+        filePath: result.filePath,
+        changes: result.descriptions.map((description, i) => ({
+          description,
+          action: result.actions[i],
+        })),
+      }),
+    );
+    allFileChanges.push({ filePath: result.filePath, actions: result.actions });
+  }
+
+  const crossFile = correlate(allFileChanges);
+  if (crossFile.moves.length > 0) {
+    console.log(
+      JSON.stringify({
+        crossFileMoves: crossFile.moves.map((m) => ({
+          kind: m.node.kind,
+          name: m.node.label ?? "unnamed",
+          fromFile: m.fromFile,
+          toFile: m.toFile,
+          modified: m.modified,
+        })),
+      }),
+    );
+  }
 }

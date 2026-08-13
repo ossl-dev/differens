@@ -1,6 +1,13 @@
 import { describe, expect, it } from "bun:test";
 import { Readable } from "node:stream";
-import { WORKER_FLAG, diffInline, diffWithWorkers, runWorker, selfInvocation } from "./pool";
+import {
+  WORKER_FLAG,
+  diffFilePairsStream,
+  diffInline,
+  diffWithWorkers,
+  runWorker,
+  selfInvocation,
+} from "./pool";
 
 // diffWithWorkers re-invokes process.argv[1] as the worker entry. Under the
 // test runner that is this file, so when the flag is present this module IS
@@ -128,5 +135,46 @@ describe("runWorker", () => {
     expect(replies[0].index).toBe(0);
     expect(replies[0].filePath).toBe("a.ts");
     expect(replies[0].descriptions[0]).toContain("changed");
+  });
+});
+
+describe("diffFilePairsStream", () => {
+  it("yields inline diffs in input order below the worker threshold", async () => {
+    const pairs = [
+      { oldPath: "a.ts", newPath: "a.ts", oldSource: OLD, newSource: NEW },
+      { oldPath: "b.ts", newPath: "b.ts", oldSource: OLD, newSource: NEW },
+    ];
+    const out: string[] = [];
+    for await (const result of diffFilePairsStream(pairs)) out.push(result.filePath);
+    expect(out).toEqual(["a.ts", "b.ts"]);
+  });
+
+  it("yields worker-pool results in input order", async () => {
+    // 25 parseable files crosses the worker threshold; children are spawned
+    // via the WORKER_FLAG guard at the top of this file.
+    const pairs = Array.from({ length: 25 }, (_, i) => ({
+      oldPath: `src/f${i}.ts`,
+      newPath: `src/f${i}.ts`,
+      oldSource: `export function f${i}(): number { return 1; }\n`,
+      newSource: `export function f${i}(): number { return 2; }\n`,
+    }));
+    const out: string[] = [];
+    for await (const result of diffFilePairsStream(pairs)) out.push(result.filePath);
+    expect(out).toEqual(pairs.map((p) => p.oldPath));
+  });
+
+  it("reports each diff under the same path as the batch API", async () => {
+    const pairs = Array.from({ length: 25 }, (_, i) => ({
+      oldPath: `src/f${i}.ts`,
+      newPath: `src/f${i}.ts`,
+      oldSource: `export function f${i}(): number { return 1; }\n`,
+      newSource: `export function f${i}(): number { return 2; }\n`,
+    }));
+    const streamed: Record<string, number> = {};
+    for await (const result of diffFilePairsStream(pairs)) {
+      streamed[result.filePath] = result.actions.length;
+    }
+    const batch = await diffWithWorkers(pairs);
+    for (const r of batch) expect(streamed[r.filePath]).toBe(r.actions.length);
   });
 });

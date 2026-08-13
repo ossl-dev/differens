@@ -284,3 +284,40 @@ describe("CLI: install-git-driver", () => {
     expect(attrs).toContain("*.ts diff=differens");
   });
 });
+
+describe("CLI: ndjson streaming output", () => {
+  it("prints one JSON object per changed file", () => {
+    write("a.ts", "export const a = 1;\n");
+    write("b.ts", "export const b = 1;\n");
+    commit();
+    write("a.ts", "export const a = 2;\n");
+    write("b.ts", "export const b = 2;\n");
+    const { stdout, status } = runCli(["--format=ndjson"]);
+    expect(status).toBe(0);
+    const lines = stdout.trim().split("\n");
+    expect(lines).toHaveLength(2);
+    const docs = lines.map((l) => JSON.parse(l));
+    expect(docs.map((d) => d.filePath).sort()).toEqual(["a.ts", "b.ts"]);
+    for (const doc of docs) expect(Array.isArray(doc.changes)).toBe(true);
+  });
+
+  it("appends a crossFileMoves trailer when a move spans files", () => {
+    write(
+      "utils.ts",
+      "function validate(input: string): boolean { return !!input; }\nexport const keep = 1;\n",
+    );
+    write("validators.ts", "export const v = 1;\n");
+    commit("first");
+    write("utils.ts", "export const keep = 1;\n");
+    write(
+      "validators.ts",
+      "export const v = 1;\nfunction validate(input: string): boolean { return !!input; }\n",
+    );
+    commit("second");
+    const { stdout } = runCli(["HEAD~1", "HEAD", "--format=ndjson"]);
+    const lines = stdout.trim().split("\n");
+    const trailer = JSON.parse(lines[lines.length - 1]!);
+    expect(trailer.crossFileMoves).toBeDefined();
+    expect(trailer.crossFileMoves.some((m: { name: string }) => m.name === "validate")).toBe(true);
+  });
+});

@@ -137,6 +137,58 @@ export async function diffWithWorkers(filePairs: FilePair[]): Promise<FileDiff[]
   return results as FileDiff[];
 }
 
+/**
+ * Stream per-file diffs as they finish, always in input order.
+ *
+ * A long changeset should start printing before the last file is diffed, so
+ * the ndjson format reads from this instead of the batch API. Each index gets
+ * a promise its chunk runner resolves the moment the reply lands; the
+ * generator awaits them in order, so output order is deterministic while
+ * completion stays as early as possible.
+ */
+export async function* diffFilePairsStream(filePairs: FilePair[]): AsyncGenerator<FileDiff> {
+  const parseable = filePairs.filter((p) => isParseable(p.oldPath)).length;
+
+  if (parseable < WORKER_THRESHOLD) {
+    for (let i = 0; i < filePairs.length; i++) yield diffInline(filePairs[i]!);
+    return;
+  }
+
+  const poolSize = Math.max(2, Math.min(8, availableParallelism()));
+  const chunks: WorkerJob[][] = Array.from({ length: poolSize }, () => []);
+  for (let i = 0; i < filePairs.length; i++) {
+    chunks[i % poolSize]!.push({ index: i, pair: filePairs[i]! });
+  }
+
+  const pending = filePairs.map(() => {
+    let resolve!: (r: FileDiff) => void;
+    const promise = new Promise<FileDiff>((res) => (resolve = res));
+    return { promise, resolve };
+  });
+
+  const runs = chunks.map(async (chunk) => {
+    if (chunk.length === 0) return;
+    try {
+      for (const reply of await runChild(chunk)) {
+        pending[reply.index]!.resolve({
+          actions: reply.actions,
+          descriptions: reply.descriptions,
+          filePath: reply.filePath,
+        });
+      }
+    } catch {
+      // A child that dies loses its slice; finish it on the main thread
+      // rather than dropping those files from the report.
+      console.error("note: a diff worker failed, finishing on the main thread");
+      for (const job of chunk) pending[job.index]!.resolve(diffInline(job.pair));
+    }
+  });
+  const settled = Promise.allSettled(runs);
+
+  for (let i = 0; i < filePairs.length; i++) yield await pending[i]!.promise;
+  await settled;
+}
+
 interface WorkerJob {
   index: number;
   pair: FilePair;
