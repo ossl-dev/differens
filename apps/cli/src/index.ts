@@ -14,7 +14,7 @@
 import { createRequire } from "node:module";
 import {
   DRIVER_FLAG,
-  diffCommitRange,
+  diffCommitRangeStream,
   diffDirectories,
   diffDriverCommand,
   diffWorkingTree,
@@ -102,9 +102,9 @@ async function handleDiff(args: string[], defaultFormat: OutputFormat = "termina
 
   if (nonFlagArgs.length === 0) {
     // Git mode: diff working tree vs HEAD
-    await handleGitDiff(format);
+    await handleGitDiff(format, args.includes("--all"));
   } else if (nonFlagArgs.length === 1 && nonFlagArgs[0]!.includes("..")) {
-    await handleRangeDiff(nonFlagArgs[0]!, format);
+    await handleRangeDiff(nonFlagArgs[0]!, format, args.includes("--all"));
   } else if (nonFlagArgs.length === 2) {
     const [oldArg, newArg] = nonFlagArgs as [string, string];
 
@@ -115,6 +115,7 @@ async function handleDiff(args: string[], defaultFormat: OutputFormat = "termina
         await diffDirectories(oldArg, newArg),
         format,
         `${oldArg} and ${newArg} are identical`,
+        { all: args.includes("--all") },
       );
       return;
     }
@@ -127,7 +128,7 @@ async function handleDiff(args: string[], defaultFormat: OutputFormat = "termina
     if (await isGitRepo()) {
       const [oldSha, newSha] = await Promise.all([resolveRef(oldArg), resolveRef(newArg)]);
       if (oldSha && newSha) {
-        await handleRangeDiff(`${oldSha}..${newSha}`, format);
+        await handleRangeDiff(`${oldSha}..${newSha}`, format, args.includes("--all"));
         return;
       }
     }
@@ -138,7 +139,7 @@ async function handleDiff(args: string[], defaultFormat: OutputFormat = "termina
   }
 }
 
-async function handleGitDiff(format: OutputFormat): Promise<void> {
+async function handleGitDiff(format: OutputFormat, all = false): Promise<void> {
   const inGit = await isGitRepo();
   if (!inGit) {
     console.error("not in a git repository");
@@ -146,11 +147,11 @@ async function handleGitDiff(format: OutputFormat): Promise<void> {
     process.exit(1);
   }
 
-  await report(await diffWorkingTree(), format, "nothing changed");
+  await report(await diffWorkingTree(), format, "nothing changed", { all });
 }
 
-async function handleRangeDiff(range: string, format: OutputFormat): Promise<void> {
-  await report(await diffCommitRange(range), format, `nothing changed in range: ${range}`);
+async function handleRangeDiff(range: string, format: OutputFormat, all = false): Promise<void> {
+  await report(diffCommitRangeStream(range), format, `nothing changed in range: ${range}`, { all });
 }
 
 async function handleFileDiff(
@@ -160,7 +161,7 @@ async function handleFileDiff(
 ): Promise<void> {
   const pair = await readFilePair(oldPath, newPath);
 
-  const result = diffWithTier(pair.oldSource, pair.newSource, pair.oldPath, pair.newPath);
+  const result = diffWithTier(pair.oldSource, pair.newSource, pair.oldPath, pair.newPath, pair);
 
   if (result.fallback) {
     console.error(`note: fell back to ${result.fallback} diff`);
@@ -252,6 +253,7 @@ usage:
 
 options:
   --format=json|markdown|llm|ndjson   output format (default: terminal)
+  --all                                show every file in large comparisons
   --help, -h                           show this help
   --version, -v                        show version number
 

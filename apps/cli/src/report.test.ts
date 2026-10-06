@@ -47,6 +47,38 @@ afterEach(() => {
 });
 
 describe("report", () => {
+  it("uses an overview for a large changeset and lets --all expose each file", async () => {
+    const inputs = Array.from({ length: 30 }, (_, i) =>
+      pair(`billing/file${i}.ts`, `billing/file${i}.ts`, "", `export const value${i} = ${i};`),
+    );
+    await report(inputs, "terminal", "nope");
+    expect(logs.join("\n")).toContain("30 files with logical changes: 30 added");
+    expect(logs.join("\n")).not.toContain("value29");
+    logs.length = 0;
+    await report(inputs, "terminal", "nope", { all: true });
+    expect(logs.join("\n")).toContain("added file `billing/file29.ts`");
+    expect(logs.join("\n")).not.toContain("Selected changes");
+  });
+
+  it("accepts streamed file pairs and reports every batch", async () => {
+    async function* inputs() {
+      for (let i = 0; i < 50; i++)
+        yield pair(`a${i}.ts`, `a${i}.ts`, "const x = 1;", "const x = 2;");
+    }
+    await report(inputs(), "json", "nope");
+    const output = JSON.parse(logs[0]!);
+    expect(output.perFile).toHaveLength(50);
+    expect(output.perFile[49].filePath).toBe("a49.ts");
+  });
+
+  it("does not call a cross-file move unchanged or repeat its add/remove facts", async () => {
+    await report(moveChangeset(), "terminal", "nope");
+    const output = logs.join("\n");
+    expect(output).not.toContain("no logical changes");
+    expect(output).not.toContain("added function `validate`");
+    expect(output).not.toContain("removed function `validate`");
+  });
+
   it("prints the empty message when there are no pairs", async () => {
     await report([], "terminal", "nothing changed");
     expect(logs).toEqual(["nothing changed"]);
@@ -55,6 +87,15 @@ describe("report", () => {
   it("prints a terminal report with a summary line", async () => {
     await report([pair("a.ts", "a.ts", "const x = 1;\n", "const x = 2;\n")], "terminal", "nope");
     expect(logs.some((l) => l.includes("changed"))).toBe(true);
+    expect(logs.at(-1)).toContain("1 modification");
+  });
+
+  it("counts one modified function rather than every changed literal", async () => {
+    const source = (offset: number) =>
+      `function values(){ return [${Array.from({ length: 100 }, (_, i) => i + offset).join(",")}]; }`;
+    await report([pair("a.ts", "a.ts", source(0), source(100))], "terminal", "nope");
+    expect(logs[0]).toContain("function `values`");
+    expect(logs[0]!.split("\n")).toHaveLength(1);
     expect(logs.at(-1)).toContain("1 modification");
   });
 

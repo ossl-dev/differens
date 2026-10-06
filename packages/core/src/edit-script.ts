@@ -3,7 +3,7 @@
  */
 
 import type { EditAction, NodeContext } from "./actions";
-import { type Matching, type TreeIndex, lo } from "./match";
+import type { Matching, TreeIndex } from "./match";
 
 export function generateEditScript(
   oldIdx: TreeIndex,
@@ -100,10 +100,15 @@ export function generateEditScript(
 
   // Deletes and inserts are both subtree-absorbing: one action for a removed
   // or added function, not one per token inside it.
+  const removed = new Uint8Array(oldIdx.n);
   for (let i = oldIdx.n - 1; i >= 0; i--) {
-    if (m.oldToNew[i]! >= 0) continue;
     const p = oldIdx.parent[i]!;
-    if (p >= 0 && m.oldToNew[p]! < 0) continue; // covered by an ancestor's Delete
+    if (p >= 0 && removed[p]) {
+      removed[i] = 1;
+      continue;
+    }
+    if (m.oldToNew[i]! >= 0) continue;
+    removed[i] = 1;
     deletes.push({
       type: "Delete",
       node: oldIdx.nodes[i]!,
@@ -115,7 +120,6 @@ export function generateEditScript(
   // before its children and `covered` is always known by the time it is read.
   const covered = new Uint8Array(newIdx.n);
   for (let j = newIdx.n - 1; j >= 0; j--) {
-    if (m.newToOld[j]! >= 0) continue;
     const p = newIdx.parent[j]!;
     // An unmatched root has no parent to be inserted into, so it is not
     // emitted -- and therefore does not cover its children either.
@@ -124,6 +128,7 @@ export function generateEditScript(
       covered[j] = 1;
       continue;
     }
+    if (m.newToOld[j]! >= 0) continue;
     covered[j] = 1;
     inserts.push({
       type: "Insert",

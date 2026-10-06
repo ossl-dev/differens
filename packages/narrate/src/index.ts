@@ -7,7 +7,9 @@
  * @packageDocumentation
  */
 
-import type { EditAction, SemanticChange, UpdateAction } from "@ossl-dev/differens-core";
+import type { EditAction, SemanticChange } from "@ossl-dev/differens-core";
+import { readableChanges } from "./readable";
+export { readableChanges } from "./readable";
 
 /** `call_expression` / `CallExpression` -> `call expression`. */
 export function humanizeKind(kind: string): string {
@@ -19,6 +21,8 @@ export function humanizeKind(kind: string): string {
 
 export interface NarrationOptions {
   filePath?: string;
+  /** Count grouped semantic entries rather than raw syntax actions. */
+  compact?: boolean;
 }
 
 /**
@@ -48,7 +52,7 @@ function preview(value: string | undefined, max: number): string | undefined {
  * nothing and dominated the output on real files.
  */
 function subject(kind: string, node: { label?: string; value?: string }): string {
-  const name = node.label ?? preview(node.value, 40);
+  const name = preview(node.label, 100) ?? preview(node.value, 40);
   return name ? `${kind} \`${name}\`` : kind;
 }
 
@@ -106,33 +110,30 @@ export function narrate(actions: EditAction[], opts: NarrationOptions = {}): Sem
   }));
 }
 
-/**
- * Collapse Updates that describe the same edit twice.
- *
- * Renaming a function relabels the function node *and* changes the value of
- * its name identifier, so the raw edit script reports `parseConfig ->
- * loadConfig` twice. Renaming a variable used five times reports it five
- * times. Keyed on the from/to pair, preferring the named node, because that
- * is the one that carries the useful sentence.
- */
+/** Only the name token inside a renamed declaration is redundant. */
 function dropRedundantUpdates(actions: EditAction[]): EditAction[] {
-  const winner = new Map<string, number>();
-  for (let i = 0; i < actions.length; i++) {
-    const action = actions[i]!;
-    if (action.type !== "Update") continue;
-    const key = `${action.detail.from ?? ""}\0${action.detail.to ?? ""}`;
-    const held = winner.get(key);
-    if (held === undefined) {
-      winner.set(key, i);
+  const renames = new Map<string, EditAction[]>();
+  for (const action of actions) {
+    if (action.type !== "Update" || action.detail.kind !== "Renamed" || !action.node.label)
       continue;
-    }
-    const heldAction = actions[held] as UpdateAction;
-    if (!heldAction.node.label && action.node.label) winner.set(key, i);
+    const key = JSON.stringify([action.detail.from, action.detail.to]);
+    const group = renames.get(key) ?? [];
+    group.push(action);
+    renames.set(key, group);
   }
-  if (winner.size === 0) return actions;
-
-  const keep = new Set(winner.values());
-  return actions.filter((action, i) => action.type !== "Update" || keep.has(i));
+  if (renames.size === 0) return actions;
+  return actions.filter((action) => {
+    if (action.type !== "Update" || action.node.label || action.node.kind !== "identifier")
+      return true;
+    const group = renames.get(JSON.stringify([action.detail.from, action.detail.to]));
+    return !group?.some(({ node }) => {
+      const name = node.children.find(
+        (child) => child.kind === "identifier" && child.value === node.label,
+      );
+      const range = name?.byteRange ?? (node.children.length === 0 ? node.byteRange : undefined);
+      return range?.[0] === action.node.byteRange[0] && range?.[1] === action.node.byteRange[1];
+    });
+  });
 }
 
 /**
@@ -143,7 +144,7 @@ export function summarize(changes: SemanticChange[], opts: NarrationOptions = {}
   if (changes.length === 0) return "no logical changes";
 
   const counts: Record<string, number> = {};
-  for (const c of changes) {
+  for (const c of opts.compact ? readableChanges(changes, Number.POSITIVE_INFINITY) : changes) {
     const type = c.action.type;
     counts[type] = (counts[type] ?? 0) + 1;
   }
@@ -169,6 +170,7 @@ export interface FormatterOptions {
  * Format a list of semantic changes for output.
  */
 export function formatChanges(changes: SemanticChange[], opts: FormatterOptions): string {
+  const readable = () => readableChanges(changes);
   switch (opts.format) {
     case "json":
       return JSON.stringify(
@@ -182,10 +184,11 @@ export function formatChanges(changes: SemanticChange[], opts: FormatterOptions)
 
     case "markdown": {
       if (changes.length === 0) return "_no logical changes_";
-      const groups = groupByFile(changes);
+      const presented = readable();
+      const groups = groupByFile(presented);
       if (groups.length === 1 && !groups[0]![0]) {
         const header = opts.filePath ? `## ${opts.filePath}\n\n` : "## Changes\n\n";
-        return header + changes.map((c) => `- ${c.description}`).join("\n");
+        return header + presented.map((c) => `- ${c.description}`).join("\n");
       }
       return groups
         .map(
@@ -197,11 +200,12 @@ export function formatChanges(changes: SemanticChange[], opts: FormatterOptions)
 
     default: {
       if (changes.length === 0) return "no logical changes";
-      const groups = groupByFile(changes);
+      const presented = readable();
+      const groups = groupByFile(presented);
       const line = (c: SemanticChange): string => `  ${iconForAction(c.action)} ${c.description}`;
       // A single file needs no heading; a changeset that spans files is
       // unreadable without one, since the descriptions never name the file.
-      if (groups.length === 1) return changes.map(line).join("\n");
+      if (groups.length === 1) return presented.map(line).join("\n");
       return groups
         .map(([file, group]) => `${file ?? "(unknown file)"}\n${group.map(line).join("\n")}`)
         .join("\n\n");
@@ -247,7 +251,10 @@ const LLM_OP: Record<EditAction["type"], string> = {
 function formatForLlm(changes: SemanticChange[]): string {
   const out: string[] = [];
   const groups = groupByFile(changes);
-  const named = changes.filter((c) => !isMinor(c.action)).length;
+  const named = groups.reduce(
+    (n, [, group]) => n + readableChanges(group.filter((c) => !isMinor(c.action))).length,
+    0,
+  );
 
   out.push(`differens/1 ${groups.length} files ${changes.length} changes ${named} named`);
 
@@ -259,9 +266,16 @@ function formatForLlm(changes: SemanticChange[]): string {
       if (isMinor(action)) {
         const kind = humanizeKind(action.node.kind);
         minor.set(kind, (minor.get(kind) ?? 0) + 1);
-        continue;
       }
-      out.push(llmLine(action));
+    }
+    for (const change of readableChanges(group.filter((c) => !isMinor(c.action)))) {
+      const { action, description } = change;
+      if (description !== narrateAction(action) && action.node.kind !== "file") {
+        const at = action.node.line ? ` :${action.node.line}` : "";
+        out.push(`${LLM_OP[action.type]} ${description.replace(/`/g, "")}${at}`);
+      } else {
+        out.push(llmLine(action));
+      }
     }
 
     if (minor.size > 0) {

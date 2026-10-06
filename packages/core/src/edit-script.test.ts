@@ -141,10 +141,10 @@ describe("generateEditScript: inserts and deletes", () => {
     const a = tree("root", []);
     const b = tree("root", [tree("fn", [leaf("body", "x"), leaf("num", "1")], "x")]);
     const changes = diffTrees(a, b).changes;
-    // The emptied old root is one Delete; the added fn is one Insert.
-    expect(changes).toHaveLength(2);
+    // The document survives; the added fn is one Insert.
+    expect(changes).toHaveLength(1);
     expect(changes.filter((c) => c.type === "Insert")).toHaveLength(1);
-    expect(changes.filter((c) => c.type === "Delete")).toHaveLength(1);
+    expect(changes.filter((c) => c.type === "Delete")).toHaveLength(0);
     const insert = changes.find((c) => c.type === "Insert");
     expect(insert!.node.label).toBe("x");
   });

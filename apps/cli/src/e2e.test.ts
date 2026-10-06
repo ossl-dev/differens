@@ -223,7 +223,7 @@ describe("CLI: worker pool on large changesets", () => {
       write(`src/f${i}.ts`, `export function f${i}(): number { return ${i + 1}; }\n`);
     const { stdout, status } = runCli([]);
     expect(status).toBe(0);
-    expect(stdout).toContain("30 modifications");
+    expect(stdout).toContain("30 files with logical changes: 30 modified");
   });
 });
 

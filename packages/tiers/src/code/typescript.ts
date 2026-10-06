@@ -18,6 +18,7 @@ const CONCEPT_MAP: Record<string, string> = {
   interface_declaration: "Interface",
   type_alias_declaration: "TypeDef",
   enum_declaration: "Enum",
+  variable_declarator: "Variable",
   variable_declaration: "Variable",
   lexical_declaration: "Variable",
   import_statement: "Import",
@@ -84,7 +85,7 @@ const CONCEPT_MAP: Record<string, string> = {
 
 export class TypeScriptExtractor implements LanguageExtractor {
   readonly language = "typescript";
-  readonly extensions = ["js", "mjs", "cjs", "jsx", "ts", "tsx"];
+  readonly extensions = ["js", "mjs", "cjs", "jsx", "ts", "mts", "cts", "tsx"];
   readonly labelFallbackTypes = new Set(["variable_declaration", "lexical_declaration"]);
 
   extractConcept(nodeType: string): string {

@@ -38,6 +38,9 @@ export interface GitDiffInput {
   oldSource: string;
   /** New file content */
   newSource: string;
+  /** File presence is independent of content: an empty file still exists. */
+  oldExists?: boolean;
+  newExists?: boolean;
 }
 
 /**
@@ -99,13 +102,10 @@ export async function resolveRef(ref: string): Promise<string | null> {
 export async function getChangedFiles(): Promise<string[]> {
   try {
     const [changed, untracked] = await Promise.all([
-      git(["diff", "HEAD", "--name-only"]),
-      git(["ls-files", "--others", "--exclude-standard"]),
+      git(["diff", "HEAD", "--name-only", "-z"]),
+      git(["ls-files", "--others", "--exclude-standard", "-z"]),
     ]);
-    return [
-      ...changed.toString().trim().split("\n"),
-      ...untracked.toString().trim().split("\n"),
-    ].filter(Boolean);
+    return [...changed.toString().split("\0"), ...untracked.toString().split("\0")].filter(Boolean);
   } catch {
     return [];
   }
@@ -137,12 +137,12 @@ export async function getWorkingTreeContent(filePath: string): Promise<string> {
  * warm cache cost more than the diff itself. One batch process streams them
  * all. Specs that do not exist at that ref come back as empty strings.
  */
-async function readBlobs(specs: string[]): Promise<string[]> {
+async function readBlobs(specs: string[]): Promise<{ source: string; exists: boolean }[]> {
   if (specs.length === 0) return [];
 
   const out = await git(["cat-file", "--batch"], `${specs.join("\n")}\n`);
   const decoder = new TextDecoder();
-  const results: string[] = [];
+  const results: { source: string; exists: boolean }[] = [];
   let pos = 0;
 
   for (let i = 0; i < specs.length; i++) {
@@ -153,16 +153,16 @@ async function readBlobs(specs: string[]): Promise<string[]> {
     const parts = header.split(" ");
     const size = parts.length >= 3 ? Number.parseInt(parts[2]!, 10) : Number.NaN;
     if (!Number.isFinite(size)) {
-      results.push("");
+      results.push({ source: "", exists: false });
       pos = nl + 1;
       continue;
     }
     const start = nl + 1;
-    results.push(decoder.decode(out.subarray(start, start + size)));
+    results.push({ source: decoder.decode(out.subarray(start, start + size)), exists: true });
     pos = start + size + 1; // trailing newline that git appends per record
   }
 
-  while (results.length < specs.length) results.push("");
+  while (results.length < specs.length) results.push({ source: "", exists: false });
   return results;
 }
 
@@ -177,45 +177,69 @@ export async function diffWorkingTree(): Promise<GitDiffInput[]> {
   // One batch process for every HEAD blob, working-tree reads in parallel.
   const [oldSources, newSources] = await Promise.all([
     readBlobs(changedFiles.map((f) => `HEAD:${f}`)),
-    mapWithConcurrency(changedFiles, 16, (f) => getWorkingTreeContent(f)),
+    mapWithConcurrency(changedFiles, 16, async (f) => {
+      try {
+        return { source: await readFile(f, "utf8"), exists: true };
+      } catch {
+        return { source: "", exists: false };
+      }
+    }),
   ]);
 
   return changedFiles.map((filePath, i) => ({
     oldPath: filePath,
     newPath: filePath,
-    oldSource: oldSources[i] ?? "",
-    newSource: newSources[i] ?? "",
+    oldSource: oldSources[i]?.source ?? "",
+    newSource: newSources[i]?.source ?? "",
+    oldExists: oldSources[i]?.exists ?? false,
+    newExists: newSources[i]?.exists ?? false,
   }));
 }
 
-/**
- * Diff a commit range (e.g., "main..feature").
- * Shells out to git diff-tree to get changed files between two refs.
- */
+/** Diff a commit range as an array, retained for library callers. */
 export async function diffCommitRange(range: string): Promise<GitDiffInput[]> {
+  const pairs: GitDiffInput[] = [];
+  for await (const pair of diffCommitRangeStream(range)) pairs.push(pair);
+  return pairs;
+}
+
+export async function* diffCommitRangeStream(range: string): AsyncGenerator<GitDiffInput> {
   const parts = range.split("..");
   if (parts.length !== 2) throw new Error(`invalid range: ${range}`);
 
   const [oldRef, newRef] = parts as [string, string];
 
   try {
-    // -z keeps paths with spaces, quotes or non-ASCII bytes intact; the
-    // default output quotes and escapes them, which then fails to resolve.
-    const nameResult = await git(["diff", "--name-only", "-z", oldRef, newRef]);
-    const files = nameResult.toString().split("\0").filter(Boolean);
-    if (files.length === 0) return [];
-
-    const [oldSources, newSources] = await Promise.all([
-      readBlobs(files.map((f) => `${oldRef}:${f}`)),
-      readBlobs(files.map((f) => `${newRef}:${f}`)),
-    ]);
-
-    return files.map((filePath, i) => ({
-      oldPath: filePath,
-      newPath: filePath,
-      oldSource: oldSources[i] ?? "",
-      newSource: newSources[i] ?? "",
-    }));
+    const fields = (
+      await git(["diff", "--name-status", "--find-renames", "-z", oldRef, newRef, "--"])
+    )
+      .toString()
+      .split("\0");
+    const paths: { oldPath: string; newPath: string; oldExists: boolean; newExists: boolean }[] =
+      [];
+    for (let i = 0; i < fields.length && fields[i]; ) {
+      const status = fields[i++]!;
+      const oldPath = fields[i++]!;
+      const renamed = status.startsWith("R") || status.startsWith("C");
+      const newPath = renamed ? fields[i++]! : oldPath;
+      paths.push({ oldPath, newPath, oldExists: status !== "A", newExists: status !== "D" });
+    }
+    if (paths.length === 0) return;
+    // Bound blob buffering and decoding to one batch on each side.
+    for (let start = 0; start < paths.length; start += 24) {
+      const batch = paths.slice(start, start + 24);
+      const [oldSources, newSources] = await Promise.all([
+        readBlobs(batch.map((p) => `${oldRef}:${p.oldPath}`)),
+        readBlobs(batch.map((p) => `${newRef}:${p.newPath}`)),
+      ]);
+      for (let i = 0; i < batch.length; i++) {
+        yield {
+          ...batch[i]!,
+          oldSource: oldSources[i]?.source ?? "",
+          newSource: newSources[i]?.source ?? "",
+        };
+      }
+    }
   } catch (err) {
     throw new Error(
       `failed to diff range ${range}: ${err instanceof Error ? err.message : String(err)}`,
@@ -382,6 +406,8 @@ export async function diffDirectories(oldDir: string, newDir: string): Promise<G
   return mapWithConcurrency(paths, 32, async (rel) => ({
     oldPath: rel,
     newPath: rel,
+    oldExists: oldSet.has(rel),
+    newExists: newSet.has(rel),
     oldSource: oldSet.has(rel) ? await readMaybe(join(oldDir, rel)) : "",
     newSource: newSet.has(rel) ? await readMaybe(join(newDir, rel)) : "",
   }));
@@ -412,5 +438,5 @@ export async function readFilePair(oldPath: string, newPath: string): Promise<Gi
     throw new Error(`cannot read file: ${newPath}`);
   }
 
-  return { oldPath, newPath, oldSource, newSource };
+  return { oldPath, newPath, oldSource, newSource, oldExists: true, newExists: true };
 }

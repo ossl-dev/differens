@@ -136,6 +136,10 @@ export function topDownMatch(
         const oldNode = oldIdx.nodes[i]!;
         const candidates = byHash.get(oldNode.contentHash);
         if (!candidates) continue;
+        // Repeated tiny fragments offer no trustworthy global identity. Let
+        // leaf recovery align them inside their matched parents instead of
+        // scanning a quadratic bucket of identical literals or tokens.
+        if (h < opts.minHeight && candidates.length > MAX_ALIGN) continue;
 
         let best = -1;
         let bestScore = Number.NEGATIVE_INFINITY;
@@ -251,6 +255,31 @@ function linkSubtree(
  * compared against the handful of places its contents actually went.
  */
 const MAX_CANDIDATES = 4;
+
+/** A surviving declaration keeps its identity when its body is extracted. */
+export function matchNamedContainers(oldIdx: TreeIndex, newIdx: TreeIndex, m: Matching): void {
+  const key = (idx: TreeIndex, i: number): string => {
+    const path: string[] = [];
+    for (let p = i; p >= 0; p = idx.parent[p]!) {
+      const node = idx.nodes[p]!;
+      if (node.label) path.push(JSON.stringify([node.kind, node.label]));
+    }
+    return path.join("/");
+  };
+  const candidates = new Map<string, number>();
+  for (let j = 0; j < newIdx.n; j++) {
+    const node = newIdx.nodes[j]!;
+    if (m.newToOld[j]! >= 0 || !node.label || node.children.length === 0) continue;
+    const name = key(newIdx, j);
+    candidates.set(name, candidates.has(name) ? -1 : j);
+  }
+  for (let i = 0; i < oldIdx.n; i++) {
+    const node = oldIdx.nodes[i]!;
+    if (m.oldToNew[i]! >= 0 || !node.label || node.children.length === 0) continue;
+    const j = candidates.get(key(oldIdx, i));
+    if (j !== undefined && j >= 0) m.link(i, j);
+  }
+}
 
 export function bottomUpMatch(
   oldIdx: TreeIndex,
@@ -414,6 +443,15 @@ export function recoverLeaves(oldIdx: TreeIndex, newIdx: TreeIndex, m: Matching)
  */
 export function recoverContainers(oldIdx: TreeIndex, newIdx: TreeIndex, m: Matching): void {
   const byStruct = new Map<number, number[]>();
+  const byParent = new Map<string, number[]>();
+  const byKind = new Map<string, number[]>();
+  const oldKinds = new Map<string, number>();
+  for (let i = 0; i < oldIdx.n; i++) {
+    const node = oldIdx.nodes[i]!;
+    if (node.label || node.children.length === 0) continue;
+    const key = `${oldIdx.parent[i]}:${node.kind}`;
+    oldKinds.set(key, (oldKinds.get(key) ?? 0) + 1);
+  }
   for (let j = 0; j < newIdx.n; j++) {
     if (m.newToOld[j]! >= 0) continue;
     const node = newIdx.nodes[j]!;
@@ -421,13 +459,43 @@ export function recoverContainers(oldIdx: TreeIndex, newIdx: TreeIndex, m: Match
     const list = byStruct.get(node.structureHash);
     if (list) list.push(j);
     else byStruct.set(node.structureHash, [j]);
+    const key = `${newIdx.parent[j]}:${node.structureHash}`;
+    const siblings = byParent.get(key);
+    if (siblings) siblings.push(j);
+    else byParent.set(key, [j]);
+    if (!node.label) {
+      const kindKey = `${newIdx.parent[j]}:${node.kind}`;
+      const kinds = byKind.get(kindKey);
+      if (kinds) kinds.push(j);
+      else byKind.set(kindKey, [j]);
+    }
   }
 
-  for (let i = 0; i < oldIdx.n; i++) {
+  // Parents first: newly paired containers anchor their children's recovery.
+  for (let i = oldIdx.n - 1; i >= 0; i--) {
     if (m.oldToNew[i]! >= 0) continue;
     const node = oldIdx.nodes[i]!;
     if (node.children.length === 0) continue;
-    const candidates = byStruct.get(node.structureHash);
+    const parent = oldIdx.parent[i]!;
+    const partner = parent >= 0 ? m.oldToNew[parent]! : -1;
+    // A unique anonymous body/block is the same container even after its
+    // children change shape. Replacing it would hide every added method.
+    if (
+      partner >= 0 &&
+      node.matchByKind &&
+      !node.label &&
+      oldKinds.get(`${parent}:${node.kind}`) === 1
+    ) {
+      const sameKind = byKind.get(`${partner}:${node.kind}`);
+      if (sameKind?.length === 1 && m.newToOld[sameKind[0]!]! < 0) {
+        m.link(i, sameKind[0]!);
+        continue;
+      }
+    }
+    const candidates =
+      partner >= 0
+        ? byParent.get(`${partner}:${node.structureHash}`)
+        : byStruct.get(node.structureHash);
     if (!candidates) continue;
 
     // Unique and still unclaimed, or the pairing is a guess.

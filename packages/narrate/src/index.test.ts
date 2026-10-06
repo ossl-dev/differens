@@ -177,7 +177,7 @@ describe("formatChanges", () => {
     expect(output).toContain("- renamed");
   });
 
-  it("formats llm output with context chain", () => {
+  it("groups a local variable removal under its enclosing function", () => {
     const changes = narrate(
       [
         {
@@ -196,7 +196,7 @@ describe("formatChanges", () => {
 
     expect(lines[0]).toBe("differens/1 1 files 1 changes 1 named");
     expect(lines[1]).toBe("# src/client.ts");
-    expect(lines[2]).toBe("- variable timeout < function connect");
+    expect(lines[2]).toBe("~ modified function connect (removed variable timeout)");
   });
 
   it("rolls unnamed changes up into a count instead of a line each", () => {
@@ -470,7 +470,7 @@ describe("formatChanges: llm details", () => {
     expect(lines[2]).toBe('~ variable x "" -> ""');
   });
 
-  it("suppresses a scope that repeats the node name", () => {
+  it("groups a local binding that shares its function name", () => {
     const change: SemanticChange = {
       filePath: "a.ts",
       description: "removed",
@@ -481,6 +481,6 @@ describe("formatChanges: llm details", () => {
       },
     };
     const lines = formatChanges([change], { format: "llm" }).split("\n");
-    expect(lines[2]).toBe("- variable f");
+    expect(lines[2]).toBe("~ modified function f (removed variable f)");
   });
 });

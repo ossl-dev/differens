@@ -82,6 +82,18 @@ const LANGUAGES: Record<string, LanguageSpec> = {
     pick: "typescript",
     extractor: () => new TypeScriptExtractor(),
   },
+  mts: {
+    name: "typescript",
+    module: "tree-sitter-typescript",
+    pick: "typescript",
+    extractor: () => new TypeScriptExtractor(),
+  },
+  cts: {
+    name: "typescript",
+    module: "tree-sitter-typescript",
+    pick: "typescript",
+    extractor: () => new TypeScriptExtractor(),
+  },
   tsx: {
     name: "typescript",
     module: "tree-sitter-typescript",
@@ -283,7 +295,14 @@ function warnOnce(message: string): void {
  * It is also iterative, so deeply nested real files (long method chains, big
  * nested literals) cannot overflow the stack mid-parse.
  */
-function cstToNode(tree: Parser.Tree, source: string, extractor?: LanguageExtractor): Node {
+const SYNTAX_DELIMITERS = new Set(["(", ")", "{", "}", "[", "]", ";", ",", "'", '"', "`"]);
+
+function cstToNode(
+  tree: Parser.Tree,
+  source: string,
+  extractor?: LanguageExtractor,
+  maxNodes = Number.POSITIVE_INFINITY,
+): Node {
   interface Frame {
     type: string;
     start: number;
@@ -299,8 +318,11 @@ function cstToNode(tree: Parser.Tree, source: string, extractor?: LanguageExtrac
   const cursor = tree.walk();
   const stack: Frame[] = [];
   let result: Node | undefined;
+  let nodes = 0;
 
   const enter = (): void => {
+    if (Number.isFinite(maxNodes) && cursor.currentDepth > 256)
+      throw new Error("syntax depth exceeds budget");
     // Every extractor's primary label rule is "the child in the name field",
     // so read it off the cursor instead of re-querying it per node.
     if (cursor.currentFieldName === "name" && stack.length > 0) {
@@ -309,7 +331,23 @@ function cstToNode(tree: Parser.Tree, source: string, extractor?: LanguageExtrac
         parent.label = source.slice(cursor.startIndex, cursor.endIndex);
       }
     }
-    if (!cursor.nodeIsNamed) return;
+    if (!cursor.nodeIsNamed) {
+      // Delimiters are represented by the containing syntax node. Operators
+      // and keywords are not: dropping them hid + -> -, const -> let, etc.
+      if (stack.length > 0 && !SYNTAX_DELIMITERS.has(cursor.nodeType)) {
+        if (++nodes > maxNodes) throw new Error("syntax tree exceeds node budget");
+        stack[stack.length - 1]!.kids.push(
+          createNode({
+            kind: "token",
+            value: source.slice(cursor.startIndex, cursor.endIndex),
+            byteRange: [cursor.startIndex, cursor.endIndex],
+            line: cursor.startPosition.row + 1,
+          }),
+        );
+      }
+      return;
+    }
+    if (++nodes > maxNodes) throw new Error("syntax tree exceeds node budget");
     const type = cursor.nodeType;
     stack.push({
       type,
@@ -333,10 +371,15 @@ function cstToNode(tree: Parser.Tree, source: string, extractor?: LanguageExtrac
     const node = createNode({
       kind: extractor ? extractor.extractConcept(frame.type) : frame.type,
       label,
-      value: frame.kids.length === 0 ? source.slice(frame.start, frame.end) : undefined,
+      value:
+        stack.length > 0 && frame.kids.length === 0
+          ? source.slice(frame.start, frame.end)
+          : undefined,
       children: frame.kids,
       byteRange: [frame.start, frame.end],
       line: frame.line,
+      matchByKind:
+        frame.type === "class_body" || frame.type === "statement_block" || frame.type === "block",
     });
     if (stack.length > 0) stack[stack.length - 1]!.kids.push(node);
     else result = node;
@@ -380,24 +423,34 @@ export function hasGrammar(extension: string): boolean {
  * process from pinning one tree per file it has ever seen.
  */
 const PARSE_CACHE_CAP = 64;
-const parseCache = new Map<string, Node>();
+const parseCache = new Map<string, { tree: Node; nodes: number; source: string }>();
+const CACHE_NODE_LIMIT = 50_000;
+let cachedNodes = 0;
+let cachedChars = 0;
+const CACHE_CHAR_LIMIT = 2_000_000;
 let cacheHits = 0;
 let cacheMisses = 0;
 
 /** Test hook: empty the parse cache and reset the counters. */
 export function resetParseCacheForTest(): void {
   parseCache.clear();
+  cachedNodes = 0;
+  cachedChars = 0;
   cacheHits = 0;
   cacheMisses = 0;
 }
 
 /** Test hook: parse-cache counters. */
-export function parseCacheStats(): { hits: number; misses: number; size: number } {
-  return { hits: cacheHits, misses: cacheMisses, size: parseCache.size };
+export function parseCacheStats(): { hits: number; misses: number; size: number; nodes: number } {
+  return { hits: cacheHits, misses: cacheMisses, size: parseCache.size, nodes: cachedNodes };
 }
 
 /** Parse source code into a Node tree */
-export function parseCode(source: string, extension: string): Node {
+export function parseCode(
+  source: string,
+  extension: string,
+  maxNodes = Number.POSITIVE_INFINITY,
+): Node {
   const lang = loadLanguage(extension);
   if (!lang) {
     // No grammar for this extension  --  wrap as a raw file node
@@ -418,18 +471,43 @@ export function parseCode(source: string, extension: string): Node {
 
   const key = `${hashText(source)}:${extension}`;
   const cached = parseCache.get(key);
-  if (cached !== undefined) {
+  if (cached !== undefined && cached.source === source) {
+    if (cached.nodes > maxNodes) throw new Error("syntax tree exceeds node budget");
     cacheHits++;
     parseCache.delete(key); // refresh LRU position
     parseCache.set(key, cached);
-    return cached;
+    return cached.tree;
   }
   cacheMisses++;
 
-  const tree = cstToNode(lang.parser.parse(source), source, lang.extractor);
-  parseCache.set(key, tree);
-  if (parseCache.size > PARSE_CACHE_CAP) {
-    parseCache.delete(parseCache.keys().next().value!);
+  const tree = cstToNode(lang.parser.parse(source), source, lang.extractor, maxNodes);
+  let nodes = 0;
+  const stack = [tree];
+  while (stack.length) {
+    const node = stack.pop()!;
+    nodes++;
+    for (const child of node.children) stack.push(child);
+  }
+  if (nodes <= CACHE_NODE_LIMIT && source.length <= CACHE_CHAR_LIMIT) {
+    if (cached) {
+      cachedNodes -= cached.nodes;
+      cachedChars -= cached.source.length;
+      parseCache.delete(key);
+    }
+    while (
+      parseCache.size > 0 &&
+      (cachedNodes + nodes > CACHE_NODE_LIMIT ||
+        cachedChars + source.length > CACHE_CHAR_LIMIT ||
+        parseCache.size >= PARSE_CACHE_CAP)
+    ) {
+      const oldest = parseCache.keys().next().value!;
+      cachedNodes -= parseCache.get(oldest)!.nodes;
+      cachedChars -= parseCache.get(oldest)!.source.length;
+      parseCache.delete(oldest);
+    }
+    parseCache.set(key, { tree, nodes, source });
+    cachedNodes += nodes;
+    cachedChars += source.length;
   }
   return tree;
 }

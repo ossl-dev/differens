@@ -30,8 +30,8 @@ export interface HunkDiff {
 /** 2000 x 2000 Uint16 = 8MB; past this the table is not worth its memory. */
 const TABLE_MAX = 2_000;
 
-/** Cap on total work across the whole recursion: about 2e8 compares. */
-const OPS_BUDGET = 2e8;
+/** Cap on total work across the whole recursion: about 2e6 compares. */
+const OPS_BUDGET = 2e6;
 
 /**
  * Diff two token sequences into an ordered Insert/Delete/Equal stream.
@@ -138,11 +138,23 @@ export function myersSplit(
   opsBudgetIn: number,
   ops: SeqOp[],
 ): boolean {
+  return myersRegion(a, b, loAIn, hiAIn, loBIn, hiBIn, { remaining: opsBudgetIn }, ops);
+}
+
+function myersRegion(
+  a: string[],
+  b: string[],
+  loAIn: number,
+  hiAIn: number,
+  loBIn: number,
+  hiBIn: number,
+  budget: { remaining: number },
+  ops: SeqOp[],
+): boolean {
   let loA = loAIn;
   let hiA = hiAIn;
   let loB = loBIn;
   let hiB = hiBIn;
-  let opsBudget = opsBudgetIn;
   let n = hiA - loA;
   let m = hiB - loB;
 
@@ -187,8 +199,8 @@ export function myersSplit(
   // The middle snake of an SES is always found within (n+m)/2 rounds.
   const rounds = half;
   for (let t = 0; t <= rounds; t++) {
-    if (opsBudget < n + m) return false;
-    opsBudget -= n + m;
+    if (budget.remaining < n + m) return false;
+    budget.remaining -= n + m;
     // Forward: furthest reaching t-path on each diagonal v.
     for (let v = -t + k1start; v <= t - k1end; v += 2) {
       const idx = half + v;
@@ -208,7 +220,7 @@ export function myersSplit(
         if (ridx >= 0 && ridx < g && l[ridx]! !== -1) {
           // Mirror the reverse path's end into forward coordinates.
           if (x >= n - l[ridx]!) {
-            return splitAndRecurse(a, b, loA, hiA, loB, hiB, x, y, suf, opsBudget, ops);
+            return splitAndRecurse(a, b, loA, hiA, loB, hiB, x, y, suf, budget, ops);
           }
         }
       }
@@ -234,7 +246,7 @@ export function myersSplit(
           const fx = h[fidx]!;
           const fy = fx - (delta - v);
           if (fx >= n - x) {
-            return splitAndRecurse(a, b, loA, hiA, loB, hiB, fx, fy, suf, opsBudget, ops);
+            return splitAndRecurse(a, b, loA, hiA, loB, hiB, fx, fy, suf, budget, ops);
           }
         }
       }
@@ -255,11 +267,11 @@ function splitAndRecurse(
   x: number,
   y: number,
   suf: number,
-  opsBudget: number,
+  budget: { remaining: number },
   ops: SeqOp[],
 ): boolean {
-  const leftOk = myersSplit(a, b, loA, loA + x, loB, loB + y, opsBudget, ops);
-  const rightOk = leftOk && myersSplit(a, b, loA + x, hiA, loB + y, hiB, opsBudget, ops);
+  const leftOk = myersRegion(a, b, loA, loA + x, loB, loB + y, budget, ops);
+  const rightOk = leftOk && myersRegion(a, b, loA + x, hiA, loB + y, hiB, budget, ops);
   if (!rightOk) return false;
   for (let i = 0; i < suf; i++) ops.push({ type: "Equal", text: a[hiA + i]! });
   return true;

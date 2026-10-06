@@ -30,13 +30,13 @@ like "removed function `retry` from class `RetryPolicy`" come from. Anonymous
 nodes are introduced by a glimpse of their source rather than as "unnamed",
 which on a real file was most of the output.
 
-Repeated edits collapse. Renaming a symbol used five times changes five nodes
-but reports one sentence, keyed on the from/to pair.
+The identifier inside a renamed declaration is deduplicated. Other edits
+remain distinct, even when they share the same before/after values.
 
 ## Four output formats
 
 ```ts
-formatChanges(changes, { format: "terminal" }); // default, one line per change
+formatChanges(changes, { format: "terminal" }); // default, grouped by named construct
 formatChanges(changes, { format: "markdown" }); // grouped under file headings
 formatChanges(changes, { format: "json" });     // the raw SemanticChange array
 formatChanges(changes, { format: "llm" });      // dense, for a model

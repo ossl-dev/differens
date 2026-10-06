@@ -9,6 +9,7 @@
 
 import { spawn } from "node:child_process";
 import { availableParallelism } from "node:os";
+import { createNode } from "@ossl-dev/differens-core";
 import type { EditAction } from "@ossl-dev/differens-core";
 import type { GitDiffInput as FilePair } from "@ossl-dev/differens-git";
 import { narrate } from "@ossl-dev/differens-narrate";
@@ -20,23 +21,60 @@ export interface FileDiff {
   actions: EditAction[];
   descriptions: string[];
   filePath: string;
+  fallback?: string;
 }
 
 const WORKER_THRESHOLD = 24;
+const MAX_WORKERS = 2;
 
 /** Report an added file under the path it actually exists at. */
 function reportedPath(pair: FilePair): string {
-  return pair.oldSource === "" && pair.newSource !== "" ? pair.newPath : pair.oldPath;
+  return pair.newExists === false ? pair.oldPath : pair.newPath;
 }
 
 export function diffInline(pair: FilePair): FileDiff {
-  const result = diffWithTier(pair.oldSource, pair.newSource, pair.oldPath, pair.newPath);
+  const result = diffWithTier(pair.oldSource, pair.newSource, pair.oldPath, pair.newPath, pair);
   const filePath = reportedPath(pair);
   const changes = narrate(result.changes, { filePath });
+  if (
+    pair.oldPath !== pair.newPath &&
+    pair.oldExists !== false &&
+    pair.newExists !== false &&
+    pair.oldSource !== "" &&
+    pair.newSource !== ""
+  ) {
+    const node = createNode({ kind: "file", label: pair.newPath, byteRange: [0, 0] });
+    changes.unshift({
+      filePath,
+      description: `renamed file \`${pair.oldPath}\` to \`${pair.newPath}\``,
+      action: {
+        type: "Move",
+        node,
+        fromParent: createNode({ kind: "file", label: pair.oldPath, byteRange: [0, 0] }),
+        toParent: node,
+        fromPosition: 0,
+        toPosition: 0,
+        context: [],
+      },
+    });
+  }
   return {
-    actions: changes.map((c) => c.action),
+    actions: changes.map(({ action }) => {
+      const shallow = (node: typeof action.node) => ({ ...node, children: [] });
+      if (action.type === "Update") return { ...action, node: shallow(action.node) };
+      if (action.type === "Move")
+        return {
+          ...action,
+          node: shallow(action.node),
+          fromParent: shallow(action.fromParent),
+          toParent: shallow(action.toParent),
+        };
+      if (action.type === "Insert") return { ...action, parent: shallow(action.parent) };
+      return action;
+    }),
     descriptions: changes.map((c) => c.description),
     filePath,
+    ...(result.fallback ? { fallback: result.fallback } : {}),
   };
 }
 
@@ -59,7 +97,10 @@ export function selfInvocation(flag: string): [string, string[]] {
 }
 
 /** Run a worker child over `chunk`, resolving with what it wrote to stdout. */
-function runChild(chunk: WorkerJob[]): Promise<WorkerReply[]> {
+function runChild(
+  chunk: WorkerJob[],
+  onReply?: (reply: WorkerReply) => void,
+): Promise<WorkerReply[]> {
   return new Promise((resolve, reject) => {
     const [cmd, args] = selfInvocation(WORKER_FLAG);
     const child = spawn(cmd, args, {
@@ -67,18 +108,40 @@ function runChild(chunk: WorkerJob[]): Promise<WorkerReply[]> {
       env: { ...process.env, DIFFERENS_QUIET: "1" },
       stdio: ["pipe", "pipe", "inherit"],
     });
-    const chunks: Buffer[] = [];
-    child.stdout!.on("data", (buf: Buffer) => chunks.push(buf));
-    child.on("error", reject);
-    child.on("close", (code) => {
-      if (code !== 0) return reject(new Error(`diff worker exited ${code}`));
-      try {
-        resolve(JSON.parse(Buffer.concat(chunks).toString()) as WorkerReply[]);
-      } catch (err) {
-        reject(err);
+    child.stdout!.setEncoding("utf8");
+    let buffer = "";
+    let next = 0;
+    const replies: WorkerReply[] = [];
+    const send = () => {
+      if (next < chunk.length) child.stdin!.write(`${JSON.stringify([chunk[next++]!])}\n`);
+      else child.stdin!.end();
+    };
+    child.stdout!.on("data", (text: string) => {
+      buffer += text;
+      let end = buffer.indexOf("\n");
+      while (end >= 0) {
+        const line = buffer.slice(0, end);
+        buffer = buffer.slice(end + 1);
+        try {
+          const batch = JSON.parse(line) as WorkerReply[];
+          replies.push(...batch);
+          for (const reply of batch) onReply?.(reply);
+          send();
+        } catch (err) {
+          child.kill();
+          reject(err);
+          return;
+        }
+        end = buffer.indexOf("\n");
       }
     });
-    child.stdin!.end(JSON.stringify(chunk));
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code !== 0 || replies.length !== chunk.length)
+        reject(new Error(`diff worker exited ${code}`));
+      else resolve(replies);
+    });
+    send();
   });
 }
 
@@ -102,10 +165,16 @@ export async function diffWithWorkers(filePairs: FilePair[]): Promise<FileDiff[]
   // of files that will only ever be line-diffed (no grammar available, plain
   // text, a compiled binary that cannot load native addons) finishes sooner
   // here than it takes to start the children.
-  const parseable = filePairs.filter((p) => isParseable(p.oldPath)).length;
+  const parseable = filePairs.filter(
+    (p) =>
+      p.oldSource !== "" &&
+      p.newSource !== "" &&
+      p.oldSource !== p.newSource &&
+      isParseable(p.newPath),
+  ).length;
 
   if (parseable >= WORKER_THRESHOLD) {
-    const poolSize = Math.max(2, Math.min(8, availableParallelism()));
+    const poolSize = Math.max(1, Math.min(MAX_WORKERS, availableParallelism() - 1));
     const chunks: WorkerJob[][] = Array.from({ length: poolSize }, () => []);
     for (let i = 0; i < filePairs.length; i++) {
       chunks[i % poolSize]!.push({ index: i, pair: filePairs[i]! });
@@ -118,6 +187,7 @@ export async function diffWithWorkers(filePairs: FilePair[]): Promise<FileDiff[]
           actions: reply.actions,
           descriptions: reply.descriptions,
           filePath: reply.filePath,
+          fallback: reply.fallback,
         };
       }
     });
@@ -147,14 +217,20 @@ export async function diffWithWorkers(filePairs: FilePair[]): Promise<FileDiff[]
  * completion stays as early as possible.
  */
 export async function* diffFilePairsStream(filePairs: FilePair[]): AsyncGenerator<FileDiff> {
-  const parseable = filePairs.filter((p) => isParseable(p.oldPath)).length;
+  const parseable = filePairs.filter(
+    (p) =>
+      p.oldSource !== "" &&
+      p.newSource !== "" &&
+      p.oldSource !== p.newSource &&
+      isParseable(p.newPath),
+  ).length;
 
   if (parseable < WORKER_THRESHOLD) {
     for (let i = 0; i < filePairs.length; i++) yield diffInline(filePairs[i]!);
     return;
   }
 
-  const poolSize = Math.max(2, Math.min(8, availableParallelism()));
+  const poolSize = Math.max(1, Math.min(MAX_WORKERS, availableParallelism() - 1));
   const chunks: WorkerJob[][] = Array.from({ length: poolSize }, () => []);
   for (let i = 0; i < filePairs.length; i++) {
     chunks[i % poolSize]!.push({ index: i, pair: filePairs[i]! });
@@ -171,13 +247,7 @@ export async function* diffFilePairsStream(filePairs: FilePair[]): AsyncGenerato
   const runs = chunks.map(async (chunk) => {
     if (chunk.length === 0) return;
     try {
-      for (const reply of await runChild(chunk)) {
-        pending[reply.index]!.resolve({
-          actions: reply.actions,
-          descriptions: reply.descriptions,
-          filePath: reply.filePath,
-        });
-      }
+      await runChild(chunk, (reply) => pending[reply.index]!.resolve(reply));
     } catch {
       // A child that dies loses its slice; finish it on the main thread
       // rather than dropping those files from the report.
@@ -200,12 +270,22 @@ type WorkerReply = FileDiff & { index: number };
 
 /** Worker mode: read a slice of jobs from stdin, write the diffs to stdout. */
 export async function runWorker(input: AsyncIterable<Buffer> = process.stdin): Promise<void> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of input) chunks.push(chunk as Buffer);
-  const jobs = JSON.parse(Buffer.concat(chunks).toString()) as WorkerJob[];
-  const replies: WorkerReply[] = jobs.map(({ index, pair }) => ({
-    index,
-    ...diffInline(pair),
-  }));
-  console.log(JSON.stringify(replies));
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const respond = (line: string) => {
+    const jobs = JSON.parse(line) as WorkerJob[];
+    console.log(JSON.stringify(jobs.map(({ index, pair }) => ({ index, ...diffInline(pair) }))));
+  };
+  for await (const chunk of input) {
+    buffer += decoder.decode(chunk, { stream: true });
+    let end = buffer.indexOf("\n");
+    while (end >= 0) {
+      const line = buffer.slice(0, end);
+      buffer = buffer.slice(end + 1);
+      if (line) respond(line);
+      end = buffer.indexOf("\n");
+    }
+  }
+  buffer += decoder.decode();
+  if (buffer.trim()) respond(buffer);
 }

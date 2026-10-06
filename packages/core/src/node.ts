@@ -58,6 +58,8 @@ export interface Node {
   /** 1-based source line, when the adapter knows it. Lets a reader jump
    *  straight to the change instead of scanning the file for it. */
   line?: number;
+  /** Adapter hint: a unique body/block survives changes to its children. */
+  matchByKind?: boolean;
   height: number;
   contentHash: number;
   structureHash: number;
@@ -71,6 +73,7 @@ export interface BuildNodeOptions {
   children?: Node[];
   byteRange: ByteRange;
   line?: number;
+  matchByKind?: boolean;
 }
 
 export function createNode(opts: BuildNodeOptions): Node {
@@ -122,6 +125,7 @@ export function createNode(opts: BuildNodeOptions): Node {
     children,
     byteRange: opts.byteRange,
     line: opts.line,
+    matchByKind: opts.matchByKind,
     height,
     contentHash,
     structureHash,

@@ -12,6 +12,7 @@ import {
   Matching,
   bottomUpMatch,
   indexTree,
+  matchNamedContainers,
   recoverContainers,
   recoverLeaves,
   topDownMatch,
@@ -53,6 +54,8 @@ export function diffTrees(
 
   const m = new Matching(oldIdx.n, newIdx.n);
   topDownMatch(oldIdx, newIdx, m, opts);
+  if (oldRoot.kind === newRoot.kind) m.link(oldIdx.n - 1, newIdx.n - 1);
+  matchNamedContainers(oldIdx, newIdx, m);
   bottomUpMatch(oldIdx, newIdx, m, opts);
   recoverLeaves(oldIdx, newIdx, m);
   // Containers that only differ in leaf values have no matched descendants

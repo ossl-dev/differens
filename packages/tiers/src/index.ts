@@ -96,6 +96,8 @@ export function classifyFile(filePath: string): FileInfo {
     "mjs",
     "cjs",
     "ts",
+    "mts",
+    "cts",
     "jsx",
     "tsx",
     "scala",
@@ -136,14 +138,23 @@ export function diffWithTier(
   newSource: string,
   oldPath: string,
   newPath: string,
+  presence: { oldExists?: boolean; newExists?: boolean } = {},
 ): TierDiffResult {
   const info = classifyFile(oldPath);
 
   // A file that is entirely new or entirely gone is one fact, not a tree
   // diff. Parsing it produces an Insert per top-level construct, which buries
   // the only thing the reader needs to know.
-  if (oldSource === "" && newSource !== "") return wholeFile("Insert", newPath, newSource);
-  if (newSource === "" && oldSource !== "") return wholeFile("Delete", oldPath, oldSource);
+  if (
+    presence.oldExists === false ||
+    (presence.oldExists === undefined && oldSource === "" && newSource !== "")
+  )
+    return wholeFile("Insert", newPath, newSource);
+  if (
+    presence.newExists === false ||
+    (presence.newExists === undefined && newSource === "" && oldSource !== "")
+  )
+    return wholeFile("Delete", oldPath, oldSource);
 
   // Short-circuit on identical sources. String comparison, not a UTF-8
   // encode of both sides: encoding allocated two full copies of every file
@@ -326,7 +337,7 @@ function diffProse(oldSource: string, newSource: string): TierDiffResult {
 function diffMarkup(oldSource: string, newSource: string): TierDiffResult {
   const oldTree = markupToNodeTree(parseMarkup(oldSource));
   const newTree = markupToNodeTree(parseMarkup(newSource));
-  const result = diffTrees(oldTree, newTree);
+  const result = diffTrees(oldTree, newTree, { maxNodes: 50_000 });
   return {
     changes: result.changes,
     nodeCount: result.nodeCount,
@@ -338,7 +349,7 @@ function diffMarkup(oldSource: string, newSource: string): TierDiffResult {
 function diffData(oldSource: string, newSource: string): TierDiffResult {
   const oldTree = parseData(oldSource);
   const newTree = parseData(newSource);
-  const result = diffTrees(oldTree, newTree);
+  const result = diffTrees(oldTree, newTree, { maxNodes: 50_000 });
   return {
     changes: result.changes,
     nodeCount: result.nodeCount,
@@ -348,9 +359,12 @@ function diffData(oldSource: string, newSource: string): TierDiffResult {
 }
 
 function diffCode(oldSource: string, newSource: string, extension: string): TierDiffResult {
-  const oldTree = parseCode(oldSource, extension);
-  const newTree = parseCode(newSource, extension);
-  const result = diffTrees(oldTree, newTree);
+  if (!hasGrammar(extension)) throw new Error(`no grammar for ${extension}`);
+  if (oldSource.length > 1_000_000 || newSource.length > 1_000_000)
+    throw new Error("source exceeds parse budget");
+  const oldTree = parseCode(oldSource, extension, 50_000);
+  const newTree = parseCode(newSource, extension, 50_000);
+  const result = diffTrees(oldTree, newTree, { maxNodes: 50_000 });
   return {
     changes: result.changes,
     nodeCount: result.nodeCount,

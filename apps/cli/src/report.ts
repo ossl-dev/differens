@@ -3,12 +3,36 @@
  */
 
 import type { SemanticChange } from "@ossl-dev/differens-core";
-import { correlate } from "@ossl-dev/differens-correlate";
+import { correlate, isMoveCandidate } from "@ossl-dev/differens-correlate";
 import type { FileChanges } from "@ossl-dev/differens-correlate";
 import type { GitDiffInput as FilePair } from "@ossl-dev/differens-git";
-import { formatChanges, humanizeKind, summarize } from "@ossl-dev/differens-narrate";
+import {
+  formatChanges,
+  humanizeKind,
+  readableChanges,
+  summarize,
+} from "@ossl-dev/differens-narrate";
 import type { OutputFormat } from "@ossl-dev/differens-narrate";
-import { diffFilePairsStream, diffWithWorkers } from "./pool";
+import { overview } from "./overview";
+import { type FileDiff, diffFilePairsStream } from "./pool";
+
+type FileInputs = FilePair[] | AsyncIterable<FilePair>;
+
+async function* diffResults(inputs: FileInputs): AsyncGenerator<FileDiff> {
+  if (Array.isArray(inputs)) {
+    yield* diffFilePairsStream(inputs);
+    return;
+  }
+  let batch: FilePair[] = [];
+  for await (const pair of inputs) {
+    batch.push(pair);
+    if (batch.length === 24) {
+      yield* diffFilePairsStream(batch);
+      batch = [];
+    }
+  }
+  if (batch.length) yield* diffFilePairsStream(batch);
+}
 
 /**
  * Diff a set of file pairs and print the result.
@@ -18,11 +42,12 @@ import { diffFilePairsStream, diffWithWorkers } from "./pool";
  * having in all three.
  */
 export async function report(
-  filePairs: FilePair[],
+  filePairs: FileInputs,
   format: OutputFormat,
   emptyMessage: string,
+  options: { all?: boolean } = {},
 ): Promise<void> {
-  if (filePairs.length === 0) {
+  if (Array.isArray(filePairs) && filePairs.length === 0) {
     console.log(emptyMessage);
     return;
   }
@@ -33,28 +58,59 @@ export async function report(
   }
 
   // Per-file diffs are independent and CPU-bound: run them on a worker
-  // pool sized to the core count so matching parallelizes across cores.
-  const results = await diffWithWorkers(filePairs);
-
-  const allNarratives: SemanticChange[] = results.flatMap((r) =>
-    r.descriptions.map((description, i) => ({
+  // pool with at most two children to leave capacity for the host.
+  let allNarratives: SemanticChange[] = [];
+  const allFileChanges: FileChanges[] = [];
+  const fallbacks: { filePath: string; fallback: string }[] = [];
+  let fileCount = 0;
+  for await (const result of diffResults(filePairs)) {
+    fileCount++;
+    const changes = result.descriptions.map((description, i) => ({
       description,
-      filePath: r.filePath,
-      action: r.actions[i]!,
-    })),
-  );
-  const allFileChanges: FileChanges[] = results.map((r) => ({
-    filePath: r.filePath,
-    actions: r.actions,
-  }));
+      filePath: result.filePath,
+      action: result.actions[i]!,
+    }));
+    const candidates = result.actions.filter(isMoveCandidate);
+    allFileChanges.push({ filePath: result.filePath, actions: candidates });
+    if (format === "terminal" || format === "markdown") {
+      // Retain candidate identity until correlation; collapse other syntax
+      // immediately so the report cannot retain every token in the repository.
+      allNarratives.push(
+        ...changes.filter((change) => isMoveCandidate(change.action)),
+        ...readableChanges(
+          changes.filter((change) => !isMoveCandidate(change.action)),
+          Number.POSITIVE_INFINITY,
+        ),
+      );
+    } else allNarratives.push(...changes);
+    if (result.fallback) fallbacks.push({ filePath: result.filePath, fallback: result.fallback });
+  }
+  if (fileCount === 0) {
+    console.log(emptyMessage);
+    return;
+  }
 
   // Cross-file correlation
   const crossFile = correlate(allFileChanges);
+  const relocated = new Set(crossFile.moves.flatMap((move) => [move.deletion, move.insertion]));
+  if (format !== "json")
+    allNarratives = allNarratives.filter((change) => !relocated.has(change.action));
+
+  if (format === "terminal" || format === "markdown") {
+    if (fallbacks.length)
+      console.error(
+        `note: ${fallbacks.length} file${fallbacks.length === 1 ? "" : "s"} used line-diff fallback: ${fallbacks
+          .slice(0, 5)
+          .map((f) => f.filePath)
+          .join(", ")}${fallbacks.length > 5 ? ", …" : ""}`,
+      );
+  }
 
   if (format === "json") {
     // JSON: one document with everything
     const output = {
       perFile: allNarratives,
+      ...(fallbacks.length ? { fallbacks } : {}),
       crossFileMoves: crossFile.moves.map((m) => ({
         kind: m.node.kind,
         name: m.node.label ?? "unnamed",
@@ -83,7 +139,18 @@ export async function report(
     return;
   }
 
-  console.log(formatChanges(allNarratives, { format }));
+  const concise =
+    !options.all && (format === "terminal" || format === "markdown")
+      ? overview(allNarratives, crossFile.moves, format)
+      : undefined;
+  if (concise) {
+    console.log(concise);
+    return;
+  }
+
+  if (allNarratives.length > 0 || crossFile.moves.length === 0) {
+    console.log(formatChanges(allNarratives, { format }));
+  }
 
   // Cross-file moves separately
   if (crossFile.moves.length > 0) {
@@ -102,7 +169,12 @@ export async function report(
     }
   }
 
-  console.log(`\n${summarize(allNarratives)}`);
+  const summary = allNarratives.length > 0 ? summarize(allNarratives, { compact: true }) : "";
+  const moved =
+    crossFile.moves.length > 0
+      ? `${crossFile.moves.length} cross-file move${crossFile.moves.length === 1 ? "" : "s"}`
+      : "";
+  console.log(`\n${[summary, moved].filter(Boolean).join(", ") || "no logical changes"}`);
 }
 
 /**
@@ -111,21 +183,25 @@ export async function report(
  * buffering. Cross-file moves need the whole set, so they trail as one final
  * object with a `crossFileMoves` key when any exist.
  */
-async function reportNdjson(filePairs: FilePair[]): Promise<void> {
+async function reportNdjson(filePairs: FileInputs): Promise<void> {
   const allFileChanges: FileChanges[] = [];
-  for await (const result of diffFilePairsStream(filePairs)) {
+  for await (const result of diffResults(filePairs)) {
     // Unchanged files contribute nothing; the batch formats skip them too.
     if (result.actions.length === 0) continue;
     console.log(
       JSON.stringify({
         filePath: result.filePath,
+        ...(result.fallback ? { fallback: result.fallback } : {}),
         changes: result.descriptions.map((description, i) => ({
           description,
           action: result.actions[i],
         })),
       }),
     );
-    allFileChanges.push({ filePath: result.filePath, actions: result.actions });
+    allFileChanges.push({
+      filePath: result.filePath,
+      actions: result.actions.filter(isMoveCandidate),
+    });
   }
 
   const crossFile = correlate(allFileChanges);

@@ -11,13 +11,17 @@ Most inputs diff quickly, but some are slow, and some edge cases produce results
 
 **Symptom:** Diffing a large tree or monorepo takes much longer than expected.
 
-**Cause:** Usually parsing, not matching. Tree matching is linear in node count (350k nodes in roughly 70 ms), and container matching at the bottom of the tree is O(n²) only in degenerate worst cases. The first parse of a huge file on a cold grammar cache dominates.
+The CLI uses at most two worker processes and sends one file to each at a
+time. Commit ranges read blobs in batches of 24 file pairs. Its parse cache
+holds at most 50,000 nodes and 2 million source characters. Repeated tiny syntax nodes
+are aligned inside their containers rather than scanned against every equal
+node in the file, and cross-file similarity reuses token sets.
 
-**Workaround:** Diff specific files instead of whole directories. On a large repository, diffing one file is much faster than diffing a directory or the whole working tree.
-
-<Info>
-There is no node-count cap: every tree size is matched for real. If a pathological input is slow, it is slow on the parser side, not because matching gave up.
-</Info>
+Tier adapters fall back to line diffing when a syntax tree exceeds the
+50,000-node analysis budget. Standalone `diffTrees` callers control their own
+`maxNodes`. Summaries group fallback edits into counts; JSON retains details.
+For a focused review, comparing two files avoids reading the rest of a large
+changeset.
 
 ## Deep nesting
 

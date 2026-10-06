@@ -182,6 +182,38 @@ describe("commit range diff", () => {
   });
 });
 
+describe("range file identity", () => {
+  it("pairs a renamed and edited file using both original paths", async () => {
+    write(
+      "old.ts",
+      "export function run() { return 1; }\nexport const keep = true;\nexport const unchanged = 'keep this declaration in both snapshots';\n",
+    );
+    git(["add", "."]);
+    git(["commit", "-qm", "old file"]);
+    git(["mv", "old.ts", "new.ts"]);
+    write(
+      "new.ts",
+      "export function run() { return 2; }\nexport const keep = true;\nexport const unchanged = 'keep this declaration in both snapshots';\n",
+    );
+    git(["commit", "-qam", "rename"]);
+    const [pair] = await diffCommitRange("HEAD~1..HEAD");
+    expect(pair!.oldPath).toBe("old.ts");
+    expect(pair!.newPath).toBe("new.ts");
+    expect(pair!.oldSource).toContain("return 1");
+    expect(pair!.newSource).toContain("return 2");
+    expect(pair!.oldExists).toBe(true);
+  });
+
+  it("records an added empty file as present", async () => {
+    write("empty.ts", "");
+    git(["add", "."]);
+    git(["commit", "-qm", "empty file"]);
+    const [pair] = await diffCommitRange("HEAD~1..HEAD");
+    expect(pair!.oldExists).toBe(false);
+    expect(pair!.newExists).toBe(true);
+  });
+});
+
 describe("directory diff", () => {
   it("pairs files across two directory trees", async () => {
     const oldDir = mkdtempSync(join(tmpdir(), "differens-old-"));

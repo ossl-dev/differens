@@ -161,12 +161,11 @@ describe("diffTrees: structure", () => {
     const newTree = tree("program", [leaf("class", "Bar")]);
 
     const result = diffTrees(oldTree, newTree, { minHeight: 1 });
-    // Nothing matches: the old root is deleted as a unit and the new class
-    // is inserted as a unit.
+    // The document survives a rewrite; only its contents are replaced.
     const deletes = ofType(result.changes, "Delete");
     const inserts = ofType(result.changes, "Insert");
     expect(deletes).toHaveLength(1);
-    expect(deletes[0]!.node).toBe(oldTree);
+    expect(deletes[0]!.node).toBe(oldTree.children[0]!);
     expect(inserts).toHaveLength(1);
     expect(inserts[0]!.node.kind).toBe("class");
     expect(inserts[0]!.node.label).toBe("Bar");
@@ -282,16 +281,15 @@ describe("diffTrees: empty trees", () => {
     expect(result.nodeCount).toBe(2);
   });
 
-  it("deletes the empty root and inserts the child when the first child is added", () => {
+  it("keeps the document root when the first child is added", () => {
     const oldRoot = tree("root", []);
     const newRoot = tree("root", [leaf("item", "a")]);
     const result = diffTrees(oldRoot, newRoot);
 
-    expect(result.changes).toHaveLength(2);
+    expect(result.changes).toHaveLength(1);
     const deletes = ofType(result.changes, "Delete");
     const inserts = ofType(result.changes, "Insert");
-    expect(deletes).toHaveLength(1);
-    expect(deletes[0]!.node).toBe(oldRoot);
+    expect(deletes).toHaveLength(0);
     expect(inserts).toHaveLength(1);
     expect(inserts[0]!.node).toBe(newRoot.children[0]!);
     expect(inserts[0]!.parent).toBe(newRoot);

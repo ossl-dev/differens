@@ -127,7 +127,7 @@ differens a.json b.json --format=llm
 
 | Flag | Use |
 |---|---|
-| (default) | Terminal, one line per change with scope: `changed value of port from 3000 to 8080 in object root` |
+| (default) | Terminal summary grouped by file and named construct, with before/after values for small edits |
 | `--format=json` | Raw SemanticChange array, for tooling |
 | `--format=markdown` | Rolled-up summary, for PR descriptions |
 | `--format=llm` | Dense line format for AI tools: one line per change, with source line numbers. Roughly 15x smaller than the `git diff` it replaces |
@@ -159,6 +159,15 @@ Ops are `+` added, `-` removed, `~` changed, `>` moved, `*` rolled-up count.
 
 On this repo's own 14-file changeset that format is 6.5KB against 100KB of
 `git diff`.
+
+Terminal, Markdown, and LLM output summarize edits within named functions,
+classes, and variables. New and removed files get one entry each. Large terminal and Markdown comparisons show directory totals and selected
+semantic changes. Use `--all` for every file. Per-file summaries show up to
+20 entries and report how many remain;
+`--format=json` and `--format=ndjson` retain the underlying actions.
+Only the identifier inside a renamed declaration is deduplicated; edits to
+separate keys or call sites remain distinct. Git ranges preserve detected
+renames and compare the contents at both paths.
 
 ### Other commands
 
@@ -200,9 +209,13 @@ sixteen languages (TypeScript/JavaScript, Python, Rust, Go, C, C++, Java, Ruby, 
 Swift, Kotlin, C#, Scala, Lua, shell), git integration (working tree, commit ranges,
 commit pairs, batched blob reads, self-writing .gitattributes), directory diffing with
 cross-directory rename detection, a cross-file correlator, streaming ndjson output, and
-the narration engine with terminal/markdown/json/llm output. Per-file diffs run on a
-process pool, and a content-addressed parse cache reuses trees within a run.
-420 tests, zero failures. Published on npm as
+the narration engine with terminal/markdown/json/llm output. Per-file diffs use at most two worker processes, sending one file at a time.
+Commit ranges read and process 24 file pairs at a time rather than loading
+both snapshots together. The parse cache holds at most 50,000 nodes and
+2 million source characters. Tier adapters fall back to line
+diffing when a tree exceeds the analysis budget; standalone core callers can
+set their own `maxNodes`.
+452 tests, zero failures. Published on npm as
 [`differens`](https://www.npmjs.com/package/differens), runs on Node.
 
 ## Prior art worth reading before contributing

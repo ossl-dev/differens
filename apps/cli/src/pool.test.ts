@@ -21,6 +21,43 @@ const OLD = "export function parseConfig(raw: string) { return JSON.parse(raw); 
 const NEW = "export function loadConfig(raw: string) { return JSON.parse(raw); }\n";
 
 describe("diffInline", () => {
+  it("does not serialize the whole class once per inserted method", () => {
+    const methods = Array.from({ length: 120 }, (_, i) => `method${i}() { return ${i}; }`).join(
+      "\n",
+    );
+    const result = diffInline({
+      oldPath: "service.ts",
+      newPath: "service.ts",
+      oldSource: "class Service { keep() { return true; } }",
+      newSource: `class Service { keep() { return true; }\n${methods}\n}`,
+    });
+    expect(result.actions.filter((a) => a.type === "Insert")).toHaveLength(120);
+    expect(JSON.stringify(result).length).toBeLessThan(250_000);
+    for (const action of result.actions)
+      if (action.type === "Insert") expect(action.parent.children).toHaveLength(0);
+  });
+
+  it("keeps edit payloads proportional to changes instead of copying the enclosing tree", () => {
+    const source = (offset: number) =>
+      `class Service {\n${Array.from(
+        { length: 120 },
+        (_, i) => `method${i}() { return ${i + offset}; }`,
+      ).join("\n")}\n}`;
+    const result = diffInline({
+      oldPath: "service.ts",
+      newPath: "service.ts",
+      oldSource: source(0),
+      newSource: source(1000),
+    });
+    expect(result.actions.length).toBeGreaterThan(100);
+    expect(JSON.stringify(result).length).toBeLessThan(120_000);
+    for (const action of result.actions) {
+      if (action.type === "Update" || action.type === "Move")
+        expect(action.node.children).toHaveLength(0);
+      if (action.type === "Insert") expect(action.parent.children).toHaveLength(0);
+    }
+  });
+
   it("diffs one pair and narrates it", () => {
     const result = diffInline({ oldPath: "a.ts", newPath: "a.ts", oldSource: OLD, newSource: NEW });
     expect(result.filePath).toBe("a.ts");
@@ -108,6 +145,36 @@ describe("diffWithWorkers: process pool", () => {
 });
 
 describe("runWorker", () => {
+  it("replies per job and preserves UTF-8 split across input chunks", async () => {
+    const logs: string[] = [];
+    const original = console.log;
+    console.log = (line: string) => logs.push(line);
+    const input = Buffer.from(
+      [0, 1]
+        .map((index) =>
+          JSON.stringify([
+            {
+              index,
+              pair: {
+                oldPath: "café.ts",
+                newPath: "café.ts",
+                oldSource: "const x = 1;",
+                newSource: "const x = 2;",
+              },
+            },
+          ]),
+        )
+        .join("\n"),
+    );
+    try {
+      await runWorker(Readable.from(Array.from(input, (byte) => Buffer.from([byte]))));
+    } finally {
+      console.log = original;
+    }
+    expect(logs).toHaveLength(2);
+    expect(logs.map((line) => JSON.parse(line)[0].filePath)).toEqual(["café.ts", "café.ts"]);
+  });
+
   it("reads jobs from stdin and writes replies to stdout", async () => {
     const logs: string[] = [];
     const origLog = console.log;

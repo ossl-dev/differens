@@ -183,11 +183,10 @@ describe("diffWithTier: data scenarios", () => {
   });
 
   it("degrades unparseable data to a raw value diff instead of crashing", () => {
-    // Not JSON, YAML, or TOML: both sides become bare scalar leaves that do
-    // not match, so the report is a whole-value Delete rather than a crash.
+    // Neither side is structured data. Keep both scalar values in the update.
     const result = diffWithTier("{oops", "{oops!", "broken.json", "broken.json");
     expect(result.tier).toBe(Tier.Data);
     expect(result.changes).toHaveLength(1);
-    expect(result.changes[0]!.type).toBe("Delete");
+    expect(result.changes[0]!.type).toBe("Update");
   });
 });

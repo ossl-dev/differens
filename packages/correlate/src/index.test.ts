@@ -1,34 +1,47 @@
 import { describe, expect, it } from "bun:test";
 import { createNode } from "@ossl-dev/differens-core";
-import type { EditAction } from "@ossl-dev/differens-core";
 import { correlate } from "./index";
 import type { FileChanges } from "./index";
 
-function makeFunc(name: string): EditAction {
-  const node = createNode({
-    kind: "Function",
-    label: name,
-    byteRange: [0, name.length],
-  });
-  return { type: "Delete", context: [], node };
-}
-
-function makeInsert(name: string): EditAction {
-  const node = createNode({
-    kind: "Function",
-    label: name,
-    byteRange: [0, name.length],
-  });
-  return {
-    type: "Insert",
-    context: [],
-    node,
-    parent: createNode({ kind: "file", byteRange: [0, 10] }),
-    position: 0,
-  };
-}
-
 describe("correlate", () => {
+  it("does not interpret identical generic types as relocated declarations", () => {
+    const node = createNode({ kind: "generic_type", label: "Promise", byteRange: [0, 1] });
+    expect(
+      correlate([
+        { filePath: "a.ts", actions: [{ type: "Delete", node, context: [] }] },
+        {
+          filePath: "b.ts",
+          actions: [{ type: "Insert", node, context: [], parent: node, position: 0 }],
+        },
+      ]).moves,
+    ).toHaveLength(0);
+  });
+
+  it("keeps unrelated declarations with similar bodies as additions and removals", () => {
+    const before = createNode({
+      kind: "Function",
+      label: "readUser",
+      value: "return await db.find(id)",
+      byteRange: [0, 1],
+    });
+    const after = createNode({
+      kind: "Function",
+      label: "readOrder",
+      value: "return await db.find(id)",
+      children: [],
+      byteRange: [0, 1],
+    });
+    // Value-only equality is insufficient when the declaration names differ.
+    const result = correlate([
+      { filePath: "a.ts", actions: [{ type: "Delete", node: before, context: [] }] },
+      {
+        filePath: "b.ts",
+        actions: [{ type: "Insert", node: after, context: [], parent: after, position: 0 }],
+      },
+    ]);
+    expect(result.moves).toHaveLength(0);
+  });
+
   it("detects exact content match across files", () => {
     const nodeA = createNode({ kind: "Function", label: "foo", byteRange: [0, 10] });
     const nodeB = createNode({ kind: "Function", label: "foo", byteRange: [0, 10] });

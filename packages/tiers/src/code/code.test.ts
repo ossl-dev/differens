@@ -175,7 +175,7 @@ describe("grammar registry", () => {
     expect(extractors.length).toBe(16);
     const byLang = new Map(extractors.map((e) => [e.language, e]));
     expect(byLang.get("javascript")!.extensions).toEqual(["js", "mjs", "cjs", "jsx"]);
-    expect(byLang.get("typescript")!.extensions).toEqual(["ts", "tsx"]);
+    expect(byLang.get("typescript")!.extensions).toEqual(["ts", "mts", "cts", "tsx"]);
     expect(byLang.get("python")!.extensions).toEqual(["py"]);
     expect(byLang.get("go")!.extensions).toEqual(["go"]);
     expect(byLang.get("rust")!.extensions).toEqual(["rs"]);
@@ -308,5 +308,35 @@ describe("parse cache", () => {
     resetParseCacheForTest();
     for (let i = 0; i < 70; i++) parseCode(`class A${i} {}`, "java");
     expect(parseCacheStats().size).toBeLessThanOrEqual(64);
+  });
+});
+
+describe("parse resource budgets", () => {
+  it("rejects pathological nesting before tree matching", () => {
+    const source = `function run(x){ return ${"(".repeat(300)}x${")".repeat(300)}; }`;
+    expect(() => parseCode(source, "ts", 50_000)).toThrow("depth exceeds budget");
+  });
+
+  it("enforces the syntax budget on cached and uncached parses", () => {
+    resetParseCacheForTest();
+    const source = "export function run(x: number){return x + 1}";
+    expect(() => parseCode(source, "ts", 5)).toThrow("node budget");
+    parseCode(source, "ts");
+    expect(() => parseCode(source, "ts", 5)).toThrow("node budget");
+    expect(parseCacheStats().nodes).toBeLessThanOrEqual(50_000);
+  });
+
+  it("evicts by retained tree size before reaching the file-count cap", () => {
+    resetParseCacheForTest();
+    for (let file = 0; file < 24; file++) {
+      const source = Array.from(
+        { length: 300 },
+        (_, i) => `export const value${file}_${i} = ${i};`,
+      ).join("\n");
+      parseCode(source, "ts");
+      expect(parseCacheStats().nodes).toBeLessThanOrEqual(50_000);
+    }
+    expect(parseCacheStats().size).toBeLessThan(24);
+    resetParseCacheForTest();
   });
 });

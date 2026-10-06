@@ -13,7 +13,7 @@
  */
 
 import type { EditAction, Node } from "@ossl-dev/differens-core";
-import { treesEqual } from "@ossl-dev/differens-core";
+import { hashText, treesEqual } from "@ossl-dev/differens-core";
 
 export interface CrossFileMatch {
   /** The moved node */
@@ -26,6 +26,8 @@ export interface CrossFileMatch {
   modified: boolean;
   /** Similarity score (1.0 = exact match) */
   similarity: number;
+  deletion: EditAction;
+  insertion: EditAction;
 }
 
 export interface CrossFileResult {
@@ -42,9 +44,35 @@ export interface CorrelateOptions {
   renameSimilarityThreshold: number;
 }
 
+const MOVABLE_KINDS = new Set([
+  "file",
+  "Function",
+  "Method",
+  "Class",
+  "Interface",
+  "TypeDef",
+  "Enum",
+  "Struct",
+  "Trait",
+  "Module",
+  "Variable",
+]);
+const MAX_SIMILARITY_CANDIDATES = 64;
+
 const DEFAULT_CORRELATE_OPTIONS: CorrelateOptions = {
   renameSimilarityThreshold: 0.6,
 };
+
+/** Only declarations and whole files can meaningfully move between files. */
+export function isMoveCandidate(action: EditAction): boolean {
+  if (action.type !== "Insert" && action.type !== "Delete") return false;
+  const node = namedNode(action.node);
+  if (!node.label || !MOVABLE_KINDS.has(node.kind)) return false;
+  return (
+    node.kind !== "Variable" ||
+    !action.context.some((ctx) => MOVABLE_KINDS.has(ctx.kind) && ctx.kind !== "file" && ctx.label)
+  );
+}
 
 /**
  * Find cross-file moves across a set of per-file diffs.
@@ -61,13 +89,7 @@ export function correlate(
 
   for (const fc of fileChanges) {
     for (const action of fc.actions) {
-      // Only named things are worth correlating. An anonymous fragment that
-      // happens to be structurally identical in two files is not a move any
-      // reader recognises -- "template_substitution moved from a.ts to b.ts"
-      // is noise -- and a cross-file move is always reported by name.
-      // An exported top-level function moves as an unlabeled Export wrapper
-      // around the labeled Function; the name is one level down.
-      if (namedNode(action.node).label === undefined) continue;
+      if (!isMoveCandidate(action)) continue;
       if (action.type === "Delete") {
         deletions.push({ action, file: fc.filePath });
       } else if (action.type === "Insert") {
@@ -94,6 +116,24 @@ export function correlate(
     insByStructure.set(h, list);
   }
 
+  const exactInsertions = new Map<number, typeof insertions>();
+  const exactKey = (node: Node) =>
+    node.kind === "file" && node.value !== undefined ? hashText(node.value) : node.contentHash;
+  for (const ins of insertions) {
+    const key = exactKey(ins.action.node);
+    const bucket = exactInsertions.get(key) ?? [];
+    bucket.push(ins);
+    exactInsertions.set(key, bucket);
+  }
+  const tokenCache = new WeakMap<Node, Set<string>>();
+  const tokens = (node: Node) => {
+    let set = tokenCache.get(node);
+    if (!set) {
+      set = new Set(tokenize(nodeText(node, node.kind !== "file")));
+      tokenCache.set(node, set);
+    }
+    return set;
+  };
   const moves: CrossFileMatch[] = [];
   const matchedDeletions = new Set<(typeof deletions)[0]>();
   const matchedInsertions = new Set<(typeof insertions)[0]>();
@@ -107,7 +147,8 @@ export function correlate(
       if (matchedDeletions.has(del)) continue;
 
       // Exact content_hash match → unambiguous move
-      for (const ins of insGroup) {
+      for (const ins of exactInsertions.get(exactKey(del.action.node)) ?? []) {
+        if (ins.action.node.kind !== del.action.node.kind) continue;
         if (matchedInsertions.has(ins)) continue;
         if (del.file === ins.file) continue; // skip same-file
 
@@ -118,7 +159,9 @@ export function correlate(
         // sides even when not one byte of the content changed.
         const exact =
           treesEqual(del.action.node, ins.action.node) ||
-          (del.action.node.value !== undefined && del.action.node.value === ins.action.node.value);
+          (del.action.node.kind === "file" &&
+            del.action.node.value !== undefined &&
+            del.action.node.value === ins.action.node.value);
         if (exact) {
           moves.push({
             node: namedNode(ins.action.node),
@@ -126,6 +169,8 @@ export function correlate(
             toFile: ins.file,
             modified: false,
             similarity: 1.0,
+            deletion: del.action,
+            insertion: ins.action,
           });
           matchedDeletions.add(del);
           matchedInsertions.add(ins);
@@ -138,11 +183,23 @@ export function correlate(
         let bestIns: (typeof insertions)[0] | null = null;
         let bestScore = 0;
 
-        for (const ins of insGroup) {
+        const candidates =
+          insGroup.length <= MAX_SIMILARITY_CANDIDATES
+            ? insGroup
+            : insGroup.filter(
+                (ins) => namedNode(ins.action.node).label === namedNode(del.action.node).label,
+              );
+        if (candidates.length > MAX_SIMILARITY_CANDIDATES) continue;
+        for (const ins of candidates) {
           if (matchedInsertions.has(ins)) continue;
+          if (
+            del.action.node.kind !== "file" &&
+            namedNode(del.action.node).label !== namedNode(ins.action.node).label
+          )
+            continue;
           if (del.file === ins.file) continue; // skip same-file (already handled by core)
 
-          const score = nodeSimilarity(del.action.node, ins.action.node);
+          const score = nodeSimilarity(tokens(del.action.node), tokens(ins.action.node));
           if (score > bestScore) {
             bestScore = score;
             bestIns = ins;
@@ -154,8 +211,10 @@ export function correlate(
             node: namedNode(bestIns.action.node),
             fromFile: del.file,
             toFile: bestIns.file,
-            modified: bestScore < 1.0,
+            modified: true,
             similarity: bestScore,
+            deletion: del.action,
+            insertion: bestIns.action,
           });
           matchedDeletions.add(del);
           matchedInsertions.add(bestIns);
@@ -182,37 +241,24 @@ function namedNode(node: Node): Node {
  * Flattens the node tree into a bag of tokens and computes
  * the intersection/union ratio.
  */
-function nodeSimilarity(a: Node, b: Node): number {
-  // A whole-file node's label is its path, and a renamed file's two paths
-  // differ by definition. Scoring path tokens against each other dilutes
-  // the content similarity that decides whether the file was also edited:
-  // a one-token edit plus a rename scored 0.54 and fell under the threshold,
-  // reporting the file as deleted and re-added.
-  const fileToFile = a.kind === "file" && b.kind === "file";
-  const tokensA = tokenize(nodeText(a, !fileToFile));
-  const tokensB = tokenize(nodeText(b, !fileToFile));
-
-  if (tokensA.length === 0 && tokensB.length === 0) return 0;
-
-  const setA = new Set(tokensA);
-  const setB = new Set(tokensB);
-
+function nodeSimilarity(setA: Set<string>, setB: Set<string>): number {
   let intersection = 0;
-  for (const t of setA) {
-    if (setB.has(t)) intersection++;
-  }
-
-  const union = new Set([...setA, ...setB]).size;
+  const small = setA.size <= setB.size ? setA : setB;
+  const large = small === setA ? setB : setA;
+  for (const token of small) if (large.has(token)) intersection++;
+  const union = setA.size + setB.size - intersection;
   return union > 0 ? intersection / union : 0;
 }
 
 /** Extract all text from a node tree (flattened) */
 function nodeText(node: Node, includeLabel = true): string {
   const parts: string[] = [];
-  if (includeLabel && node.label) parts.push(node.label);
-  if (node.value) parts.push(node.value);
-  for (const child of node.children) {
-    parts.push(nodeText(child, includeLabel));
+  const stack = [node];
+  while (stack.length) {
+    const current = stack.pop()!;
+    if (includeLabel && current.label) parts.push(current.label);
+    if (current.value) parts.push(current.value);
+    for (const child of current.children) stack.push(child);
   }
   return parts.join(" ");
 }
