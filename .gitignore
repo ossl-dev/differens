@@ -1,5 +1,15 @@
-target/
+# Rust build output
+/target/
+
+# Local machine and environment files
 *.log
 .DS_Store
 .env
 .env.local
+
+# Local agent indexes, settings, and transient hook state
+/.cocoindex_code/
+/.claude/settings.local.json
+**/.impeccable/hook.cache.json
+**/.impeccable/hook.pending.json
+**/.impeccable/config.local.json
