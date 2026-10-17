@@ -1,0 +1,239 @@
+{
+  "sourceCommit": "4014d5b7a1cedb81e559126f3979524850b97013",
+  "samples": 7,
+  "warmupRuns": 1,
+  "filesystem": "warm",
+  "measure": "new process, Git reads, parsing, matching, correlation, narration, JSON stdout captured",
+  "arch": "aarch64",
+  "os": "macos",
+  "repositories": [
+    {
+      "name": "express",
+      "url": "https://github.com/expressjs/express.git",
+      "old": "98bd4cd96b250d25e1672c36f49cfc743bc801e7",
+      "new": "a419aa7350389a275ab45fde2e849ed1f02449ef",
+      "files": 8,
+      "actions": 620,
+      "fallbacks": [],
+      "measurements": {
+        "after": {
+          "medianMs": 83.94425,
+          "p95Ms": 91.914,
+          "allMs": [
+            81.970167,
+            82.20704199999999,
+            82.48095799999999,
+            83.94425,
+            85.128833,
+            91.28708300000001,
+            91.914
+          ]
+        },
+        "before": {
+          "medianMs": 118.395792,
+          "p95Ms": 123.405667,
+          "allMs": [
+            115.477875,
+            115.850958,
+            118.02175,
+            118.395792,
+            120.19241699999999,
+            122.2255,
+            123.405667
+          ]
+        },
+        "baselineActions": 3797
+      }
+    },
+    {
+      "name": "flask",
+      "url": "https://github.com/pallets/flask.git",
+      "old": "514fc6b3e8402e4c646d5284e97a4f0ab50a7c4b",
+      "new": "d086db856be187255b8ec61ef409357393020f32",
+      "files": 18,
+      "actions": 499,
+      "fallbacks": [],
+      "measurements": {
+        "after": {
+          "medianMs": 138.35958300000001,
+          "p95Ms": 149.335667,
+          "allMs": [
+            119.156167,
+            128.417041,
+            134.187417,
+            138.35958300000001,
+            144.057083,
+            148.70370799999998,
+            149.335667
+          ]
+        },
+        "before": {
+          "medianMs": 157.10062499999998,
+          "p95Ms": 175.407916,
+          "allMs": [
+            147.234208,
+            153.08645800000002,
+            155.564208,
+            157.10062499999998,
+            162.40137499999997,
+            169.534042,
+            175.407916
+          ]
+        },
+        "baselineActions": 499
+      }
+    },
+    {
+      "name": "ripgrep",
+      "url": "https://github.com/BurntSushi/ripgrep.git",
+      "old": "d57de83a944c1b349be376b6762334009372d454",
+      "new": "3fce3b5bb0236da2df6d99672afb8a719642eca7",
+      "files": 21,
+      "actions": 258,
+      "fallbacks": [],
+      "measurements": {
+        "after": {
+          "medianMs": 113.446583,
+          "p95Ms": 113.9995,
+          "allMs": [
+            111.071625,
+            111.781875,
+            112.839,
+            113.446583,
+            113.57825000000001,
+            113.649834,
+            113.9995
+          ]
+        },
+        "before": {
+          "medianMs": 136.174458,
+          "p95Ms": 140.227666,
+          "allMs": [
+            135.15333299999998,
+            135.817542,
+            135.894709,
+            136.174458,
+            138.535458,
+            139.194917,
+            140.227666
+          ]
+        },
+        "baselineActions": 258
+      }
+    },
+    {
+      "name": "chi",
+      "url": "https://github.com/go-chi/chi.git",
+      "old": "ae6be7469132cf471ca099d8c7bda4010c4ff7b2",
+      "new": "3a33ba578e0dd93444e0ff386cc26e665d92e31e",
+      "files": 19,
+      "actions": 374,
+      "fallbacks": [],
+      "measurements": {
+        "after": {
+          "medianMs": 84.316584,
+          "p95Ms": 84.452209,
+          "allMs": [
+            83.49199999999999,
+            83.588667,
+            84.124583,
+            84.316584,
+            84.338917,
+            84.365791,
+            84.452209
+          ]
+        },
+        "before": {
+          "medianMs": 107.124542,
+          "p95Ms": 109.162833,
+          "allMs": [
+            106.03025000000001,
+            106.15537499999999,
+            106.66166700000001,
+            107.124542,
+            107.57304199999999,
+            107.950542,
+            109.162833
+          ]
+        },
+        "baselineActions": 375
+      }
+    },
+    {
+      "name": "prettier",
+      "url": "https://github.com/prettier/prettier.git",
+      "old": "c95bd90928d784d2559872d7ea9b021bea1bd4eb",
+      "new": "344d6dc42c8057fbf5573326b52dbc8a43635e7e",
+      "files": 33,
+      "actions": 700,
+      "fallbacks": [],
+      "measurements": {
+        "after": {
+          "medianMs": 93.571709,
+          "p95Ms": 97.381833,
+          "allMs": [
+            92.14958299999999,
+            92.335042,
+            93.444375,
+            93.571709,
+            96.49199999999999,
+            97.228,
+            97.381833
+          ]
+        },
+        "before": {
+          "medianMs": 136.704709,
+          "p95Ms": 149.2825,
+          "allMs": [
+            132.89100000000002,
+            136.106709,
+            136.42820899999998,
+            136.704709,
+            138.581833,
+            139.835292,
+            149.2825
+          ]
+        },
+        "baselineActions": 6681
+      }
+    }
+  ],
+  "baselineCommit": "7b7301cf4b9adf1d07e1bfa3fe8325050d61e8e1",
+  "baselineBinarySha256": "c0fcbc1a84de3ed7854cd47823cbe57c374d7c7d4c25583fd3a3a79aebc92bed",
+  "sourceBinarySha256": "918867603bfe55621ffa3ee41e2eff72c41bf444405796deab99f80119194a0a",
+  "date": "2026-10-17",
+  "osVersion": "26.6.2",
+  "cpu": "Apple M2 Pro",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Homebrew)",
+  "git": "git version 2.54.0 (Apple Git-157)",
+  "modeChecks": [
+    {
+      "name": "express",
+      "old": "98bd4cd96b250d25e1672c36f49cfc743bc801e7",
+      "new": "a419aa7350389a275ab45fde2e849ed1f02449ef",
+      "modes": [
+        "commits",
+        "directories",
+        "working-tree"
+      ],
+      "exactDecodedJsonEqual": true,
+      "actions": 620,
+      "moves": 0,
+      "fallbacks": []
+    },
+    {
+      "name": "chi",
+      "old": "ae6be7469132cf471ca099d8c7bda4010c4ff7b2",
+      "new": "3a33ba578e0dd93444e0ff386cc26e665d92e31e",
+      "modes": [
+        "commits",
+        "directories",
+        "working-tree"
+      ],
+      "exactDecodedJsonEqual": true,
+      "actions": 374,
+      "moves": 0,
+      "fallbacks": []
+    }
+  ]
+}

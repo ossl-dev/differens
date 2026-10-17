@@ -48,3 +48,62 @@ runner's input generator in `xtask/src/benchmark.rs`, preserve the same absolute
 legacy invocation against the release binary with `--format=json`. The Node
 baseline bundles the CLI for Node while retaining its native Tree-sitter modules.
 Never compare the earlier single-shot library timers with process measurements.
+
+## Real repository audit
+
+`cargo xtask audit-repos --repos-dir target/audit-repos --fetch --samples 7`
+checks pinned Express, Flask, ripgrep, chi, and Prettier histories. The manifest
+is `benchmarks/real-repos.json`. The audit verifies all 99 changed paths, expected
+named changes, selected LLM facts, JSON/NDJSON agreement, and equal results with
+automatic, one, and four workers. It also saves all three human formats for review.
+
+The paired results in `benchmarks/results/real-repos.json` compare the initial
+native migration at `7b7301c` with the audited native implementation. These are
+Rust-before/Rust-after measurements, separate from the JavaScript comparison
+above. Each binary gets one warmup and seven measured processes with rotating
+order and warm filesystem caches; JSON stdout is captured. Repository code and
+dependency scripts are never run.
+
+| Repository | Before audit | After audit | Median speedup |
+| --- | ---: | ---: | ---: |
+| express | 118.40 ms | 83.94 ms | 1.41× |
+| flask | 157.10 ms | 138.36 ms | 1.14× |
+| ripgrep | 136.17 ms | 113.45 ms | 1.20× |
+| chi | 107.12 ms | 84.32 ms | 1.27× |
+| prettier | 136.70 ms | 93.57 ms | 1.46× |
+
+All five comparisons had zero fallbacks. These timings were measured on macOS
+arm64; raw samples and machine metadata are retained with the results.
+
+Corrected line alignment reduces raw action counts for the large history/raw
+text inputs in Express and Prettier. The path and format checks still pass;
+smaller action counts are not themselves evidence of equivalent output quality.
+The chi audit requires all four changed receivers and rejects a phantom update
+inside its newly added helper. The ripgrep audit rejects false function moves
+caused by repeated comments and attributes.
+
+Full old/new directory snapshots and a Git working tree patched to the exact new
+tree were also compared for Express and chi. Their decoded JSON, including order,
+moves, and fallback metadata, matched the commit-range reports exactly.
+
+## Isolated stress cases
+
+`benchmarks/results/rust-audit-stress.json` records component measurements collected
+during the audit, with source revisions, sample counts, and scope. Repeated
+subtrees and deep anchored chains exposed quadratic matching; indexed name lookup
+removed repeated candidate scans. Buffered spill I/O fixed excessive small writes
+and reads. Compact detached Unicode maps retain only relevant source boundaries.
+
+| Workload | Before | After | Scope |
+| --- | ---: | ---: | --- |
+| 10,000 repeated containers | 921.10 ms | 3.50 ms | Matching only |
+| 5,000-level anchored chain | 154.34 ms | 1.36 ms | Matching only |
+| 1,000 modified candidates | 74.15 ms | 1.62 ms | Correlation only |
+| 10.4 MB whole-file rename | 16,686 ms | 365 ms | Native process, NDJSON discarded |
+| 1,000 changed small Git files | 77.45 ms | 61.84 ms | Native Git range process |
+
+These synthetic cases target specific defects and do not predict ordinary
+repository speedups. The first two exclude tree construction and parsing.
+Detached metadata for a tiny node after 100,000 non-ASCII characters fell from
+1,600,064 to 80 bytes, while preserving the legacy JSON projection. Those figures
+describe that retained metadata, not peak process memory.

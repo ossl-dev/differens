@@ -1,0 +1,61 @@
+{
+  "baselineCommit": "7b7301cf4b9adf1d07e1bfa3fe8325050d61e8e1",
+  "candidateCommit": "82e49f2777608168331dd522fab28dfafa27967f",
+  "os": "macos",
+  "arch": "aarch64",
+  "method": "Isolated component comparisons collected during the audit; values are medians where timing applies. Timings are workload-specific, not universal speedup claims.",
+  "cases": [
+    {
+      "case": "10000 repeated two-node containers; append one sibling",
+      "scope": "core matching only; excludes construction and parsing",
+      "samples": 5,
+      "beforeMs": 921.1,
+      "afterMs": 3.5
+    },
+    {
+      "case": "5000-level anchored chain; one changed leaf",
+      "scope": "core matching only; excludes construction and parsing",
+      "samples": 5,
+      "beforeMs": 154.338,
+      "afterMs": 1.357
+    },
+    {
+      "case": "1000 modified declaration candidates",
+      "scope": "correlation kernel; indexed versus streaming name lookup",
+      "samples": 5,
+      "beforeMs": 74.15,
+      "afterMs": 1.62,
+      "beforeMetadataReads": 1004000,
+      "afterMetadataReads": 4000
+    },
+    {
+      "case": "10.4 MB newline-rich whole-file rename",
+      "scope": "native NDJSON process with output discarded; spill read/write buffering",
+      "samples": 3,
+      "beforeMs": 16686.0,
+      "afterMs": 365.0
+    },
+    {
+      "case": "1000 changed small Git files",
+      "scope": "native Git range process; bounded blob lookahead",
+      "samples": 5,
+      "beforeMs": 77.45,
+      "afterMs": 61.84
+    },
+    {
+      "case": "two identical commit refs",
+      "scope": "native process and Git dispatch; removes redundant ref resolution",
+      "samples": 7,
+      "beforeMs": 54.5,
+      "afterMs": 38.6
+    },
+    {
+      "case": "tiny detached node after 100000 non-ASCII characters",
+      "scope": "retained metadata and serialized snapshot; identical legacy JSON",
+      "beforeAuxiliaryBytes": 1600064,
+      "afterAuxiliaryBytes": 80,
+      "beforeSnapshotBytes": 1433679,
+      "afterSnapshotBytes": 345
+    }
+  ]
+}

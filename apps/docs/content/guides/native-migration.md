@@ -50,3 +50,24 @@ Reinstall a Git driver after moving the binary because local configuration recor
 its executable path. Use a retained previous release artifact for rollback. Native
 speed/memory improvements require same-quality release measurements; changing the
 implementation language does not establish a fixed speedup.
+
+## Post-migration audit corrections
+
+The native audit also covers issues inherited from the previous implementation:
+
+- Markup keeps trailing slashes in unquoted URLs and the order of mixed text.
+- JSON5/TOML non-finite numbers use an explicit fallback rather than becoming null.
+- TOML datetimes remain scalar strings; private-looking user keys remain data.
+- C/C++ declarator syntax no longer becomes part of an identifier's name.
+- Python decorators and class assignments retain named scopes.
+- Go methods sharing a name match and render by receiver identity; matching cannot
+  borrow a body from a different receiver when extracting a helper.
+- Dirty, uninitialized, and unborn submodules preserve observable Git changes.
+- LLM headers include cross-file moves and preserve raw counts after grouping.
+- Structural body replacements retain their named function or method in LLM reports.
+- Long value previews reveal the actual edit; embedded backticks remain valid Markdown.
+
+Bounded line alignment uses unique unchanged anchors after its exact-work budget
+expires. This avoids cascading positional edits without claiming a globally
+minimal script. Performance evidence and reproducible commands are described in
+[benchmarks](/guides/benchmarks.html).
