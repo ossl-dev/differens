@@ -29,7 +29,17 @@
     "expected": {
       "file": "crates/core/flags/hiargs.rs",
       "kind": "Function",
-      "label": "index_read"
+      "label": "index_read",
+      "llm_excludes": [
+        "> function min_depth",
+        "> function symlinks",
+        "> function first_path_not_symlink",
+        "> function symlink_loop",
+        "> function same_file_system",
+        "> function no_read_permissions",
+        "> function filter",
+        "> function empty"
+      ]
     }
   },
   {

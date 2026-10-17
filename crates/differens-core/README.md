@@ -37,8 +37,10 @@ Detached nodes and flat snapshots retain their applicable keys.
 
 Actions are `Insert`, `Delete`, `Update`, or `Move`. Rename and value updates
 precede moves, deletions, and insertions. Added or removed subtrees produce one
-action. Sibling reorders retain a longest increasing subsequence to minimize
-reported moves. Context lists ancestors nearest first, including the root.
+action. Sibling reorders use a longest increasing subsequence. Named containers
+that retain their relative order stay anchored while anonymous siblings align
+within the remaining intervals. Context lists ancestors nearest first, including
+the root.
 
 Legacy hashes use UTF-16 code units and two folded FNV streams. Hash agreement
 only selects candidates: exact content and topology checks establish equality.

@@ -46,7 +46,7 @@ fn compare(old: &Arc<Tree>, new: &Arc<Tree>) -> differens_core::DiffResult {
 
 `EditAction` variants are `Insert`, `Delete`, `Update`, and `Move`. Each owns node references and a nearest-first `Vec<NodeContext>`. Updates carry `UpdateDetail::Renamed { from, to }` or `ValueChanged { from, to }`. A scalar type transition qualifies the values with their types. Missing values remain `None`.
 
-Actions are ordered updates, moves, deletions, insertions. Subtree additions/removals absorb descendant edits; sibling reorders use a longest increasing subsequence. This is a deterministic heuristic edit script, not a guarantee of a globally minimal tree edit distance.
+Actions are ordered updates, moves, deletions, insertions. Subtree additions/removals absorb descendant edits; sibling reorders use a longest increasing subsequence, anchoring named containers whose relative order stays unchanged before aligning anonymous siblings between them. This is a deterministic heuristic edit script, not a guarantee of a globally minimal tree edit distance.
 
 ## Hashes and serialization
 

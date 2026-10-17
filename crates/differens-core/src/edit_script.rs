@@ -80,8 +80,7 @@ pub(crate) fn generate(old: &Arc<Tree>, new: &Arc<Tree>, matching: &Matching) ->
             continue;
         }
         group.sort_by_key(|&(i, _)| old.nodes[i].position);
-        let sequence: Vec<_> = group.iter().map(|&(_, j)| new.nodes[j].position).collect();
-        let keep = longest_increasing_subsequence(&sequence);
+        let keep = sibling_alignment(old, new, &group);
         for (k, (i, j)) in group.into_iter().enumerate() {
             if !keep[k] {
                 moves.push(move_action(
@@ -99,6 +98,65 @@ pub(crate) fn generate(old: &Arc<Tree>, new: &Arc<Tree>, matching: &Matching) ->
     updates.extend(moves);
     updates.extend(unmatched_actions(old, new, matching));
     updates
+}
+
+fn sibling_alignment(old: &Tree, new: &Tree, group: &[(usize, usize)]) -> Vec<bool> {
+    let sequence: Vec<_> = group.iter().map(|&(_, j)| new.nodes[j].position).collect();
+    let mut keep = longest_increasing_subsequence(&sequence);
+    let anchors: Vec<_> = group
+        .iter()
+        .enumerate()
+        .filter_map(|(index, &(i, j))| {
+            let old = &old.nodes[i];
+            let new = &new.nodes[j];
+            (!old.children.is_empty()
+                && !new.children.is_empty()
+                && old.label.as_deref().is_some_and(|label| !label.is_empty())
+                && new.label.as_deref().is_some_and(|label| !label.is_empty()))
+            .then_some(index)
+        })
+        .collect();
+    if anchors.len() < 2
+        || anchors.iter().all(|&index| keep[index])
+        || anchors
+            .windows(2)
+            .any(|pair| sequence[pair[0]] >= sequence[pair[1]])
+    {
+        return keep;
+    }
+    // Duplicate anonymous siblings can claim the longest subsequence while
+    // stable declarations are reported as moved. When every named container
+    // retains its relative order, anchor those declarations and align only
+    // siblings that stay within corresponding intervals. Cross-interval trivia
+    // remains a move. Actual declaration reorders keep the legacy LIS and ties.
+    keep.fill(false);
+    let mut start = 0;
+    let mut lower = None;
+    let mut interval_indices = Vec::new();
+    let mut interval_positions = Vec::new();
+    for end in anchors.into_iter().chain(std::iter::once(group.len())) {
+        let upper = sequence.get(end).copied().unwrap_or(usize::MAX);
+        interval_indices.clear();
+        interval_positions.clear();
+        for (offset, &position) in sequence[start..end].iter().enumerate() {
+            if lower.is_none_or(|lower| position > lower) && position < upper {
+                interval_indices.push(start + offset);
+                interval_positions.push(position);
+            }
+        }
+        for (index, retained) in interval_indices
+            .iter()
+            .zip(longest_increasing_subsequence(&interval_positions))
+        {
+            keep[*index] = retained;
+        }
+        if end < group.len() {
+            keep[end] = true;
+            lower = Some(sequence[end]);
+            start = end + 1;
+        }
+    }
+    keep
 }
 
 fn update_value(node: &crate::Node, other: &crate::Node) -> Option<String> {
