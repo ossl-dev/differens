@@ -346,6 +346,38 @@ fn same_named_go_methods_keep_distinct_receiver_summaries() {
 }
 
 #[test]
+fn llm_keeps_structural_body_changes_under_their_named_owner() {
+    let context = vec![NodeContext {
+        kind: "Function".into(),
+        label: Some("cleanup".into()),
+    }];
+    let changes = narrate(
+        &[
+            EditAction::Delete {
+                node: node("statement_list", None, None),
+                context: context.clone(),
+            },
+            EditAction::Insert {
+                node: node("statement_list", None, None),
+                parent: node("Block", None, None),
+                position: 0,
+                context,
+            },
+        ],
+        Some("cleanup.go"),
+    );
+    let output = format_changes(&changes, OutputFormat::Llm).unwrap();
+    assert!(output.contains("2 changes 1 named"), "{output}");
+    assert!(
+        output.contains("modified function cleanup (1 removal, 1 addition)"),
+        "{output}"
+    );
+    let prepared = differens_narrate::prepare_llm_changes(&changes);
+    assert_eq!(prepared.len(), 1);
+    assert!(prepared[0].description.contains("function `cleanup`"));
+}
+
+#[test]
 fn markdown_values_with_backticks_round_trip_as_inline_code() {
     use pulldown_cmark::{Event, Parser};
     let old = "use `req.accepted`";

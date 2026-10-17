@@ -428,7 +428,12 @@ fn minor(action: &EditAction) -> bool {
     matches!(
         action.node().kind.as_str(),
         "line" | "word" | "Comment" | "comment"
-    ) || (!matches!(action, EditAction::Update { .. }) && action.node().label.is_none())
+    ) || (!matches!(action, EditAction::Update { .. })
+        && action.node().label.is_none()
+        && !action
+            .context()
+            .iter()
+            .any(|context| context.label.is_some() && is_declaration(&context.kind)))
 }
 
 /// Group named LLM facts while tree ancestry is still available, retaining minor
