@@ -54,10 +54,23 @@ fn root() -> PathBuf {
         .to_owned()
 }
 fn command(program: &str, args: &[&str]) -> Result<()> {
-    let status = Command::new(program)
-        .args(args)
-        .current_dir(root())
-        .status()?;
+    // Keep nested Cargo invocations on the toolchain that launched xtask,
+    // even when another Cargo/Rust installation appears first on PATH.
+    let executable = if program == "cargo" {
+        std::env::var_os("CARGO").unwrap_or_else(|| program.into())
+    } else {
+        program.into()
+    };
+    let mut command = Command::new(&executable);
+    if program == "cargo" && std::env::var_os("RUSTC").is_none() {
+        let compiler = Path::new(&executable)
+            .parent()
+            .map(|directory| directory.join(format!("rustc{}", std::env::consts::EXE_SUFFIX)));
+        if let Some(compiler) = compiler.filter(|path| path.is_absolute() && path.is_file()) {
+            command.env("RUSTC", compiler);
+        }
+    }
+    let status = command.args(args).current_dir(root()).status()?;
     if !status.success() {
         return Err(format!("{program} {} failed with {status}", args.join(" ")).into());
     }
