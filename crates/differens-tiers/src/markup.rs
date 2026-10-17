@@ -8,6 +8,7 @@ struct Element {
     tag: String,
     attrs: BTreeMap<String, String>,
     text: String,
+    text_runs: Vec<([usize; 2], String)>,
     children: Vec<usize>,
     range: [usize; 2],
 }
@@ -94,10 +95,59 @@ pub fn parse_markup(source: &str) -> Result<Arc<Tree>, ParseError> {
         let end = rest[step..]
             .find('<')
             .map_or(source.len(), |offset| pos + offset + step);
-        elements[parent].text.push_str(&source[pos..end]);
+        let last_child_start = elements[parent]
+            .children
+            .last()
+            .map(|id| elements[*id].range[0]);
+        let parent_element = &mut elements[parent];
+        let fragment = &source[pos..end];
+        if let Some((range, text)) = parent_element
+            .text_runs
+            .last_mut()
+            .filter(|(range, _)| last_child_start.is_none_or(|child_start| range[0] > child_start))
+        {
+            range[1] = end;
+            text.push_str(fragment);
+        } else {
+            parent_element
+                .text_runs
+                .push(([pos, end], fragment.to_owned()));
+        }
         pos = end;
     }
+    retain_text_order(&mut elements, &mut node_count)?;
     build_tree(&elements, source)
+}
+
+// Keep text-only elements compact and compatible. Mixed content needs ordered
+// text children: aggregating it on the parent loses moves across inline tags.
+fn retain_text_order(
+    elements: &mut Vec<Element>,
+    node_count: &mut usize,
+) -> Result<(), ParseError> {
+    for id in 0..elements.len() {
+        if elements[id].children.is_empty() || elements[id].text_runs.is_empty() {
+            continue;
+        }
+        let mut children = std::mem::take(&mut elements[id].children);
+        for (range, text) in std::mem::take(&mut elements[id].text_runs) {
+            *node_count += 1;
+            if *node_count > 50_000 {
+                return Err(ParseError::Budget);
+            }
+            children.push(elements.len());
+            elements.push(Element {
+                tag: "text_content".to_owned(),
+                text,
+                range,
+                ..Element::default()
+            });
+        }
+        children.sort_unstable_by_key(|child| elements[*child].range[0]);
+        elements[id].children = children;
+        elements[id].text = String::new();
+    }
+    Ok(())
 }
 
 fn build_tree(elements: &[Element], source: &str) -> Result<Arc<Tree>, ParseError> {
@@ -136,10 +186,12 @@ fn build_tree(elements: &[Element], source: &str) -> Result<Arc<Tree>, ParseErro
             .get("id")
             .or_else(|| element.attrs.get("class"))
             .cloned();
-        spec.value = if element.text.is_empty() {
-            None
-        } else {
+        spec.value = if !element.text.is_empty() {
             Some(element.text.clone())
+        } else if element.children.is_empty() {
+            element.text_runs.first().map(|(_, text)| text.clone())
+        } else {
+            None
         };
         spec.children = children;
         spec.byte_range = element.range;
@@ -191,7 +243,7 @@ fn attributes(
                 source = source.get(end + 1..).unwrap_or("");
             } else {
                 let end = source.find(char::is_whitespace).unwrap_or(source.len());
-                source[..end].trim_end_matches('/').clone_into(&mut value);
+                source[..end].clone_into(&mut value);
                 source = &source[end..];
             }
         }

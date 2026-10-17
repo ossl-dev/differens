@@ -3,6 +3,8 @@
 //! rather than locations in the original document.
 //! JSON5 requires Pest >=2.9.4 for native stack guards; TOML retains its default
 //! recursion limit, and YAML is checked before recursive tree construction.
+mod json;
+mod toml;
 use crate::ParseError;
 use differens_core::{NodeId, NodeSpec, Tree, TreeBuilder};
 use serde_json::{Map, Value};
@@ -37,11 +39,10 @@ pub fn parse_data(source: &str) -> Result<Arc<Tree>, ParseError> {
 pub fn parse_data_as(source: &str, extension: &str) -> Result<Arc<Tree>, ParseError> {
     let value = match extension {
         "json" => {
+            json::check_budget(source)?;
             serde_json::from_str(source).map_err(|error| ParseError::Syntax(error.to_string()))?
         }
-        "jsonc" | "json5" => {
-            json5::from_str(source).map_err(|error| ParseError::Syntax(error.to_string()))?
-        }
+        "jsonc" | "json5" => json::parse_json5(source)?,
         "yaml" | "yml" => {
             check_yaml_budget(source)?;
             let documents = YamlLoader::load_from_str(source)
@@ -61,11 +62,7 @@ pub fn parse_data_as(source: &str, extension: &str) -> Result<Arc<Tree>, ParseEr
                     .unwrap_or(Value::Null)
             }
         }
-        "toml" => {
-            let value: toml::Value =
-                toml::from_str(source).map_err(|error| ParseError::Syntax(error.to_string()))?;
-            serde_json::to_value(value).map_err(|error| ParseError::Syntax(error.to_string()))?
-        }
+        "toml" => toml::parse(source)?,
         "env" | "local" | "ini" | "cfg" => parse_assignments(source)?,
         _ => Value::String(source.trim().to_owned()),
     };
@@ -219,7 +216,11 @@ fn parse_assignments(source: &str) -> Result<Value, ParseError> {
                 .ok_or_else(|| ParseError::Syntax("section overlaps scalar".to_owned()))?;
         }
         let value = value.trim();
-        let scalar = json5::from_str(value).unwrap_or_else(|_| Value::String(value.to_owned()));
+        let scalar = match json::parse_json5(value) {
+            Ok(value) => value,
+            Err(ParseError::Budget) => return Err(ParseError::Budget),
+            Err(_) => Value::String(value.to_owned()),
+        };
         object.insert(key.trim().to_owned(), scalar);
     }
     Ok(Value::Object(root))

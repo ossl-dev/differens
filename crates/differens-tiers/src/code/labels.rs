@@ -36,60 +36,78 @@ pub(super) fn extract(language: &str, node: Node<'_>, source: &str) -> Option<St
     if let Some(name) = node.child_by_field_name("name") {
         return Some(text(name, source));
     }
-    let found = match (language, node.kind()) {
-        ("typescript", "variable_declaration" | "lexical_declaration") => {
-            child_kind(node, "variable_declarator")
-                .and_then(|child| child.child_by_field_name("name"))
-        }
-        ("rust", "type_item") => node.child_by_field_name("type"),
-        ("c" | "cpp", "function_definition") => node
-            .child_by_field_name("declarator")
-            .and_then(|child| child.child_by_field_name("declarator")),
-        ("c" | "cpp", "declaration") => node.child_by_field_name("declarator").and_then(|child| {
-            if matches!(child.kind(), "init_declarator" | "function_declarator") {
-                child.child_by_field_name("declarator")
-            } else {
-                Some(child)
+    let found =
+        match (language, node.kind()) {
+            ("typescript", "variable_declaration" | "lexical_declaration") => {
+                child_kind(node, "variable_declarator")
+                    .and_then(|child| child.child_by_field_name("name"))
             }
-        }),
-        ("c" | "cpp", "field_declaration") => {
-            node.child_by_field_name("declarator").and_then(|child| {
-                if language == "cpp" && child.kind() == "function_declarator" {
-                    child.child_by_field_name("declarator")
-                } else {
-                    Some(child)
+            ("python", "decorated_definition") => node
+                .child_by_field_name("definition")
+                .and_then(|definition| definition.child_by_field_name("name")),
+            ("python", "assignment" | "augmented_assignment") => node.child_by_field_name("left"),
+            ("rust", "type_item") => node.child_by_field_name("type"),
+            ("c" | "cpp", "function_definition" | "declaration" | "field_declaration") => {
+                let mut declarator = node.child_by_field_name("declarator");
+                while let Some(inner) = declarator.and_then(|child| {
+                    child.child_by_field_name("declarator").or_else(|| {
+                        if child.kind() == "parenthesized_declarator" {
+                            child.named_child(0)
+                        } else {
+                            None
+                        }
+                    })
+                }) {
+                    declarator = Some(inner);
                 }
-            })
-        }
-        ("java", "local_variable_declaration" | "field_declaration") => node
-            .child_by_field_name("declarator")
-            .and_then(|child| child.child_by_field_name("name")),
-        ("ruby", "instance_variable") => Some(node),
-        ("php", "property_declaration") => {
-            child_kind(node, "property_element").and_then(|child| child.child_by_field_name("name"))
-        }
-        (
-            "kotlin",
-            "class_declaration"
-            | "function_declaration"
-            | "property_declaration"
-            | "variable_declaration"
-            | "type_alias"
-            | "parameter"
-            | "class_parameter"
-            | "enum_entry",
-        ) => identifier(node),
-        ("csharp", "variable_declaration" | "field_declaration") => {
-            descendant(node, "variable_declarator")
-                .and_then(|child| child.child_by_field_name("name"))
-        }
-        ("scala", "val_definition" | "var_definition") => node
-            .child_by_field_name("pattern")
-            .or_else(|| child_kind(node, "identifier")),
-        ("lua", "variable_declaration") => {
-            descendant(node, "variable_list").and_then(|child| child.child_by_field_name("name"))
-        }
-        _ => None,
-    };
+                declarator
+            }
+            ("java", "local_variable_declaration" | "field_declaration") => node
+                .child_by_field_name("declarator")
+                .and_then(|child| child.child_by_field_name("name")),
+            ("ruby", "instance_variable") => Some(node),
+            ("php", "property_declaration") => child_kind(node, "property_element")
+                .and_then(|child| child.child_by_field_name("name")),
+            (
+                "kotlin",
+                "class_declaration"
+                | "function_declaration"
+                | "property_declaration"
+                | "variable_declaration"
+                | "type_alias"
+                | "parameter"
+                | "class_parameter"
+                | "enum_entry",
+            ) => identifier(node),
+            ("csharp", "variable_declaration" | "field_declaration") => {
+                descendant(node, "variable_declarator")
+                    .and_then(|child| child.child_by_field_name("name"))
+            }
+            ("scala", "val_definition" | "var_definition") => node
+                .child_by_field_name("pattern")
+                .or_else(|| child_kind(node, "identifier")),
+            ("lua", "variable_declaration") => descendant(node, "variable_list")
+                .and_then(|child| child.child_by_field_name("name")),
+            _ => None,
+        };
     found.map(|node| text(node, source))
+}
+
+// A Go method's receiver identifies its owning type independently of the local
+// receiver variable, pointer form, or generic parameter names. This is matcher
+// metadata only; public labels remain the original method name.
+pub(super) fn match_key(language: &str, node: Node<'_>, source: &str) -> Option<String> {
+    if language != "go" || node.kind() != "method_declaration" {
+        return None;
+    }
+    let receiver = node.child_by_field_name("receiver")?;
+    let declaration = child_kind(receiver, "parameter_declaration")?;
+    let mut receiver_type = declaration.child_by_field_name("type")?;
+    while receiver_type.kind() == "pointer_type" {
+        receiver_type = receiver_type.named_child(0)?;
+    }
+    if receiver_type.kind() == "generic_type" {
+        receiver_type = receiver_type.child_by_field_name("type")?;
+    }
+    Some(format!("go::{}", &source[receiver_type.byte_range()]))
 }

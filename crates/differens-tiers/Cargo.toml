@@ -17,10 +17,13 @@ thiserror.workspace = true
 tree-sitter = { workspace = true, optional = true }
 tree-sitter-language = { workspace = true, optional = true }
 yaml-rust2.workspace = true
-toml = { workspace = true, features = ["preserve_order"] }
+toml_edit = { version = "0.22.27", default-features = false, features = ["parse"] }
 json5.workspace = true
 # Enforce native stack guards in JSON5 parsing, including unlocked library consumers.
 pest = "2.9.4"
+
+[dev-dependencies]
+toml = { workspace = true, features = ["preserve_order"] }
 
 [build-dependencies]
 cc.workspace = true

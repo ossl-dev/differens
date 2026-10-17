@@ -391,6 +391,7 @@ mod native {
                     spec.children = frame.children;
                     spec.byte_range = [frame.syntax.start_byte(), frame.syntax.end_byte()];
                     spec.line = Some(frame.syntax.start_position().row + 1);
+                    spec.match_key = labels::match_key(language, frame.syntax, source);
                     spec.emit_match_by_kind = true;
                     spec.match_by_kind = matches!(
                         frame.syntax.kind(),
