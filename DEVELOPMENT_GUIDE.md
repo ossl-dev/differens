@@ -44,8 +44,8 @@ cargo xtask package --dry-run
 
 `cargo xtask coverage` uses `cargo-llvm-cov` and the pinned toolchain's LLVM tools.
 Install that Cargo tool separately when running the coverage gate locally. Its
-configured gate is 95% lines and 90% functions; configured thresholds are not a
-claim about a coverage run that has not been measured.
+gate requires 95% line coverage and 90% function coverage. Check the coverage
+report for the measured result.
 
 Use focused crate tests during implementation, then complete workspace checks.
 Tests exercise real temporary Git repositories, seeded sequence references,

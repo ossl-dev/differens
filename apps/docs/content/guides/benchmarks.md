@@ -18,7 +18,7 @@ Use repeated samples on a quiet machine, reporting median, p95, and spread. Cove
 
 ## Baseline and claims
 
-Frozen legacy fixture provenance lives under `fixtures/parity`; benchmark metadata/results live under `benchmarks`. Existing legacy timings were single-run observations and do not establish a Rust speedup. Native speed and memory claims require reproducible release-build measurements at the same output quality. No fixed multiplier is promised.
+Frozen legacy fixture provenance lives under `fixtures/parity`; benchmark metadata/results live under `benchmarks`. The older single-run library timings are not comparable to the repeated process measurements below. Native speed and memory claims require reproducible release-build measurements at the same output quality. No fixed multiplier is promised.
 
 The core has no default size cap. Tier analysis and sequence work have budgets; reports expose fallbacks. Peak memory includes parser caches, in-flight windows, outputs, and retained correlation candidates, not only the node arena.
 

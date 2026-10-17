@@ -1,21 +1,22 @@
 # TypeScript / JavaScript
 
-The TypeScript extractor covers both languages. One grammar handles `.ts`/`.tsx`, another handles `.js`/`.jsx`/`.mjs`/`.cjs`. Both map onto the same canonical concepts.
+JavaScript and TypeScript share semantic mappings. The native build links separate
+grammars for JavaScript/JSX, TypeScript (`.ts`, `.mts`, `.cts`), and TSX (`.tsx`).
 
 ## What it detects
 
-- **Functions**: declarations, expressions, and arrow functions all become `Function`
-- **Methods**: `method_definition` becomes `Method`
-- **Classes**: declarations and expressions become `Class`
-- **Interfaces**: `interface_declaration` becomes `Interface`
-- **Types**: `type_alias_declaration` becomes `TypeDef`
-- **Enums**: `enum_declaration` becomes `Enum`
-- **Imports**: `import_statement` becomes `Import`, with `NamedImports` / `NamespaceImport` children
-- **Exports**: `export_statement` and `export_default` become `Export`
-- **Variables**: `variable_declaration` (`var`) and `lexical_declaration` (`let`/`const`) become `Variable`, labeled with the declarator name
-- **JSX**: elements, attributes, and expressions are their own concepts
-- **Control flow**: if / for / while / switch / try / return / throw
-- **Literals and expressions**: strings, numbers, templates, regex, booleans, objects, arrays, calls, member access, operators, await / yield
+- Functions: declarations, expressions, and arrow functions all become `Function`
+- Methods: `method_definition` becomes `Method`
+- Classes: declarations and expressions become `Class`
+- Interfaces: `interface_declaration` becomes `Interface`
+- Types: `type_alias_declaration` becomes `TypeDef`
+- Enums: `enum_declaration` becomes `Enum`
+- Imports: `import_statement` becomes `Import`, with `NamedImports` / `NamespaceImport` children
+- Exports: `export_statement` and `export_default` become `Export`
+- Variables: `variable_declaration` (`var`) and `lexical_declaration` (`let`/`const`) become `Variable`, labeled with the declarator name
+- JSX: elements, attributes, and expressions are their own concepts
+- Control flow: if / for / while / switch / try / return / throw
+- Literals and expressions: strings, numbers, templates, regex, booleans, objects, arrays, calls, member access, operators, await / yield
 
 ## Node type mapping
 
@@ -53,11 +54,14 @@ The TypeScript extractor covers both languages. One grammar handles `.ts`/`.tsx`
 
 Node types without a mapping keep their raw tree-sitter type name.
 
-**Labels.** Most declarations are named via the `name` field, read straight off the tree-sitter cursor. `variable_declaration` and `lexical_declaration` are the exceptions. Their names live on a `variable_declarator` child, so they go through `extractLabel`.
+Most declaration labels come from Tree-sitter's `name` field. For `var`, `let`,
+and `const`, the Rust label extractor reads the first `variable_declarator` child.
+The implementation lives in `crates/differens-tiers/src/code/labels.rs`.
 
 ## Example: a TypeScript refactor
 
-Rename `computeTotal` to `calculateTotalAmount`, add a `discount` parameter, and move the function to another file:
+Rename `computeTotal` to `calculateTotalAmount`, add a `discount` parameter, and
+change the function body:
 
 ```typescript before.ts
 export function computeTotal(items: Item[]): number {
@@ -66,31 +70,34 @@ export function computeTotal(items: Item[]): number {
 
 export const TAX_RATE = 0.08;
 ```
+
 ```typescript after.ts
-export const TAX_RATE = 0.08;
-```
-```typescript helpers/math.ts
 export function calculateTotalAmount(items: Item[], discount: number): number {
   const base = items.reduce((acc, item) => acc + item.price, 0);
   return base - discount;
 }
-```
-```text Output
-  cross-file moves:
-  → function `computeTotal` from src/utils.ts to src/helpers/math.ts
-  ~ renamed function `computeTotal` to `calculateTotalAmount`
-  + added parameter `discount` in function `calculateTotalAmount`
-  + added statement `const base = ...` in function `calculateTotalAmount`
-  ~ changed value of return expression from `items.reduce(...)` to `base - discount`
-4 modifications, 1 move
+
+export const TAX_RATE = 0.08;
 ```
 
-A line diff would report `utils.ts` losing a function and `math.ts` gaining one, with the whole body rewritten. The semantic diff reports one function that moved, was renamed, and gained a parameter.
+Running `differens before.ts after.ts`:
+
+```text
+  ~ renamed function `computeTotal` to `calculateTotalAmount`
+  ~ modified function `computeTotal` (1 removal)
+  ~ modified function `calculateTotalAmount` (3 additions)
+```
+
+The human report groups the parameter and body edits under the function names.
+Use `--format=json` to read each action. When comparing directories or repository
+revisions, Differens can also detect moves across files. Modified declaration
+moves must keep the same name; moving and renaming a function together may
+produce an addition and a removal.
 
 ## Known limitations
 
-- **Multi-declarator variables**: `const a = 1, b = 2` labels the `Variable` with the first declarator's name only.
-- **Interface members are distinct concepts**: `property_signature`, `call_signature`, and `method_signature` are separate concepts, not a unified "member".
-- **JSX text is a flat node**: `jsx_text` collapses contiguous text, so inline formatting changes inside JSX text can read as a single update.
-- **No type-flow inference**: the extractor does not distinguish a value used as a type from a type used as a value.
-- **Unmapped node types pass through**: anything outside the map keeps its raw tree-sitter type name.
+- Multi-declarator variables: `const a = 1, b = 2` labels the `Variable` with the first declarator's name only.
+- Interface members are distinct concepts: `property_signature`, `call_signature`, and `method_signature` are separate concepts, not a unified "member".
+- JSX text is a flat node: `jsx_text` collapses contiguous text, so inline formatting changes inside JSX text can read as a single update.
+- No type-flow inference: the extractor does not distinguish a value used as a type from a type used as a value.
+- Unmapped node types pass through: anything outside the map keeps its raw tree-sitter type name.

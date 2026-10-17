@@ -1,10 +1,10 @@
 # C
 
-## C extractor
+The C extractor reads function and variable names through the declarator chain,
+following nested pointer and parenthesized declarators to the identifier. This
+keeps parameter lists and pointer syntax out of declaration names.
 
-The C extractor maps tree-sitter C CST nodes to canonical concepts. C has no `name` fields in its grammar, so every declaration name is recovered through the declarator chain: `function_definition` → `function_declarator` → identifier.
-
-### Detected concepts
+## Detected concepts
 
 | tree-sitter node type | Canonical concept |
 |---|---|
@@ -19,27 +19,26 @@ The C extractor maps tree-sitter C CST nodes to canonical concepts. C has no `na
 | `if_statement` | IfBlock |
 | `number_literal` | number_literal |
 
-### Example
+## Example
 
 Renaming a function:
 
-```c
-// old.c
+```c old.c
 int total(int a, int b) { return a + b; }
 ```
 
-```c
-// new.c
+```c new.c
 int sum(int a, int b) { return a + b; }
 ```
 
 Running `differens old.c new.c`:
 
-```
-~ renamed function `total` to `sum`
+```text
+  ~ renamed function `total` to `sum`
+  ~ changed function `sum` (`total` → `sum`)
 ```
 
-### Known limitations
+## Known limitations
 
 - Preprocessor macros are tokens, not structure: a macro that generates code does not expand before diffing.
-- Function prototypes and definitions are matched structurally; a prototype moving between headers reports as a move, not a signature change.
+- Prototypes and definitions are matched structurally. Cross-file prototype moves depend on a supported grammar, candidate kind, and matching evidence; header extensions do not currently have a linked grammar.

@@ -1,10 +1,21 @@
-# Machine Outputs
+# Machine outputs
 
-Available report formats: `--format=json`, `--format=llm`, `--format=markdown`, and `--format=ndjson`. Output ordering is deterministic for the same inputs and configuration.
+Use JSON for individual actions, NDJSON for streaming file records, and LLM output
+for a compact report with source lines. Markdown groups edits for a human reader.
+The same inputs and configuration produce the same output order.
 
 ## JSON
 
-`differens main..feature --format=json` prints one document with everything: the per-file narrated changes and the cross-file moves.
+Repository and directory comparisons return one object with `perFile` and
+`crossFileMoves` arrays:
+
+```bash
+differens main..feature --format=json
+```
+
+This example shows selected entries from a report with a rename and a move.
+Node metadata is shortened for readability; actual nodes also include ranges,
+hashes, children, and other metadata.
 
 ```json
 {
@@ -14,15 +25,15 @@ Available report formats: `--format=json`, `--format=llm`, `--format=markdown`, 
       "filePath": "src/checkout.ts",
       "action": {
         "type": "Update",
-        "node": { "kind": "function", "label": "calculateTotalAmount", "line": 12 },
+        "node": { "kind": "Function", "label": "calculateTotalAmount", "line": 12 },
         "detail": { "kind": "Renamed", "from": "computeTotal", "to": "calculateTotalAmount" },
-        "context": [{ "kind": "class", "label": "Checkout" }]
+        "context": [{ "kind": "Class", "label": "Checkout" }]
       }
     }
   ],
   "crossFileMoves": [
     {
-      "kind": "function",
+      "kind": "Function",
       "name": "formatPrice",
       "fromFile": "src/old/utils.ts",
       "toFile": "src/new/utils.ts",
@@ -32,98 +43,132 @@ Available report formats: `--format=json`, `--format=llm`, `--format=markdown`, 
 }
 ```
 
-Schema notes:
+Each `perFile` entry is a `SemanticChange`: a description, file path, and typed
+`action`. Its `context` lists enclosing nodes, nearest ancestor first. The action
+types are `Insert`, `Delete`, `Update`, and `Move`. Cross-file summaries identify
+the declaration or file, its source and destination, and whether it changed during
+the move. JSON retains the original per-file actions even when a human report
+combines them into a move.
 
-- In the legacy schema, code-node `byteRange` values retain UTF-16 code-unit offsets for compatibility. Native Rust `Node::byte_range` values use UTF-8 bytes; conversion happens only at serialization. Data adapters can use synthetic ranges, so those ranges are not guaranteed to locate the scalar in its original source text.
+Standalone file comparisons return a `SemanticChange` array rather than an
+envelope. They use the old input path as `filePath`. Repository and directory
+reports use the new path, or the old path for a deleted file. Those reports also
+serialize update/move nodes and insertion parents with shallow metadata; additions
+and deletions keep their subtrees. Standalone file actions retain full nodes.
 
-- `perFile` is an array of `SemanticChange` objects: `description`, `filePath`, and the typed `action` and containment `context` chain, nearest ancestor first. Update/move nodes and insertion parents use shallow metadata projections; added/deleted nodes retain subtrees.
-- `crossFileMoves` is a flattened summary of kind, name, source, destination, and whether the node was edited in transit.
-- Hash values are serialized as integers within the legacy 53-bit range.
-- This envelope is for repository/directory comparisons. Standalone file JSON is a `SemanticChange` array.
-- Empty file JSON is `[]`; an empty changeset is `{"perFile":[],"crossFileMoves":[]}`. NDJSON emits no file record for unchanged inputs.
-- When semantic analysis falls back to lines, changeset JSON adds `fallbacks` records with `filePath` and `fallback`. NDJSON places fallback information on the affected file record.
+An unchanged standalone comparison returns `[]`. An unchanged repository or
+directory comparison returns `{"perFile":[],"crossFileMoves":[]}`.
+
+### Fallback diagnostics
+
+If semantic analysis falls back to lines, the CLI writes a note to stderr.
+Repository/directory JSON also includes a `fallbacks` array of records with
+`filePath` and `fallback`. NDJSON includes `fallback` on the affected file record.
+Standalone JSON keeps its array shape, so its fallback note is on stderr only.
+See [troubleshooting](/guides/troubleshooting.html) for common causes.
 
 ## LLM
 
-`--format=llm` is a compact, self-contained document. It costs less than the raw diff it replaces. Each named change gets one line, each file is named once, and unnamed churn collapses into a tally. Every named change carries its source line, so a model can read twenty lines of context instead of the whole file.
+`--format=llm` groups edits under named declarations and includes source lines
+where the parser provides them. Unnamed edits, such as comments, appear as a
+tally. The [quickstart](/getting-started/quickstart.html) produces:
 
 ```text
-differens/1 2 files 5 changes 4 named
-# src/checkout.ts
-~ function computeTotal :12 < class Checkout computeTotal -> calculateTotalAmount
-+ function applyDiscount :40
-# src/cart.ts
-* 2 comments
-# cross-file
-> formatPrice src/old/utils.ts -> src/new/utils.ts edited
+differens/1 1 files 5 changes 3 named
+# before.ts
+~ function calculateTotalAmount :1 computeTotal -> calculateTotalAmount
+~ modified function computeTotal (1 removal) :2
+~ modified function calculateTotalAmount (3 additions) :3
 ```
 
-Line grammar:
+The header's `changes` count records the underlying actions before presentation
+grouping, with each cross-file move counted once. `named` counts the presented
+major entries and cross-file moves. These counts can differ from each other and
+from the number of body lines. Both endpoints of a cross-file move contribute to
+the file count.
 
 | Part | Meaning |
 | --- | --- |
-| `differens/1 <files> files <changes> changes <named> named` | Header, one line |
-| `# <path>` | File heading, named once |
-| `+` `-` `~` `>` | Insert, Delete, Update, Move |
-| `:12` | 1-based source line of the change |
+| `differens/1 <files> files <changes> changes <named> named` | Report header; `/1` identifies the LLM text format |
+| `# <path>` | File heading |
+| `+` `-` `~` `>` | Insert, delete, update, move |
+| `:12` | One-based source line, when available |
 | `< class Checkout` | Nearest named ancestor scope |
 | `from -> to` | Rename or value change |
-| `* 2 comments` | Rolled-up minor changes (unnamed nodes, prose lines) |
-| `# cross-file` / `> name from -> to [edited]` | Cross-file moves section |
+| `~ modified function name (...) :12` | Grouped declaration edits |
+| `* 2 comments` | Tally of minor edits |
+| `# cross-file` | Start of cross-file move entries |
+| `> name from -> to edited` | Modified cross-file move; exact moves omit `edited` |
 
-Pipe it straight into a model:
+Updates and insertions use new-source locations; deletions use old-source
+locations. Grouped edits refer to their enclosing declaration. A structural body
+replacement still names its function or method, and Go methods include their
+receiver, for example `basicWriter.Write`.
 
-```bash Feed an LLM
+You can pass the report to a model through a separate tool:
+
+```bash
 differens main..feature --format=llm | llm "summarize this changeset"
 ```
 
-```text Sample model answer
-Renamed computeTotal to calculateTotalAmount inside Checkout, added
-applyDiscount, and moved formatPrice from src/old/utils.ts to
-src/new/utils.ts with minor edits.
-```
+The `llm` command in this example is an external tool. Differens itself runs the
+matching and narration locally without a model.
 
 ## Markdown
 
-`--format=markdown` is a changelog you can drop into a PR description: one `##` heading per file, one bullet per change.
+`--format=markdown` uses file headings and bullets, with related edits grouped
+under their declaration. The quickstart produces:
 
-```md
-## src/checkout.ts
+```markdown
+## before.ts
 
 - renamed function `computeTotal` to `calculateTotalAmount`
-- added function `applyDiscount`
+- modified function `computeTotal` (1 removal)
+- modified function `calculateTotalAmount` (3 additions)
 ```
 
-Standalone comparisons with no logical changes render as `_no logical changes_`. Empty repository or range comparisons use their context message, such as `nothing changed` or `nothing changed in range: HEAD..HEAD`.
+Embedded backticks in source values use longer Markdown code delimiters.
+Standalone comparisons with no logical changes render as `_no logical changes_`.
+Empty repository or range comparisons use a context message, such as
+`nothing changed` or `nothing changed in range: HEAD..HEAD`.
 
-## NDJSON (streaming)
+## NDJSON
 
-`--format=ndjson` is the streaming format: one JSON object per changed file, emitted in input order as bounded worker windows complete. A long changeset starts producing output while the later files are still matching.
+`--format=ndjson` writes one JSON object per changed file, in input order, as each
+bounded worker window completes. Each object has a `filePath` and a `changes`
+array containing descriptions and actions. The path appears once on the file
+record. Unchanged files produce no record, so an unchanged comparison produces
+no stdout bytes.
 
-```json
-{"filePath":"src/checkout.ts","changes":[{"description":"renamed function `computeTotal` to `calculateTotalAmount`","action":{...}}]}
-```
-
-Per-line shape:
-
-- `filePath`: which file this object covers.
-- `changes`: narrated changes for that file, `description` plus the typed `action`, same shape as the `perFile` entries in the JSON format.
-- Unchanged files produce no line, matching the other formats.
-
-NDJSON streams file output. Cross-file candidates use an 8 MiB memory cache, then spill to indexed temporary storage. Individual large files, token sets during correlation, and the resulting move list can still exceed that cache budget.
-
-Cross-file moves need the whole changeset, so when any exist they trail as one final object:
-
-```json
-{"crossFileMoves":[{"kind":"function","name":"formatPrice","fromFile":"src/old/utils.ts","toFile":"src/new/utils.ts","modified":false}]}
-```
-
-Consumers filter per-file lines with `select(.filePath)` and read the trailer with `select(.crossFileMoves)`.
+To inspect file paths without loading one large JSON document:
 
 ```bash
 differens main..feature --format=ndjson | jq -c 'select(.filePath) | .filePath'
 ```
 
+Cross-file correlation needs the whole changeset. If it finds moves, one final
+object contains their summaries:
+
+```json
+{"crossFileMoves":[{"kind":"Function","name":"formatPrice","fromFile":"src/old/utils.ts","toFile":"src/new/utils.ts","modified":false}]}
+```
+
+Read file records with `select(.filePath)` and the trailer with
+`select(.crossFileMoves)`. File actions have the same shape as JSON actions;
+matching a cross-file move does not remove them from the stream.
+
+The candidate cache holds 8 MiB before spilling to indexed temporary files.
+Individual large files, temporary token sets, and the final move list can exceed
+that cache budget. Streaming output does not guarantee constant memory use.
+
 ## Source coordinates
 
-Schema 1 code-node `byteRange` fields retain the legacy UTF-16 code-unit offsets, despite the historical field name. Rust `Node::byte_range` uses UTF-8 byte offsets. Tree-level source mapping translates serialized code spans, including emoji and combining text. Data adapters use synthetic tree ranges rather than source offsets. Lines are one-based.
+Rust `Node::byte_range` uses UTF-8 byte offsets. Serialized code-node `byteRange`
+fields keep UTF-16 code-unit offsets for compatibility with earlier releases,
+despite the field name. Tree-level source mapping converts code spans during
+serialization, including emoji and combining text. Data adapters use synthetic
+tree ranges, so those ranges cannot locate a scalar in its source file.
+
+Lines are one-based when present. Hashes serialize as integers within the 53-bit
+range. JSON has no separate schema-version field; the `differens/1` prefix applies
+to the LLM text format.

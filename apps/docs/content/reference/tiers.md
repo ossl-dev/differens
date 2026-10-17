@@ -41,6 +41,6 @@ assert!(!result.changes.is_empty());
 
 Source parsers return `Result<Arc<Tree>, ParseError>`. Typed scalar metadata preserves changes such as numeric `1` to string `"1"`. Markup attributes include `href` and other non-label attributes. YAML supports nested indentation through its format parser.
 
-Sequence helpers `diff_lines` and `diff_words` share trimmed common boundaries, exact small-input LCS, and bounded large-input Myers processing. Code/data/markup parser failures fall back directly to raw lines. Consult source constants and [benchmarks](/guides/benchmarks.html) for analysis budgets.
+Sequence helpers `diff_lines` and `diff_words` trim equal boundaries, use exact LCS for small inputs, and use bounded Myers processing for larger inputs. If the work budget runs out, unique unchanged anchors divide the remaining input into smaller gaps for positional comparison. Code/data/markup parser failures fall back directly to raw lines. Consult source constants and [benchmarks](/guides/benchmarks.html) for analysis budgets.
 
 Binary plugins implement `BinaryDiffPlugin` and register through `register_binary_plugin`. The default adapter still reports changed bytes when no plugin answers. Byte identity is never inferred from lossy text decoding.

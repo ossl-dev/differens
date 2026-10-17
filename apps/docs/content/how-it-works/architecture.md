@@ -14,7 +14,7 @@ The Git/filesystem layer produces `FilePair` values with original bytes and expl
 
 ## Ownership
 
-Each tree owns a flat postorder node arena. Actions carry `NodeRef` values sharing one `Arc<Tree>` owner. Matching state is separate. Parser state remains local to worker threads. No subprocess JavaScript runtime or serialized worker IPC is required.
+Each tree owns a flat postorder node arena. Actions carry `NodeRef` values sharing one `Arc<Tree>` owner. Matching state is separate. Parser state remains local to worker threads. Each worker reuses its parsers and a bounded parse cache within that thread.
 
 Shallow projections keep update/move metadata compact on the wire while preserving internal tree identity. Insertions/deletions can retain subtrees for correlation. Candidate subtrees detach from unrelated tree nodes. An accounted 8 MiB cache spills to indexed temporary storage when exceeded; correlation loads candidates on demand. Source windows use a soft 64 MiB budget across at most 24 files, so one large file can exceed it.
 

@@ -11,7 +11,8 @@ Use the repository's pinned toolchain and install a C/C++ compiler for Tree-sitt
 
 ## A code file uses line diff
 
-Run `differens languages`. Code classification does not guarantee a linked grammar. Unsupported extensions, parser failures, source/depth limits, and tree node budgets can trigger line fallback. Check stderr diagnostics or machine-output fallback metadata. Raising a budget may increase time and memory costs.
+Run `differens languages`. Code classification does not guarantee a linked grammar. Unsupported extensions, parser failures, source/depth limits, and tree node budgets can trigger line fallback. Check stderr diagnostics or machine-output fallback metadata. The CLI has no flag to raise parser budgets. Library callers can choose matching
+limits, but larger budgets may increase time and memory costs.
 
 ## Changes appear as deletion and insertion
 
@@ -31,4 +32,7 @@ Native workers process bounded windows, but a single large file and retained cro
 
 ## Machine output has an unexpected shape
 
-Standalone file JSON is an array; directory/repository JSON is an envelope. NDJSON emits file objects and an optional cross-file trailer. Empty outputs remain valid machine output. Read [machine outputs](/guides/machine-outputs.html) before consuming it.
+Standalone file JSON is an array; directory/repository JSON is an envelope. An
+unchanged comparison produces `[]` or empty envelope arrays. NDJSON emits file
+objects and an optional cross-file trailer; unchanged inputs produce no records.
+Read [machine outputs](/guides/machine-outputs.html) before consuming it.

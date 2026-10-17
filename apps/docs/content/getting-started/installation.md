@@ -1,13 +1,14 @@
 # Installation
 
-Differens is a native executable. Building from source needs the pinned Rust toolchain, Cargo, and a C/C++ compiler for the linked Tree-sitter runtime and grammar scanners. Git is needed for repository comparisons and driver registration.
+Build Differens with the Rust toolchain pinned in `rust-toolchain.toml`, Cargo,
+and a C/C++ compiler for Tree-sitter and its grammar scanners. Install Git to
+compare repositories or register the Git diff driver.
 
 ## From a checkout
 
 ```bash
 git clone https://github.com/ossl-dev/differens.git
 cd differens
-cargo build --release --locked
 cargo install --path apps/cli --locked
 
 differens --version
@@ -30,4 +31,7 @@ Use the checkout installation for an unpublished revision. Previous npm releases
 
 The workspace contains `differens-core`, `differens-tiers`, `differens-narrate`, `differens-correlate`, `differens-git`, and `differens-engine`. Depend on the stages you need. `differens-core` supports `default-features = false` for consumers that do not need JSON serialization or parsers.
 
-See the [reference](/reference/core.html) for tested API shapes. Native package availability and platform artifacts depend on the actual published release; building this checkout does not publish packages.
+Start with the [core reference](/reference/core.html) for tree construction or
+[tiers](/reference/tiers.html) to compare source bytes. If you used an npm release,
+follow the [migration guide](/guides/native-migration.html) for CLI replacement,
+Git driver setup, and the Rust equivalents of the JavaScript packages.

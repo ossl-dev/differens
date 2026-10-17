@@ -1,28 +1,63 @@
 # Native migration
 
-The monorepo now uses a Cargo workspace for application code, tests, maintenance,
-and documentation builds. Install the current checkout with:
+Differens 0.3.0 uses Rust for the CLI, libraries, tests, and maintenance tools.
+The TypeScript packages, Bun build, and JavaScript workers have been removed from
+this checkout. Documentation is CommonMark rendered by `cargo xtask docs`.
+
+## Switch the CLI
+
+Build from this checkout with the pinned Rust toolchain and a C/C++ compiler:
 
 ```bash
 cargo install --path apps/cli --locked
+differens --version
+differens languages
 ```
 
-The executable is still `differens`. File/directory comparisons, working-tree and
-commit-range modes, driver setup, language listing, five formats, and configuration
-remain available. Native grammar linkage removes runtime grammar discovery from
-the normal install path.
+The executable is still named `differens`. File and directory comparisons,
+working-tree and commit-range comparisons, configuration, Git driver setup, and
+all five output formats remain available. Grammars are linked into the binary,
+so running the installed CLI does not require Node, Bun, or a grammar download.
 
-## Library boundary
+If your shell still finds an older installation, check `type -a differens` and
+put Cargo's binary directory first on `PATH`, or remove the old installation
+with the package manager that installed it. Verify that `differens --version`
+reports the version in this checkout's `Cargo.toml`.
 
-Existing JavaScript imports are not source-compatible with Rust crates. Choose
-`differens-core`, `differens-tiers`, `differens-narrate`, `differens-correlate`,
-`differens-git`, or `differens-engine` for the required stage. Build trees with
-`TreeBuilder`; pass source bytes and explicit `SourcePresence` to tier routing.
-Refer to the [core](/reference/core.html) and [tiers](/reference/tiers.html) APIs.
+Rerun `differens install-git-driver` in each repository where you registered the
+old driver. Git's local configuration stores the executable path; the native
+installer also removes the old text-conversion settings while keeping unrelated
+attributes.
 
-Historical package versions remain historical. This source migration does not
-publish registry packages, update package metadata, or deploy documentation.
-Native registry/archive availability follows a deliberate release.
+Once a native release has been published, `cargo install differens --locked`
+can install it from the Cargo registry. Existing npm releases contain the older
+JavaScript implementation. Publishing native crates and deploying this
+documentation are separate release steps.
+
+## Move library integrations to Rust
+
+JavaScript imports are not source-compatible with the Rust APIs. Choose a crate
+for the stage your integration needs:
+
+| Previous npm package | Rust crate | Entry points |
+| --- | --- | --- |
+| `@ossl-dev/differens-core` | `differens-core` | `TreeBuilder`, `NodeSpec`, `diff_trees` |
+| `@ossl-dev/differens-tiers` | `differens-tiers` | `diff_with_tier`, `SourcePresence`, parsing APIs |
+| `@ossl-dev/differens-narrate` | `differens-narrate` | `narrate`, `format_changes`, `OutputFormat` |
+| `@ossl-dev/differens-correlate` | `differens-correlate` | `correlate`, `FileChanges`, `CorrelateOptions` |
+| `@ossl-dev/differens-git` | `differens-git` | `GitRepository`, `FilePair`, input streams |
+| CLI worker/report orchestration | `differens-engine` | `DiffEngine`, `report`, `report_file` |
+
+Build immutable trees with `TreeBuilder` rather than constructing mutable nested
+nodes. Pass original bytes to `diff_with_tier`; `SourcePresence` distinguishes an
+empty file from a missing file. Rust spans use UTF-8 byte offsets, while serialized
+code spans retain the earlier UTF-16 offsets. See the [core](/reference/core.html),
+[tiers](/reference/tiers.html), and [machine output](/guides/machine-outputs.html)
+references before replacing an integration.
+
+The [tiers reference](/reference/tiers.html) includes a Rust example for
+comparing source bytes. There is no JavaScript runtime wrapper in the
+native workspace.
 
 ## Corrective differences
 
@@ -38,18 +73,18 @@ Ordinary matching/narration parity is checked against frozen fixture outputs.
 Intentional corrections have their own fixtures. Inspect fallback metadata and
 source around reported lines when evaluating a real changeset.
 
-## Operational changes
+## Workers and storage
 
-The CLI uses native worker threads and ordered windows. `--jobs=N` chooses
-concurrency. Ordered windows cap work at 24 files with a soft 64 MiB source budget;
+`--jobs=N` selects native worker threads. Zero, the default, selects one or two
+workers based on available CPUs, leaving one CPU for the host when possible.
+The engine processes at most 24 files per window with a soft 64 MiB source budget;
 a single large file can exceed that budget. Cross-file candidates use an 8 MiB
-memory cache and spill to indexed temporary storage. Deep tree ownership and traversal are flat;
-analysis budgets remain explicit.
+memory cache before spilling to indexed temporary storage. Trees use flat
+ownership and iterative traversal; analysis still has explicit work budgets.
 
-Reinstall a Git driver after moving the binary because local configuration records
-its executable path. Use a retained previous release artifact for rollback. Native
-speed/memory improvements require same-quality release measurements; changing the
-implementation language does not establish a fixed speedup.
+Keep a previous release artifact if you need to roll back. The
+[benchmarks guide](/guides/benchmarks.html) records the measured migration results
+and their limits, along with commands to reproduce the audits.
 
 ## Post-migration audit corrections
 

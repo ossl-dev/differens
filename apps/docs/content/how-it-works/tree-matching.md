@@ -11,11 +11,25 @@ The core follows the GumTree lineage: anchor equal subtrees, recover surviving c
 5. Leaf recovery aligns kinds inside matched parents with small-input LCS. More than 64 unmatched children use positional pairing.
 6. Unique verified structure matches recover containers; leaf recovery runs again. A unique anonymous adapter-marked body may survive changing child shape.
 
-Identical code can move between parents. Candidate search is not restricted to already-matched parents; those parents provide affinity and recovery context.
+Named-container identity can include an internal match key. Go methods use their
+receiver type, so two types with the same method name keep separate scopes.
+Changing the receiver variable or pointer form does not change that identity.
+
+Identical code can move between parents within a compatible identity scope.
+Candidate search also considers parents that have not yet matched; matched
+parents provide affinity and recovery context.
 
 ## Edit scripts
 
-`Update` describes a matched label/value change; `Move` describes relocation or sibling reorder. `Delete` and `Insert` absorb entire removed/added subtrees. Actions appear in that order. Sibling reorders keep a longest increasing subsequence, minimizing moves within that ordering problem. The whole heuristic tree script is not a globally minimal tree-edit-distance proof.
+`Update` describes a matched label or value change; `Move` describes relocation
+or sibling reorder. `Delete` and `Insert` absorb entire removed or added subtrees.
+Actions appear in that order.
+
+Sibling reorders anchor named containers whose relative order is unchanged, then
+align anonymous siblings between them with a longest increasing subsequence.
+Repeated comments or attributes between declarations therefore do not force
+unchanged declarations to appear as moves. The full edit script is a deterministic
+heuristic and may not have the globally smallest number of edits.
 
 Context runs nearest ancestor first and includes the root wrapper. Rename and value edits on the same node can produce separate actions; narration may deduplicate a declaration's matching name-token rename.
 

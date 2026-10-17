@@ -1,8 +1,8 @@
 # Roadmap
 
-The Rust migration preserves the existing semantic diff product in one native
-monorepo. Future features remain separate from migration correctness and delivery
-validation.
+Differens runs as a native Rust CLI with reusable library crates. The migration
+and follow-up audit are implemented; release checks and product improvements
+remain below.
 
 ## Current implementation
 
@@ -22,6 +22,20 @@ changes, scalar type-only changes, and nested YAML edits. The original applicati
 runtime and build chain are replaced by Cargo/Rust; linked upstream parsers still
 contain native C/C++ code.
 
+## Recorded validation
+
+- [x] Compare frozen legacy outputs and track intentional corrections separately.
+- [x] Audit pinned Express, Flask, ripgrep, chi, and Prettier histories, covering
+  all 99 changed paths, selected named facts, output formats, and worker ordering.
+- [x] Record repeated native/JavaScript standalone measurements and paired
+  native-before/native-after repository measurements.
+- [x] Bound cross-file candidate retention with an 8 MiB cache and indexed
+  temporary storage; measure matcher, correlation, and spill stress cases.
+
+Commands, source revisions, measurements, and their limits are in the
+[benchmark guide](apps/docs/content/guides/benchmarks.md). These local results do
+not establish release readiness on other platforms.
+
 ## Release and performance validation
 
 - [ ] Accumulate real-world beta changesets and classify unexplained differences.
@@ -31,8 +45,8 @@ contain native C/C++ code.
 - [ ] Exercise rollback with previous immutable artifacts before promoting a release.
 - [ ] Validate registry crate ownership, dependency-order publication, and release
   archive installation before advertising a published native version.
-- [ ] Evaluate persistent caches, parser retention, candidate projection/spill, and
-  cancellation using measured workload evidence.
+- [ ] Evaluate persistent caches, parser retention, further candidate-storage
+  improvements, and cancellation using measured workloads.
 
 Native execution alone does not prove a fixed performance multiplier. Worker
 windows bound in-flight work; retained correlation candidates and large files

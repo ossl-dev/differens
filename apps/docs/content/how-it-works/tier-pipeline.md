@@ -13,7 +13,7 @@ Classification picks an initial adapter from the file path. The router compares 
 
 Code, data, and markup try their parser, then fall directly to raw lines on failure or analysis-budget exhaustion. A registered code grammar can produce generic structural concepts where a semantic mapping is absent. Extensions classified as code without a linked grammar use lines.
 
-The shared sequence engine trims equal boundaries, uses exact LCS for small inputs, and bounded linear-space Myers for larger inputs. If work exceeds its limit, it retains a valid positional fallback instead of claiming an optimal sequence.
+The shared sequence engine trims equal boundaries, uses exact LCS for small inputs, and bounded linear-space Myers for larger inputs. When that work budget runs out, it aligns unique unchanged lines or words, then compares the gaps positionally. The resulting edits are valid but may not be minimal.
 
 Data parsers retain scalar types, so `1` and `"1"` differ. YAML indentation is parsed by its format parser. Markup retains non-label attributes such as `href`. Binary comparisons retain original bytes, including invalid UTF-8.
 

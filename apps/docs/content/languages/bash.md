@@ -1,10 +1,8 @@
 # Shell
 
-## Shell extractor
-
 The Shell extractor (tree-sitter-bash) maps CST nodes to canonical concepts for `sh`, `bash`, and `zsh`. Function names come from the `name` field on the function's word; variable assignments and commands label the same way, so no fallback rules are needed.
 
-### Detected concepts
+## Detected concepts
 
 | tree-sitter node type | Canonical concept |
 |---|---|
@@ -21,27 +19,26 @@ The Shell extractor (tree-sitter-bash) maps CST nodes to canonical concepts for 
 | `string` | string_literal |
 | `number` | number_literal |
 
-### Example
+## Example
 
 Renaming a function:
 
-```bash
-# old.sh
+```bash old.sh
 total() { echo hi; }
 ```
 
-```bash
-# new.sh
+```bash new.sh
 sum() { echo hi; }
 ```
 
 Running `differens old.sh new.sh`:
 
-```
-~ renamed function `total` to `sum`
+```text
+  ~ renamed function `total` to `sum`
+  ~ changed function `sum` (`total` → `sum`)
 ```
 
-### Known limitations
+## Known limitations
 
 - Heredoc bodies are strings; edits inside them report as value changes.
 - Command substitutions and pipelines are structure: a pipeline reordering reports as a reorder of call expressions.

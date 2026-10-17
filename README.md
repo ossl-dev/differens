@@ -40,7 +40,8 @@ differens install-git-driver         # explicit local Git driver setup
 ```
 
 `differens diff ...` is an explicit alias. `--jobs=N` chooses native worker
-threads; zero selects available CPUs. `differens.toml` or `.differensrc.json` sets
+threads; zero selects one or two workers based on available CPUs, leaving one
+CPU for the host when possible. `differens.toml` or `.differensrc.json` sets
 the default format and Git driver extensions. Flags take precedence.
 
 | Format | Use |

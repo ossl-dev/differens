@@ -19,6 +19,6 @@ Semantic mappings turn grammar kinds into concepts such as `Function`, `Class`, 
 
 A code-classified extension without a registered grammar uses raw lines. This includes unsupported composite formats and other extensions shown by classification alone. Header, CSS/SQL, Vue/Svelte/Astro, and other coverage should be checked against `languages` rather than inferred from the filename.
 
-Language pages preserve representative source examples and concept mappings. Semantic diffing identifies syntax/declaration changes; it does not prove behavioral equivalence or implement a compiler's type system.
+The examples on the language pages were checked against the native CLI. Each page lists concept mappings and known limits. Semantic diffing identifies syntax/declaration changes; it does not prove behavioral equivalence or implement a compiler's type system.
 
 For new grammar or concept mappings, see [contributing](/guides/contributing.html). For non-code formats, see [tier adapters](/languages/tiers.html).

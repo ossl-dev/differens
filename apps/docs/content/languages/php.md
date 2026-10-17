@@ -1,10 +1,8 @@
 # PHP
 
-## PHP extractor
-
 The PHP extractor maps tree-sitter PHP CST nodes to canonical concepts. Class, method, and function names come from the standard `name` field; property names come from the property element's `name` field, keeping the `$`.
 
-### Detected concepts
+## Detected concepts
 
 | tree-sitter node type | Canonical concept |
 |---|---|
@@ -21,29 +19,27 @@ The PHP extractor maps tree-sitter PHP CST nodes to canonical concepts. Class, m
 | `function_call_expression` | CallExpression |
 | `array_creation_expression` | ArrayLiteral |
 
-### Example
+## Example
 
 Renaming a method:
 
-```php
+```php old.php
 <?php
-// old.php
 class Counter { function total($n) { return $n + 1; } }
 ```
 
-```php
+```php new.php
 <?php
-// new.php
 class Counter { function sum($n) { return $n + 1; } }
 ```
 
 Running `differens old.php new.php`:
 
-```
-~ renamed method `total` to `sum` in class `Counter`
+```text
+  ~ renamed method `total` to `sum` in class `Counter`
 ```
 
-### Known limitations
+## Known limitations
 
 - Heredoc and nowdoc bodies are string literals; changes inside them report as value changes, not line edits.
 - Attribute syntax is parsed structurally; attribute argument edits report as value changes.

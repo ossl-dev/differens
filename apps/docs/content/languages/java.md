@@ -1,10 +1,8 @@
 # Java
 
-## Java extractor
-
 The Java extractor maps tree-sitter Java CST nodes to canonical concepts. Class and method names come from the standard `name` field; variable names are recovered from the declarator.
 
-### Detected concepts
+## Detected concepts
 
 | tree-sitter node type | Canonical concept |
 |---|---|
@@ -21,27 +19,25 @@ The Java extractor maps tree-sitter Java CST nodes to canonical concepts. Class 
 | `decimal_integer_literal` | integer_literal |
 | `method_invocation` | CallExpression |
 
-### Example
+## Example
 
 Renaming a method:
 
-```java
-// old.java
+```java old.java
 class Counter { int total(int n) { return n + 1; } }
 ```
 
-```java
-// new.java
+```java new.java
 class Counter { int sum(int n) { return n + 1; } }
 ```
 
 Running `differens old.java new.java`:
 
-```
-~ renamed method `total` to `sum` in class `Counter`
+```text
+  ~ renamed method `total` to `sum` in class `Counter`
 ```
 
-### Known limitations
+## Known limitations
 
 - Lambda bodies are diffed structurally; a lambda extracted to a named method reports as an addition plus a body change, not an extraction.
 - Annotations are structure: adding an annotation reports as an insert, not an "annotated" action.

@@ -39,3 +39,8 @@ Git failures and file read errors are propagated. Binary bytes survive input col
 `diff_driver_command(executable, args)` quotes a command for Git's external-diff shell. `DRIVER_FLAG` is the internal entry flag. `generate_git_attributes(extensions)` creates attribute rules.
 
 `repo.install_git_driver(command)` configures the local repository. `repo.write_git_attributes(extensions)` updates rules while preserving unrelated lines. The CLI command `differens install-git-driver` performs these changes explicitly and records the current executable path. Reinstall the driver after moving that binary.
+
+The installer removes obsolete `diff.differens.textconv` and
+`diff.differens.cachetextconv` settings. To uninstall, unset
+`diff.differens.command` and remove `diff=differens` attributes while keeping the
+rest of each rule. See [Git integration](/guides/git-integration.html).

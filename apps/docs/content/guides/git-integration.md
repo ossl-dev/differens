@@ -1,99 +1,100 @@
-# Git Integration
+# Git integration
 
-Differens plugs into your normal `git diff` workflow. Instead of line hunks, it reports the semantic changes: renames, moves, added parameters.
+Register Differens as a Git diff driver to see semantic summaries through
+`git diff`. You can also run the CLI directly to compare a whole changeset and
+find moves between files.
 
 ## Install the driver
 
-One command registers Differens as a git diff driver in your repo's local config and writes the `.gitattributes` rules itself:
+From your repository, run:
 
-```bash Register the driver
+```bash
 differens install-git-driver
 ```
 
-```text Output
-git diff driver installed.
-wrote /your/repo/.gitattributes: 22 extensions now use the differens driver.
-`git diff` narrates those files instead of printing hunks.
+The installer records the current executable path in local Git configuration and
+writes `diff=differens` rules to `.gitattributes`. By default it registers every
+extension listed by `differens languages`. Set `driverExtensions` in
+`differens.toml` to choose a subset:
+
+```toml
+driverExtensions = ["rs", "ts", "tsx", "py"]
 ```
 
-The command registers every extension with a working grammar, or the subset pinned in the config file's `driverExtensions`. Existing `.gitattributes` lines are preserved: a line already matching an extension keeps its other attributes and gains the driver, every other line passes through, and running the command twice changes nothing. To cover fewer extensions, list them in `differens.toml`. Files without the attribute keep normal `git diff` output.
+Existing attribute rules keep their other attributes. If a rule already names a
+different diff driver, Differens appends its own attribute so it takes precedence.
+Running the installer again does not duplicate the rules. Reducing the configured
+extension list does not remove rules written by an earlier installation; edit
+those attributes if you want to stop using the driver for those extensions.
 
-Now `git diff` on a `.ts` file shows the change instead of a hunk:
+`git diff` and `git diff --staged` now show semantic summaries for matching files.
+Other files keep their normal Git output. The driver receives one file pair at a
+time, so use the standalone CLI to detect moves across files. After moving or
+replacing the installed executable, run the installer again.
 
-```text Before: git diff
-- function computeTotal(items: Item[]): number {
--   return items.reduce((acc, item) => acc + item.price, 0);
-+ function calculateTotalAmount(items: Item[], discount: number): number {
-+   const base = items.reduce((acc, item) => acc + item.price, 0);
-+   return base - discount;
-  }
+To remove the driver:
+
+```bash
+git config --local --unset-all diff.differens.command
 ```
 
-```text After: differens driver
-  ~ renamed function `computeTotal` to `calculateTotalAmount`
-  + added parameter `discount`
+Remove `diff=differens` from the affected `.gitattributes` rules too, keeping any
+other attributes on those lines. See the [Git API reference](/reference/git.html)
+for the underlying Rust functions.
 
-1 modification, 1 addition
-```
+## Compare the working tree
 
-The driver receives both versions of every changed file, so this works in `git diff`, `git diff --staged`, and `git difftool`. To remove the driver later, unset the config. See the note in the [git package reference](/reference/git.html).
-
-## Standalone modes
-
-No git driver required. `differens` reads git directly.
-
-### Working tree
-
-With no arguments, `differens` diffs the working tree against HEAD and correlates the changes across files:
+With no arguments, `differens` compares the working tree against `HEAD`:
 
 ```bash
 differens
 ```
 
-This is `git diff HEAD` in semantic form. It picks up unstaged and staged changes, plus untracked files: a brand-new file is the most important change to report, so it is merged in from `git ls-files --others`.
+The comparison includes staged and unstaged edits plus untracked files. On a
+branch without a commit, existing files appear as additions. File read errors
+and failed Git commands produce errors rather than empty comparisons.
 
-### Commit ranges
+Submodule comparisons preserve changes that Git exposes, including dirty,
+uninitialized, and unborn submodule states. Differens reports those entries;
+it does not recursively analyze each submodule's internal changeset.
+
+## Compare commits
+
+Use a range or two refs:
 
 ```bash
 differens main..feature
+differens HEAD~1 HEAD
 ```
 
-Diffs every file that changed between two refs. Output is grouped per file, with cross-file moves reported at the end:
+Both forms compare the selected trees. File summaries appear in order, followed
+by any cross-file moves. Modified declaration moves must retain the same name
+and pass the similarity threshold. A move combined with a rename or substantial
+rewrite can remain an addition and a removal.
 
-```text
-src/checkout.ts
-  ~ renamed function `computeTotal` to `calculateTotalAmount`
-
-  cross-file moves:
-  → function `formatPrice` from src/old/utils.ts to src/new/utils.ts
-
-3 modifications, 1 move
-```
-
-### Two commits
-
-Both arguments resolve as git refs, so two SHAs or branch names diff like a range:
-
-```bash
-differens 8f3a1c2 5b0e9d7
-```
-
-### Two directories
-
-If both arguments are directories, Differens walks each one and diffs matching relative paths:
+## Compare directory snapshots
 
 ```bash
 differens release/1.0/ release/1.1/
 ```
 
-Files present on only one side are whole-file additions or removals, and a file that moved to a different relative path reports as a rename (or a rename plus edit) rather than a delete and an add. Generated and vendor directories (`node_modules`, `dist`, `.git`, …) are skipped. Semantic analysis budgets can select raw line fallback for large or unsupported inputs; files are still compared.
+Files at matching relative paths are compared. Files on only one side appear as
+additions or removals; correlation can pair them into exact or modified file
+renames. Walks skip generated and vendor directories, including `.git`,
+`node_modules`, `target`, `dist`, `build`, and `vendor`. Large or unsupported
+semantic inputs can fall back to lines.
 
-## How it compares to git diff
+File and directory comparisons work outside a Git repository. Use `./` or absolute
+paths when a filename could also resolve as a Git ref, and `--` before filenames
+that begin with a dash.
 
-| | `git diff` | `differens` |
-| --- | --- | --- |
-| Unit | Lines | Logical changes |
-| A rename | Delete + insert | One `renamed` action |
-| A move between files | Delete + insert | One `Move`, with the destination file |
-| Code reformatting | Line churn | Usually no logical changes when parsed structure is retained |
-| Speed | Instant on huge files | Parse + match per file (see [Benchmarks](/guides/benchmarks.html)) |
+## What the reports tell you
+
+Differens names syntax changes, groups edits under declarations, and detects
+supported moves. Use JSON for the original actions, or `--format=llm` for compact
+summaries with source locations. A move does not establish that behavior stayed
+the same; read the source or a line diff when reviewing behavior.
+
+Formatting-only edits often disappear when the parsed structure stays the same.
+Parsing, matching, and output still take time; see [benchmarks](/guides/benchmarks.html)
+for measured workloads.

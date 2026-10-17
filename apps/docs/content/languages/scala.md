@@ -1,10 +1,8 @@
 # Scala
 
-## Scala extractor
-
 The Scala extractor maps tree-sitter Scala CST nodes to canonical concepts. Class, object, and definition names come from the standard `name` field; `val` and `var` names come from the pattern field.
 
-### Detected concepts
+## Detected concepts
 
 | tree-sitter node type | Canonical concept |
 |---|---|
@@ -21,27 +19,25 @@ The Scala extractor maps tree-sitter Scala CST nodes to canonical concepts. Clas
 | `string` | string_literal |
 | `boolean_literal` | boolean_literal |
 
-### Example
+## Example
 
 Renaming a method:
 
-```scala
-// old.scala
+```scala old.scala
 class Counter { def total(n: Int): Int = n + 1 }
 ```
 
-```scala
-// new.scala
+```scala new.scala
 class Counter { def sum(n: Int): Int = n + 1 }
 ```
 
 Running `differens old.scala new.scala`:
 
-```
-~ renamed function `total` to `sum` in class `Counter`
+```text
+  ~ renamed function `total` to `sum` in class `Counter`
 ```
 
-### Known limitations
+## Known limitations
 
 - Implicits and given clauses are structure: adding one reports as an insert on the declaration.
 - `var` definitions in some template contexts produce an ERROR node in the grammar; they parse cleanly in class and object bodies.

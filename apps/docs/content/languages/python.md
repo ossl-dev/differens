@@ -4,14 +4,14 @@ The Python extractor covers `.py` files. Python has a single grammar construct f
 
 ## What it detects
 
-- **Functions**: `def` (sync and async) becomes `Function`
-- **Classes**: `class_definition` becomes `Class`; methods are `Function` nodes nested inside
-- **Decorators**: `decorator` becomes `Decorator`; a decorated definition becomes a `DecoratedDef` wrapper around the underlying function or class
-- **Imports**: `import_statement`, `import_from_statement`, and `future_import_statement` all become `Import`
-- **Assignments**: `assignment` and `augmented_assignment` become `Assignment` / `AugmentedAssignment`. Python has no separate `Variable` concept. A variable's name lives in the declarator of the assignment that binds it, not in a canonical label
-- **Control flow**: if / elif / else, for / while, try / except / finally, with, match / case
-- **Comprehensions and lambdas**: list / dict / set comprehensions, generator expressions, `lambda`
-- **Type annotations**: `type`, `generic_type`, and `union_type` become `TypeAnnotation` / `GenericType` / `UnionType`
+- Functions: `def` (sync and async) becomes `Function`
+- Classes: `class_definition` becomes `Class`; methods are `Function` nodes nested inside
+- Decorators: `decorator` becomes `Decorator`; a decorated definition becomes a `DecoratedDef` wrapper around the underlying function or class
+- Imports: `import_statement`, `import_from_statement`, and `future_import_statement` all become `Import`
+- Assignments: `assignment` and `augmented_assignment` become `Assignment` / `AugmentedAssignment`. Assignment labels come from the left-hand expression; there is no separate `Variable` concept
+- Control flow: if / elif / else, for / while, try / except / finally, with, match / case
+- Comprehensions and lambdas: list / dict / set comprehensions, generator expressions, `lambda`
+- Type annotations: `type`, `generic_type`, and `union_type` become `TypeAnnotation` / `GenericType` / `UnionType`
 
 ## Node type mapping
 
@@ -46,48 +46,50 @@ The Python extractor covers `.py` files. Python has a single grammar construct f
 
 Node types without a mapping keep their raw tree-sitter type name.
 
-**Labels.** Labels come from the `name` field on the definition node.
+Function and class labels come from the definition's `name` field. A
+`DecoratedDef` wrapper keeps the underlying definition's name. Assignments use
+their left-hand expression as a label. Human reports retain class assignments,
+while local assignment details are grouped under their function.
 
-## Example: refactoring a Python module
+## Example: decorated functions and class assignments
 
-Extract `apply_discount` out of `pricing.py` into a new `discounts.py`, rename it to `apply_promo`, and add a `max_discount` parameter:
+Change a class setting, rename a decorated function, and edit its return value:
 
-```python pricing.py (before)
-TAX_RATE = 0.08
+```python before.py
+class Pricing:
+    tax_rate = 0.08
 
-def apply_discount(price: float) -> float:
-    return price * (1 - TAX_RATE)
-
-def checkout(total: float) -> float:
-    return apply_discount(total) + 2.99
-```
-```python pricing.py (after)
-TAX_RATE = 0.08
-from discounts import apply_promo
-
-def checkout(total: float) -> float:
-    return apply_promo(total) + 2.99
-```
-```python discounts.py (after)
-def apply_promo(price: float, max_discount: float = 0.5) -> float:
-    return price * (1 - max_discount)
-```
-```text Output
-  cross-file moves:
-  → function `apply_discount` from pricing.py to discounts.py
-  ~ renamed function `apply_discount` to `apply_promo`
-  + added parameter `max_discount` in function `apply_promo`
-  ~ changed value of return expression from `price * (1 - TAX_RATE)` to `price * (1 - max_discount)`
-  ~ changed value of call expression from `apply_discount(total)` to `apply_promo(total)` in function `checkout`
-4 modifications, 1 move
+    @staticmethod
+    def apply_discount(price: float) -> float:
+        return price * 0.9
 ```
 
-The line diff shows `pricing.py` losing two functions and `discounts.py` gaining one. The semantic diff shows one function moved across files, renamed, and given a defaulted parameter. `checkout` barely changed.
+```python after.py
+class Pricing:
+    tax_rate = 0.10
+
+    @staticmethod
+    def apply_promo(price: float) -> float:
+        return price * 0.8
+```
+
+Running `differens before.py after.py`:
+
+```text
+  ~ renamed function `apply_discount` to `apply_promo` in decorated definition `apply_promo`
+  ~ renamed function `apply_discount` to `apply_promo` in class `Pricing`
+  ~ changed property `tax_rate` (`0.08` → `0.10`)
+  ~ changed function `apply_promo` (`0.9` → `0.8`)
+```
+
+The class assignment keeps its name, and the decorated function keeps its class
+scope. Local assignment edits are grouped with their containing function in human
+reports. JSON retains the underlying assignment actions.
 
 ## Known limitations
 
-- **Methods are not distinct**: there is no `Method` concept; a method is a `Function` nested in a `Class`.
-- **No `Variable` concept**: plain assignments become `Assignment`, so a renamed variable shows up as a change in its declarator children, not on a canonical label.
-- **Decorated definitions wrap the definition**: `DecoratedDef` is a wrapper node, so a decorator change and a body change are separate edits.
-- **Lambdas have no label**: `lambda` becomes `Lambda` with no name.
-- **Unmapped node types pass through**: anything outside the map keeps its raw tree-sitter type name.
+- Methods are not distinct: there is no `Method` concept; a method is a `Function` nested in a `Class`.
+- Assignments use `Assignment`, not `Variable`; their labels contain the left-hand expression.
+- Decorators and bodies have separate tree nodes; human reports may group their edits under the named definition.
+- Lambdas have no label: `lambda` becomes `Lambda` with no name.
+- Unmapped node types pass through: anything outside the map keeps its raw tree-sitter type name.

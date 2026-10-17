@@ -26,7 +26,7 @@ Add shared behavior to the owning crate rather than duplicating it in the CLI. K
 
 ## Adding a language extractor
 
-Add the pinned grammar and feature/build wiring to `crates/differens-tiers`, then map its CST kinds and declaration labels in the code adapter's extractor module. Register its extensions/dialect, and add valid, malformed, Unicode, rename, move, and packaged grammar smoke tests. Code classification alone does not count as semantic coverage.
+Add the pinned grammar and feature/build wiring to `crates/differens-tiers`, then add concept mappings in `src/code/concepts.rs` and declaration labels in `src/code/labels.rs`. Register its extensions/dialect, and add valid, malformed, Unicode, rename, move, and packaged grammar smoke tests. Code classification alone does not count as semantic coverage.
 
 ## Fixtures and corrections
 

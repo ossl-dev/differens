@@ -1,10 +1,8 @@
 # Kotlin
 
-## Kotlin extractor
-
 The Kotlin extractor maps tree-sitter Kotlin CST nodes to canonical concepts. The Kotlin grammar declares no field names at all, so every name is recovered from the first identifier-like child: class names from `type_identifier`, function and variable names from `simple_identifier`.
 
-### Detected concepts
+## Detected concepts
 
 | tree-sitter node type | Canonical concept |
 |---|---|
@@ -22,27 +20,25 @@ The Kotlin extractor maps tree-sitter Kotlin CST nodes to canonical concepts. Th
 | `when_expression` | SwitchBlock |
 | `string_literal` | string_literal |
 
-### Example
+## Example
 
 Renaming a function:
 
-```kotlin
-// old.kt
+```kotlin old.kt
 class Counter { fun total(n: Int): Int { return n + 1 } }
 ```
 
-```kotlin
-// new.kt
+```kotlin new.kt
 class Counter { fun sum(n: Int): Int { return n + 1 } }
 ```
 
 Running `differens old.kt new.kt`:
 
-```
-~ renamed function `total` to `sum` in class `Counter`
+```text
+  ~ renamed function `total` to `sum` in class `Counter`
 ```
 
-### Known limitations
+## Known limitations
 
 - The grammar's missing field names mean label recovery is positional: a declaration with two identifier children can mislabel in exotic syntax.
 - Extension functions report as functions; the receiver type is part of the structure, not the name.

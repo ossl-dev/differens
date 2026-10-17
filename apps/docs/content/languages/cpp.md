@@ -1,10 +1,8 @@
 # C++
 
-## C++ extractor
-
 The C++ extractor maps tree-sitter C++ CST nodes to canonical concepts. Class and namespace names come from the standard `name` field; function names are recovered through the declarator chain.
 
-### Detected concepts
+## Detected concepts
 
 | tree-sitter node type | Canonical concept |
 |---|---|
@@ -20,27 +18,26 @@ The C++ extractor maps tree-sitter C++ CST nodes to canonical concepts. Class an
 | `preproc_include` | PreprocInclude |
 | `access_specifier` | AccessSpecifier |
 
-### Example
+## Example
 
 Renaming a method:
 
-```cpp
-// old.cpp
+```cpp old.cpp
 class Counter { int total(int n) { return n + 1; } };
 ```
 
-```cpp
-// new.cpp
+```cpp new.cpp
 class Counter { int sum(int n) { return n + 1; } };
 ```
 
 Running `differens old.cpp new.cpp`:
 
-```
-~ renamed function `total` to `sum` in class `Counter`
+```text
+  ~ renamed function `total` to `sum` in class `Counter`
+  ~ changed function `sum` (`total` → `sum`)
 ```
 
-### Known limitations
+## Known limitations
 
 - Preprocessor macros are tokens, not structure; conditional compilation does not expand before diffing.
-- Templates are diffed as written: an instantiation change reports in the template body, not per instantiation.
+- Templates are diffed as written. The extractor does not expand them or compare compiler-generated instantiations.

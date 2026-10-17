@@ -1,10 +1,8 @@
 # C#
 
-## C# extractor
-
 The C# extractor maps tree-sitter C# CST nodes to canonical concepts. Class, method, and namespace names come from the standard `name` field; variable names come from the declarator.
 
-### Detected concepts
+## Detected concepts
 
 | tree-sitter node type | Canonical concept |
 |---|---|
@@ -21,27 +19,25 @@ The C# extractor maps tree-sitter C# CST nodes to canonical concepts. Class, met
 | `string_literal` | string_literal |
 | `integer_literal` | integer_literal |
 
-### Example
+## Example
 
 Renaming a method:
 
-```csharp
-// old.cs
+```csharp old.cs
 class Counter { int Total(int n) { return n + 1; } }
 ```
 
-```csharp
-// new.cs
+```csharp new.cs
 class Counter { int Sum(int n) { return n + 1; } }
 ```
 
 Running `differens old.cs new.cs`:
 
-```
-~ renamed method `Total` to `Sum` in class `Counter`
+```text
+  ~ renamed method `Total` to `Sum` in class `Counter`
 ```
 
-### Known limitations
+## Known limitations
 
 - Partial classes across files are correlated per file; the cross-file correlator pairs moved members when the whole changeset is diffed at once.
-- LINQ query syntax reports as call expressions, not query clauses.
+- LINQ query syntax uses its grammar nodes where no canonical concept mapping exists; the extractor does not infer query behavior.

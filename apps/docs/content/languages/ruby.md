@@ -1,10 +1,8 @@
 # Ruby
 
-## Ruby extractor
-
 The Ruby extractor maps tree-sitter Ruby CST nodes to canonical concepts. Class and module names come from the `name` field on constants; method names from the `name` field on identifiers.
 
-### Detected concepts
+## Detected concepts
 
 | tree-sitter node type | Canonical concept |
 |---|---|
@@ -22,12 +20,11 @@ The Ruby extractor maps tree-sitter Ruby CST nodes to canonical concepts. Class 
 | `hash` | ObjectLiteral |
 | `string` | string_literal |
 
-### Example
+## Example
 
 Renaming a method:
 
-```ruby
-# old.rb
+```ruby old.rb
 class Counter
   def total(n)
     n + 1
@@ -35,8 +32,7 @@ class Counter
 end
 ```
 
-```ruby
-# new.rb
+```ruby new.rb
 class Counter
   def sum(n)
     n + 1
@@ -46,11 +42,11 @@ end
 
 Running `differens old.rb new.rb`:
 
-```
-~ renamed method `total` to `sum` in class `Counter`
+```text
+  ~ renamed method `total` to `sum` in class `Counter`
 ```
 
-### Known limitations
+## Known limitations
 
 - Dynamic method definition (`define_method`) is a call, not a method: names built at runtime are invisible to the extractor.
-- `true`, `false`, and `nil` are anonymous tokens in the grammar, so there are no named boolean or null literal nodes to report.
+- `true`, `false`, and `nil` are anonymous tokens in the grammar. The native parser retains their token text, so changes between them remain visible.

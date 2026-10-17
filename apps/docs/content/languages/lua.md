@@ -1,10 +1,8 @@
 # Lua
 
-## Lua extractor
-
 The Lua extractor maps tree-sitter Lua CST nodes to canonical concepts. Function names come from the standard `name` field; local variable names come from the variable list under the declaration.
 
-### Detected concepts
+## Detected concepts
 
 | tree-sitter node type | Canonical concept |
 |---|---|
@@ -21,19 +19,17 @@ The Lua extractor maps tree-sitter Lua CST nodes to canonical concepts. Function
 | `return_statement` | Return |
 | `number` | number_literal |
 
-### Example
+## Example
 
 Renaming a function:
 
-```lua
--- old.lua
+```lua old.lua
 function total(n)
   return n + 1
 end
 ```
 
-```lua
--- new.lua
+```lua new.lua
 function sum(n)
   return n + 1
 end
@@ -41,11 +37,11 @@ end
 
 Running `differens old.lua new.lua`:
 
-```
-~ renamed function `total` to `sum`
+```text
+  ~ renamed function `total` to `sum`
 ```
 
-### Known limitations
+## Known limitations
 
 - Lua has no int/float split; every number literal reports as `number_literal`.
 - Metatable calls (`obj:method()`) report as method calls only when written as method-index syntax.

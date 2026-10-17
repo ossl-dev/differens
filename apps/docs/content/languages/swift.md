@@ -1,10 +1,8 @@
 # Swift
 
-## Swift extractor
-
 The Swift extractor maps tree-sitter Swift CST nodes to canonical concepts. Class, protocol, and function names come from the standard `name` field; property names come from the binding pattern.
 
-### Detected concepts
+## Detected concepts
 
 | tree-sitter node type | Canonical concept |
 |---|---|
@@ -21,27 +19,25 @@ The Swift extractor maps tree-sitter Swift CST nodes to canonical concepts. Clas
 | `line_string_literal` | string_literal |
 | `integer_literal` | integer_literal |
 
-### Example
+## Example
 
 Renaming a function:
 
-```swift
-// old.swift
+```swift old.swift
 class Counter { func total(n: Int) -> Int { return n + 1 } }
 ```
 
-```swift
-// new.swift
+```swift new.swift
 class Counter { func sum(n: Int) -> Int { return n + 1 } }
 ```
 
 Running `differens old.swift new.swift`:
 
-```
-~ renamed function `total` to `sum` in class `Counter`
+```text
+  ~ renamed function `total` to `sum` in class `Counter`
 ```
 
-### Known limitations
+## Known limitations
 
 - Property observers (`didSet`, `willSet`) are bodies; their edits report as body changes on the property.
 - Computed property getters and setters are not labeled as accessor kinds; they diff as blocks inside the property.
