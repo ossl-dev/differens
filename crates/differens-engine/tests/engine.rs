@@ -1,4 +1,4 @@
-use std::{fs, io};
+use std::{fmt::Write as _, fs, io};
 
 use differens_engine::{DiffEngine, ReportOptions, diff_inline, load_config, report, report_file};
 use differens_git::FilePair;
@@ -242,14 +242,16 @@ type basicWriter struct { http.ResponseWriter; wroteHeader bool; discard bool }\
 func (b *basicWriter) maybeWriteHeader() { b.wroteHeader = true }\n";
     let mut old = prefix.to_owned();
     for receiver in receivers {
-        old.push_str(&format!(
+        write!(
+            old,
             "type {receiver} struct {{ basicWriter }}\n\
 func (f *{receiver}) Flush() {{\n\
 f.wroteHeader = true\n\
 fl := f.basicWriter.ResponseWriter.(http.Flusher)\n\
 fl.Flush()\n\
 }}\n"
-        ));
+        )
+        .unwrap();
     }
     let helper = "func (b *basicWriter) flush() {\n\
 b.maybeWriteHeader()\n\
@@ -257,10 +259,12 @@ if !b.discard { b.ResponseWriter.(http.Flusher).Flush() }\n\
 }\n";
     let mut new = format!("{prefix}{helper}");
     for receiver in receivers {
-        new.push_str(&format!(
+        write!(
+            new,
             "type {receiver} struct {{ basicWriter }}\n\
 func (f *{receiver}) Flush() {{ f.basicWriter.flush() }}\n"
-        ));
+        )
+        .unwrap();
     }
     let input = pair("wrap_writer.go", &old, &new);
     let raw = diff_inline(&input).unwrap();
