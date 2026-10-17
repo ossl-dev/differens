@@ -91,6 +91,10 @@ pub struct Tree {
 }
 
 impl Tree {
+    pub(crate) fn has_match_keys(&self) -> bool {
+        !self.match_keys.is_empty()
+    }
+
     #[must_use]
     pub fn root(&self) -> NodeId {
         NodeId(self.nodes.len() - 1)

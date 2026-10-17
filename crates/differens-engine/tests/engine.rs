@@ -230,6 +230,77 @@ func (b B) Flush() int { return 2 }\n";
 }
 
 #[test]
+fn shared_flush_helper_addition_keeps_every_existing_receiver_edit_visible() {
+    let receivers = [
+        "flushWriter",
+        "flushHijackWriter",
+        "httpFancyWriter",
+        "http2FancyWriter",
+    ];
+    let prefix = "package middleware\nimport \"net/http\"\n\
+type basicWriter struct { http.ResponseWriter; wroteHeader bool; discard bool }\n\
+func (b *basicWriter) maybeWriteHeader() { b.wroteHeader = true }\n";
+    let mut old = prefix.to_owned();
+    for receiver in receivers {
+        old.push_str(&format!(
+            "type {receiver} struct {{ basicWriter }}\n\
+func (f *{receiver}) Flush() {{\n\
+f.wroteHeader = true\n\
+fl := f.basicWriter.ResponseWriter.(http.Flusher)\n\
+fl.Flush()\n\
+}}\n"
+        ));
+    }
+    let helper = "func (b *basicWriter) flush() {\n\
+b.maybeWriteHeader()\n\
+if !b.discard { b.ResponseWriter.(http.Flusher).Flush() }\n\
+}\n";
+    let mut new = format!("{prefix}{helper}");
+    for receiver in receivers {
+        new.push_str(&format!(
+            "type {receiver} struct {{ basicWriter }}\n\
+func (f *{receiver}) Flush() {{ f.basicWriter.flush() }}\n"
+        ));
+    }
+    let input = pair("wrap_writer.go", &old, &new);
+    let raw = diff_inline(&input).unwrap();
+    assert!(
+        !raw.changes.iter().any(|change| {
+            matches!(change.action, differens_core::EditAction::Update { .. })
+                && change.action.context().iter().any(|context| {
+                    context.kind == "Method" && context.label.as_deref() == Some("flush")
+                })
+        }),
+        "new helper must be an addition without descendant modifications"
+    );
+    assert_eq!(
+        raw.changes
+            .iter()
+            .filter(|change| {
+                matches!(change.action, differens_core::EditAction::Insert { .. })
+                    && change.action.node().kind == "Method"
+                    && change.action.node().label.as_deref() == Some("flush")
+            })
+            .count(),
+        1
+    );
+    let raw_count = raw.changes.len();
+    let llm = rendered(vec![input], OutputFormat::Llm, false, 1);
+    assert!(
+        llm.lines()
+            .next()
+            .unwrap()
+            .starts_with(&format!("differens/1 1 files {raw_count} changes ")),
+        "{llm}"
+    );
+    for receiver in receivers {
+        assert!(llm.contains(&format!("{receiver}.Flush")), "{llm}");
+    }
+    assert!(llm.contains("+ method basicWriter.flush"), "{llm}");
+    assert!(!llm.contains("modified method basicWriter.flush"), "{llm}");
+}
+
+#[test]
 fn large_reports_use_bounded_overview_and_all_restores_every_file() {
     let inputs: Vec<_> = (0..1000)
         .map(|index| {

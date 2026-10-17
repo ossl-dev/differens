@@ -28,9 +28,12 @@ never mutates tree content.
 
 `NodeSpec::match_key` can disambiguate same-named containers, such as Go methods
 on different receiver types. Keys live in a sparse tree-level map and participate
-in named-container matching paths. They are hints, not content: legacy hashes,
-JSON, and `trees_equal` ignore them. Detached nodes and flat snapshots retain
-their applicable keys.
+in named-container matching paths. During matching, each hinted node and its
+descendants stay within that `(kind, key)` scope; a nested hint starts a new
+scope. Method names can change within one receiver. This prevents identical
+bodies from being matched into an unrelated receiver or a newly added helper.
+Keys are not content: legacy hashes, JSON, and `trees_equal` ignore them.
+Detached nodes and flat snapshots retain their applicable keys.
 
 Actions are `Insert`, `Delete`, `Update`, or `Move`. Rename and value updates
 precede moves, deletions, and insertions. Added or removed subtrees produce one

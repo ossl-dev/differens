@@ -26,7 +26,7 @@ assert_eq!(result.changes[0].action_type(), "Update");
 
 `Tree::node(NodeId)` borrows immutable metadata. `root_ref()` on `Arc<Tree>` returns an owned `NodeRef`; it holds the tree alive and exposes `children()` and `parent()`. An ID belongs to one tree. Spans use UTF-8 byte offsets; lines are one-based.
 
-`NodeSpec::match_key: Option<String>` supplies an internal identity hint for same-named containers, such as `go::basicWriter` for an overloaded Go method. `Tree::match_key(id)` and `NodeRef::match_key()` expose it. Keys occupy a sparse tree-level map and distinguish named-container paths; they do not change labels, legacy JSON, hashes, or exact content equality. Detachment and flat snapshots preserve the applicable keys.
+`NodeSpec::match_key: Option<String>` supplies an internal identity hint for same-named containers, such as `go::basicWriter` for an overloaded Go method. `Tree::match_key(id)` and `NodeRef::match_key()` expose it. Keys occupy a sparse tree-level map and distinguish named-container paths. Each hinted node and its descendants match within the same `(kind, key)` scope; nested hints override their ancestor's scope. Labels remain editable within a scope, so method renames still work. This prevents identical bodies from being matched into an unrelated receiver's helper. Keys do not change labels, legacy JSON, hashes, or exact content equality. Detachment and flat snapshots preserve the applicable keys.
 
 ## Compare
 

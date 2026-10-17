@@ -95,6 +95,7 @@ fn link_subtree(old: &Tree, new: &Tree, matching: &mut Matching, i: usize, j: us
 pub(crate) struct Matching {
     pub(crate) old: Vec<Option<usize>>,
     pub(crate) new: Vec<Option<usize>>,
+    owners: Option<(Vec<usize>, Vec<usize>)>,
 }
 
 impl Matching {
@@ -102,11 +103,51 @@ impl Matching {
         Self {
             old: vec![None; old],
             new: vec![None; new],
+            owners: None,
         }
     }
 
+    fn initialize_owners(&mut self, old: &Tree, new: &Tree) {
+        fn owners<'a>(
+            tree: &'a Tree,
+            intern: &mut HashMap<(&'a str, &'a str), usize>,
+        ) -> Vec<usize> {
+            let mut owners = vec![0; tree.len()];
+            for i in (0..tree.len()).rev() {
+                owners[i] = if let Some(key) = tree.match_key(crate::NodeId(i)) {
+                    let next = intern.len() + 1;
+                    *intern.entry((&tree.nodes[i].kind, key)).or_insert(next)
+                } else {
+                    tree.nodes[i].parent.map_or(0, |parent| owners[parent.0])
+                };
+            }
+            owners
+        }
+        if !old.has_match_keys() && !new.has_match_keys() {
+            return;
+        }
+        // Hinted receiver scopes are closed matching boundaries, including the
+        // declaration itself. Labels are deliberately absent: a method rename
+        // within the same receiver must still match. Unhinted comparisons need
+        // no owner arrays; hinted comparisons allocate only two linear arrays.
+        let mut intern = HashMap::new();
+        self.owners = Some((owners(old, &mut intern), owners(new, &mut intern)));
+    }
+
+    fn old_owner(&self, i: usize) -> usize {
+        self.owners.as_ref().map_or(0, |(old, _)| old[i])
+    }
+
+    fn new_owner(&self, j: usize) -> usize {
+        self.owners.as_ref().map_or(0, |(_, new)| new[j])
+    }
+
+    fn compatible(&self, i: usize, j: usize) -> bool {
+        self.old_owner(i) == self.new_owner(j)
+    }
+
     pub(crate) fn link(&mut self, i: usize, j: usize) {
-        if self.old[i].is_none() && self.new[j].is_none() {
+        if self.old[i].is_none() && self.new[j].is_none() && self.compatible(i, j) {
             self.old[i] = Some(j);
             self.new[j] = Some(i);
         }
@@ -114,6 +155,7 @@ impl Matching {
 }
 
 pub(crate) fn top_down(old: &Tree, new: &Tree, matching: &mut Matching, min_height: usize) {
+    matching.initialize_owners(old, new);
     let height = old.nodes[old.root().0]
         .height
         .max(new.nodes[new.root().0].height);
@@ -121,7 +163,7 @@ pub(crate) fn top_down(old: &Tree, new: &Tree, matching: &mut Matching, min_heig
     let mut new_buckets = vec![Vec::new(); height + 1];
     old_buckets[old.nodes[old.root().0].height].push(old.root().0);
     new_buckets[new.nodes[new.root().0].height].push(new.root().0);
-    let mut by_hash: HashMap<u64, HashBucket<'_>> = HashMap::new();
+    let mut by_hash: HashMap<(u64, usize), HashBucket<'_>> = HashMap::new();
 
     for h in (1..=height).rev() {
         let a = std::mem::take(&mut old_buckets[h]);
@@ -131,7 +173,7 @@ pub(crate) fn top_down(old: &Tree, new: &Tree, matching: &mut Matching, min_heig
             for &j in &b {
                 if matching.new[j].is_none() {
                     by_hash
-                        .entry(new.nodes[j].content_hash)
+                        .entry((new.nodes[j].content_hash, matching.new_owner(j)))
                         .or_default()
                         .candidates
                         .push(j);
@@ -141,7 +183,9 @@ pub(crate) fn top_down(old: &Tree, new: &Tree, matching: &mut Matching, min_heig
                 if matching.old[i].is_some() {
                     continue;
                 }
-                let Some(bucket) = by_hash.get_mut(&old.nodes[i].content_hash) else {
+                let Some(bucket) =
+                    by_hash.get_mut(&(old.nodes[i].content_hash, matching.old_owner(i)))
+                else {
                     continue;
                 };
                 if h < min_height && bucket.candidates.len() > MAX_ALIGN {
@@ -309,6 +353,7 @@ fn near_complete_parent(
     let candidate = new.nodes[last_child].parent?.0;
     if matching.new[candidate].is_some()
         || old.nodes[i].kind != new.nodes[candidate].kind
+        || !matching.compatible(i, candidate)
         || size != new.nodes[candidate].size
         || descendants.min_new < new.lo(candidate)
         || descendants.max_new >= candidate
@@ -359,7 +404,7 @@ pub(crate) fn bottom_up(old: &Tree, new: &Tree, matching: &mut Matching, ratio: 
                         if matching.new[a.0].is_some() {
                             break;
                         }
-                        if new.nodes[a.0].kind == old.nodes[i].kind {
+                        if new.nodes[a.0].kind == old.nodes[i].kind && matching.compatible(i, a.0) {
                             if stamp[a.0] != i {
                                 stamp[a.0] = i;
                                 common[a.0] = 0;
@@ -433,7 +478,7 @@ pub(crate) fn recover_leaves(old: &Tree, new: &Tree, matching: &mut Matching) {
         }
         if old_leaves.len() > MAX_ALIGN || new_leaves.len() > MAX_ALIGN {
             for (&x, &y) in old_leaves.iter().zip(&new_leaves) {
-                if old.nodes[x].kind == new.nodes[y].kind {
+                if old.nodes[x].kind == new.nodes[y].kind && matching.compatible(x, y) {
                     matching.link(x, y);
                 }
             }
@@ -443,17 +488,21 @@ pub(crate) fn recover_leaves(old: &Tree, new: &Tree, matching: &mut Matching) {
         let mut table = vec![0_usize; (old_leaves.len() + 1) * width];
         for x in (0..old_leaves.len()).rev() {
             for y in (0..new_leaves.len()).rev() {
-                table[x * width + y] =
-                    if old.nodes[old_leaves[x]].kind == new.nodes[new_leaves[y]].kind {
-                        table[(x + 1) * width + y + 1] + 1
-                    } else {
-                        table[(x + 1) * width + y].max(table[x * width + y + 1])
-                    };
+                table[x * width + y] = if old.nodes[old_leaves[x]].kind
+                    == new.nodes[new_leaves[y]].kind
+                    && matching.compatible(old_leaves[x], new_leaves[y])
+                {
+                    table[(x + 1) * width + y + 1] + 1
+                } else {
+                    table[(x + 1) * width + y].max(table[x * width + y + 1])
+                };
             }
         }
         let (mut x, mut y) = (0, 0);
         while x < old_leaves.len() && y < new_leaves.len() {
-            if old.nodes[old_leaves[x]].kind == new.nodes[new_leaves[y]].kind {
+            if old.nodes[old_leaves[x]].kind == new.nodes[new_leaves[y]].kind
+                && matching.compatible(old_leaves[x], new_leaves[y])
+            {
                 matching.link(old_leaves[x], new_leaves[y]);
                 x += 1;
                 y += 1;
@@ -507,7 +556,7 @@ pub(crate) fn recover_containers(old: &Tree, new: &Tree, matching: &mut Matching
                 .get(&(Some(crate::NodeId(partner)), node.kind.as_str()))
                 .filter(|c| eligible && c.len() == 1)
             {
-                if matching.new[candidates[0]].is_none() {
+                if matching.new[candidates[0]].is_none() && matching.compatible(i, candidates[0]) {
                     matching.link(i, candidates[0]);
                     continue;
                 }
@@ -522,7 +571,7 @@ pub(crate) fn recover_containers(old: &Tree, new: &Tree, matching: &mut Matching
         };
         let mut only = None;
         for &j in candidates {
-            if matching.new[j].is_some() {
+            if matching.new[j].is_some() || !matching.compatible(i, j) {
                 continue;
             }
             if verified_structure[i] != Some(j) {
@@ -560,6 +609,35 @@ mod tests {
         assert_eq!(matching.old, [Some(0), None, None]);
         assert_eq!(matching.new, [Some(0), None, None]);
     }
+    #[test]
+    fn nearest_hinted_owner_includes_itself_and_overrides_its_ancestor() {
+        let mut builder = TreeBuilder::new();
+        let plain = builder.push(NodeSpec::new("token")).unwrap();
+        let nested = builder.push(NodeSpec::new("token")).unwrap();
+        let mut inner = NodeSpec::new("Method");
+        inner.match_key = Some("inner".to_owned());
+        inner.children.push(nested);
+        let inner = builder.push(inner).unwrap();
+        let mut outer = NodeSpec::new("Method");
+        outer.match_key = Some("outer".to_owned());
+        outer.children = vec![plain, inner];
+        let outer = builder.push(outer).unwrap();
+        let mut root = NodeSpec::new("file");
+        root.children.push(outer);
+        let root = builder.push(root).unwrap();
+        let tree = builder.finish(root).unwrap();
+        let mut matching = Matching::new(tree.len(), tree.len());
+        matching.initialize_owners(&tree, &tree);
+        assert!(matching.compatible(outer.0, plain.0));
+        assert!(matching.compatible(inner.0, nested.0));
+        assert!(!matching.compatible(outer.0, inner.0));
+        assert!(!matching.compatible(root.0, plain.0));
+        matching.link(plain.0, nested.0);
+        assert_eq!(matching.old[plain.0], None);
+        matching.link(nested.0, nested.0);
+        assert_eq!(matching.old[nested.0], Some(nested.0));
+    }
+
     fn reference_bottom_up(old: &Tree, new: &Tree, matching: &mut Matching, ratio: f64) {
         let mut stamp = vec![usize::MAX; new.len()];
         let mut common = vec![0_usize; new.len()];
