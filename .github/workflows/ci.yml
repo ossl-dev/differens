@@ -1,20 +1,30 @@
 name: CI
 on:
   push:
-    paths-ignore:
-      - '**.md'
-      - '.gitignore'
-      - 'apps/docs/**'
+    paths:
+      - '**/*.rs'
+      - '**/Cargo.toml'
+      - Cargo.lock
+      - rust-toolchain.toml
+      - .cargo/**
+      - crates/**
+      - fixtures/**
+      - xtask/**
+      - apps/docs/**
+      - .github/workflows/ci.yml
   pull_request:
     paths:
-      - 'packages/**'
-      - 'apps/**'
-      - 'package.json'
-      - 'bun.lock'
-      - 'tsconfig.json'
-      - 'biome.json'
-      - 'turbo.json'
-      - '.github/workflows/ci.yml'
+      - '**/*.rs'
+      - '**/Cargo.toml'
+      - Cargo.lock
+      - rust-toolchain.toml
+      - .cargo/**
+      - crates/**
+      - fixtures/**
+      - xtask/**
+      - apps/docs/**
+      - .github/workflows/ci.yml
+  workflow_dispatch:
 
 jobs:
   test:
@@ -22,30 +32,62 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-      - name: Typecheck
-        run: bun run typecheck
-      - name: Lint (Biome)
-        run: bun run lint
-      - name: Test (unit, integration, and CLI e2e)
-        run: bun run test
-      - name: Coverage gate
-        run: bun run test:coverage-gate
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Lint
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Test native workspace and frozen behavior corpus
+        run: cargo test --workspace --locked
+      - name: Test dependency-light core
+        run: cargo test -p differens-core --no-default-features --locked
+      - name: Test adapters without native grammars
+        run: cargo test -p differens-tiers --no-default-features --locked
+      - name: API and static documentation
+        run: |
+          cargo doc --workspace --no-deps --locked
+          cargo xtask docs
 
-  format:
+  coverage:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain
+      - name: Install coverage tool
+        run: cargo install cargo-llvm-cov --version 0.9.1 --locked
+      - name: Check line and function coverage
+        run: cargo xtask coverage
+
+  msrv:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install minimum supported Rust
+        run: rustup toolchain install 1.85.1 --profile minimal
+      - name: Check workspace on minimum supported Rust
+        run: cargo +1.85.1 check --workspace --locked
+
+  archives:
+    if: github.event_name == 'workflow_dispatch'
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain
+      - name: Build native archive
+        run: cargo xtask package
+      - uses: actions/upload-artifact@v4
         with:
-          bun-version: latest
-      - name: Check formatting (Biome)
-        run: bunx biome check --formatter-enabled=true --linter-enabled=false .
+          name: differens-${{ runner.os }}-${{ runner.arch }}
+          path: target/packages/*

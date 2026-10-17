@@ -1,8 +1,0 @@
-{
-  "name": "@ossl-dev/differens-tsconfig",
-  "version": "0.2.0",
-  "private": true,
-  "exports": {
-    "./tsconfig.json": "./tsconfig.json"
-  }
-}

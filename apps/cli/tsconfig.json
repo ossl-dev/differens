@@ -1,8 +1,0 @@
-{
-  "extends": "@ossl-dev/differens-tsconfig/tsconfig.json",
-  "compilerOptions": {
-    "outDir": "dist",
-    "rootDir": "src"
-  },
-  "include": ["src"]
-}
