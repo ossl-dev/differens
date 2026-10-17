@@ -1,0 +1,41 @@
+# differens-git
+
+File, directory, and Git inputs with original source bytes and explicit file presence. This crate discovers inputs; parsing and semantic analysis live in other crates.
+
+```rust
+use differens_git::{GitRepository, read_file_pair};
+
+fn inputs() -> differens_git::Result<()> {
+    let pair = read_file_pair("before.rs", "after.rs")?;
+    assert!(pair.old_exists && pair.new_exists);
+    let repo = GitRepository::discover(".")?;
+    for pair in repo.diff_working_tree_stream()? {
+        let pair = pair?;
+        println!("{}", pair.new_path);
+    }
+    Ok(())
+}
+```
+
+`FilePair` stores `old_path`, `new_path`, `old_source: Vec<u8>`, `new_source: Vec<u8>`, `old_exists`, and `new_exists`. Empty bytes do not imply a missing file.
+
+## Repository inputs
+
+- `GitRepository::discover(cwd)` finds the repository root.
+- `root()` returns its path.
+- `resolve_ref(reference)` resolves a commit or returns `None` for an unresolved ref.
+- `diff_working_tree_stream()` yields fallible file pairs against HEAD.
+- `diff_commit_range_stream(range)` yields pairs from a Git range.
+- `diff_working_tree()` and `diff_commit_range(range)` collect those streams.
+
+Git failures and file read errors are propagated. Binary bytes survive input collection. Paths unsupported by the public display-path representation produce errors rather than silently naming another file.
+
+## Direct files and directories
+
+`read_file_pair(old_path, new_path)` compares two files, following symbolic links to their contents. `diff_directories_stream(old, new)` yields directory pairs; `diff_directories` collects them. `is_directory(path)` checks an input path. Walks skip a fixed set of generated/vendor directories before descending, including `.git`, `node_modules`, `target`, `dist`, `build`, and `vendor`. Git and directory inputs preserve symbolic-link target text.
+
+## Git driver
+
+`diff_driver_command(executable, args)` quotes a command for Git's external-diff shell. `DRIVER_FLAG` is the internal entry flag. `generate_git_attributes(extensions)` creates attribute rules.
+
+`repo.install_git_driver(command)` configures the local repository. `repo.write_git_attributes(extensions)` updates rules while preserving unrelated lines. The CLI command `differens install-git-driver` performs these changes explicitly and records the current executable path. Reinstall the driver after moving that binary.

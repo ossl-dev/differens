@@ -1,0 +1,121 @@
+[
+  {
+    "dialect": "javascript",
+    "extension": "js",
+    "path": "javascript.js",
+    "concept": "Function",
+    "label": "run"
+  },
+  {
+    "dialect": "typescript",
+    "extension": "ts",
+    "path": "typescript.ts",
+    "concept": "Function",
+    "label": "run"
+  },
+  {
+    "dialect": "tsx",
+    "extension": "tsx",
+    "path": "tsx.tsx",
+    "concept": "Function",
+    "label": "View"
+  },
+  {
+    "dialect": "python",
+    "extension": "py",
+    "path": "python.py",
+    "concept": "Function",
+    "label": "run"
+  },
+  {
+    "dialect": "rust",
+    "extension": "rs",
+    "path": "rust.rs",
+    "concept": "Function",
+    "label": "run"
+  },
+  {
+    "dialect": "go",
+    "extension": "go",
+    "path": "go.go",
+    "concept": "Function",
+    "label": "run"
+  },
+  {
+    "dialect": "c",
+    "extension": "c",
+    "path": "c.c",
+    "concept": "Function",
+    "label": "run"
+  },
+  {
+    "dialect": "cpp",
+    "extension": "cpp",
+    "path": "cpp.cpp",
+    "concept": "Function",
+    "label": "run"
+  },
+  {
+    "dialect": "java",
+    "extension": "java",
+    "path": "java.java",
+    "concept": "Method",
+    "label": "run"
+  },
+  {
+    "dialect": "ruby",
+    "extension": "rb",
+    "path": "ruby.rb",
+    "concept": "Method",
+    "label": "run"
+  },
+  {
+    "dialect": "php",
+    "extension": "php",
+    "path": "php.php",
+    "concept": "Function",
+    "label": "run"
+  },
+  {
+    "dialect": "swift",
+    "extension": "swift",
+    "path": "swift.swift",
+    "concept": "Function",
+    "label": "run"
+  },
+  {
+    "dialect": "kotlin",
+    "extension": "kt",
+    "path": "kotlin.kt",
+    "concept": "Function",
+    "label": "run"
+  },
+  {
+    "dialect": "csharp",
+    "extension": "cs",
+    "path": "csharp.cs",
+    "concept": "Method",
+    "label": "run"
+  },
+  {
+    "dialect": "scala",
+    "extension": "scala",
+    "path": "scala.scala",
+    "concept": "Function",
+    "label": "run"
+  },
+  {
+    "dialect": "lua",
+    "extension": "lua",
+    "path": "lua.lua",
+    "concept": "Function",
+    "label": "run"
+  },
+  {
+    "dialect": "bash",
+    "extension": "sh",
+    "path": "bash.sh",
+    "concept": "Function",
+    "label": "run"
+  }
+]

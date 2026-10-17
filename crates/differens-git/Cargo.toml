@@ -1,0 +1,17 @@
+[package]
+name = "differens-git"
+version.workspace = true
+description = "Byte-preserving Git and filesystem inputs for Differens"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+walkdir.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

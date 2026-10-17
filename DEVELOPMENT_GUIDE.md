@@ -1,214 +1,102 @@
 # Development guide
 
-Differens is a semantic diffing engine: it parses code into trees, matches nodes structurally, and tells you what actually changed -- renamed, moved, extracted, reformatted -- instead of which lines changed.
+Differens is one Cargo workspace. Install the pinned toolchain from
+`rust-toolchain.toml`, a C/C++ compiler for Tree-sitter/scanners, and Git for
+repository integration tests. The lockfile belongs to the monorepo.
 
-## Code structure
+## Structure
 
-```
-differens/
-├── packages/
-│   ├── core/          # Node hashing + GumTree-style tree matching
-│   ├── tiers/         # Content router + 6 tier adapters (T0-T5)
-│   │   ├── binary.ts  # T0: binary detection (hash-only)
-│   │   ├── raw.ts     # T1: LCS line diff (safety net)
-│   │   ├── prose.ts   # T2: word-level prose diff
-│   │   ├── markup.ts  # T3: HTML/XML tree parser
-│   │   ├── data.ts    # T4: JSON/YAML/TOML value trees
-│   │   └── code/      # T5: tree-sitter CST + per-language extractors
-│   │       ├── extractor.ts    # LanguageExtractor interface
-│   │       ├── typescript.ts   # TS/JS semantic extractor
-│   │       ├── python.ts       # Python semantic extractor
-│   │       ├── rust.ts         # Rust semantic extractor
-│   │       └── go.ts           # Go semantic extractor
-│   ├── narrate/       # Template engine: edit actions -> English
-│   ├── correlate/     # Cross-file move/rename detection
-│   ├── git/           # Git shell-out integration
-│   └── tsconfig/      # Shared TypeScript config
-├── apps/
-│   └── cli/           # The `differens` command
-├── turbo.json         # Turborepo pipeline
-├── biome.json         # Formatter + linter config
-└── package.json       # Root workspace config
+```text
+crates/differens-core/       validated arenas, matching, typed edits
+crates/differens-tiers/      shared sequence engine and format/language adapters
+crates/differens-narrate/    descriptions, grouping, output formatting
+crates/differens-correlate/  cross-file move identity and similarity
+crates/differens-git/        files, directories, Git subprocesses, driver setup
+crates/differens-engine/     bounded worker windows, config, reporting
+apps/cli/                   native differens executable
+apps/docs/content/          CommonMark documentation and language examples
+fixtures/                   frozen parity, corrections, grammar smoke inputs
+xtask/                      Rust checks, benchmarks, docs, packaging, coverage
 ```
 
-**Starting point:** `packages/core/src/index.ts` for the matching algorithm. `packages/tiers/src/index.ts` for the content router and adapter pipeline.
+The core accepts immutable trees and has no parser or filesystem dependency. The
+input crate retains original bytes and explicit file presence. Tiers create core
+trees; narration and correlation consume actions. The engine composes those
+libraries. Keep shared behavior in its owning crate rather than duplicating it
+in CLI dispatch.
 
-**Pipeline:** Content router -> Tier adapter -> Diff core -> Cross-file correlator -> Narration engine -> Output formatter. Each tier can fall back to the tier below it. The diff core never cares where its input came from (git, two files, two directories).
-
-## Prerequisites
-
-- **Bun** >= 1.3. Verify: `bun --version`
-- Git (for git integration tests)
+## Commands
 
 ```bash
-bun install
+cargo build --workspace --locked
+cargo run -p differens -- before.rs after.rs
+cargo test --workspace --locked
+cargo test -p differens-core --no-default-features
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo doc --workspace --no-deps --locked
+cargo xtask check
+cargo xtask parity
+cargo xtask docs
+cargo xtask bench
+cargo xtask package --dry-run
 ```
 
-## Building
+`cargo xtask coverage` uses `cargo-llvm-cov` and the pinned toolchain's LLVM tools.
+Install that Cargo tool separately when running the coverage gate locally. Its
+configured gate is 95% lines and 90% functions; configured thresholds are not a
+claim about a coverage run that has not been measured.
 
-```bash
-bun run build        # Build all packages
-bun run typecheck    # TypeScript check across all packages
-```
+Use focused crate tests during implementation, then complete workspace checks.
+Tests exercise real temporary Git repositories, seeded sequence references,
+frozen legacy outputs, explicit corrected cases, grammar dialects, and deep-tree
+cleanup. Native package validation and published registry state are distinct.
 
-## Running the CLI
+## Invariants
 
-**From source (dev):** no build step needed, Bun runs TypeScript directly.
+- `TreeBuilder` receives children before parents in contiguous source-order
+  postorder. IDs belong to one tree; use an owned `NodeRef` across result lifetimes.
+- Content/structure hashes nominate candidates. Full topology and field checks
+  establish equality. Keep UTF-16 hashing compatibility separate from UTF-8 spans.
+- Preserve `None` versus empty values and explicit legacy metadata fields.
+- Missing files are presence values. Git failures and unreadable inputs propagate
+  errors; they do not become empty or unchanged files.
+- Parser budgets and sequence work limits produce visible fallback metadata.
+- Keep action/report order deterministic across worker counts.
+- In-flight worker windows, caches, retained moves, and large individual files all
+  contribute to memory use. Measure the full workload before changing limits.
 
-```bash
-bun run apps/cli/src/index.ts <inputs>
-```
+## Adding a language or format
 
-**From the built bundle:** same code, just compiled.
+Pin grammar/runtime revisions and licenses, add build/feature wiring, register
+extensions/dialects, and map CST kinds/labels in the tiers crate. Add valid,
+malformed, Unicode, rename/move, and native artifact smoke tests. Preserve TS and
+TSX as distinct grammar dialects. An extension classified as code is not semantic
+coverage until a parser is linked and tested.
 
-```bash
-bun run build --filter=differens
-./apps/cli/dist/index.js <inputs>
-```
+Data and markup adapters should retain semantic information: scalar types,
+attributes, and nested structure. Share sequence matching and core matching;
+avoid a second tree matcher inside an adapter. Parser output must satisfy arena
+invariants and source-span conventions.
 
-**Standalone executable:** single file with the Bun runtime embedded, no dependencies.
+## Documentation
 
-```bash
-bun build ./apps/cli/src/index.ts --compile --outfile differens
-./differens <inputs>
-```
+Edit `apps/docs/content/*.md` and nested CommonMark pages. Preserve existing page
+slugs when possible and update `apps/docs/navigation.json` and `routes.json` when
+adding or moving a page. `cargo xtask docs` builds static HTML under `target/site`
+with Rust; API docs use `cargo doc`. No client JavaScript or external documentation
+runtime is required. Source-language examples remain legitimate documentation.
 
-**Published on npm:** `npm install -g differens`, then:
+## Commits and delivery
 
-```bash
-differens <inputs>
-```
+Match existing readable past-tense commit subjects:
 
-## Releasing
+- `Added Python extractor for async functions`
+- `Fixed root insertion when the old tree is empty`
+- `Replaced recursive tree walks with arena traversal`
 
-Seven packages go out: the five libraries, then the CLI under both
-`differens` and `@ossl-dev/differens-cli` from one build. Bump the versions, then
-from the repo root:
-
-```bash
-bun run release -- --dry-run
-```
-
-```bash
-bun run release
-```
-
-Everything after `--` goes through to `npm publish`, so `--otp=123456` is how a
-one-time code gets in if the account uses app-based 2FA. A passkey has no code
-to pass: npm falls back to a browser challenge, and that needs a real terminal.
-Run the release from your own shell, not from a pipe or a CI step without a
-TTY, or npm prints an auth URL and exits `EOTP` without ever waiting for it.
-
-Publishing runs in dependency order, which matters: `tiers` names `core` as a
-real dependency, so `core` has to exist on the registry first. Two things make
-a partial run survivable -- a version already on the registry is skipped rather
-than retried into an error, and a scope the account cannot publish into skips
-only its own packages, so the unscoped CLI still goes out.
-
-`scripts/publish.ts` builds once and stages each publish into a temp directory.
-The repo manifests are never rewritten, so an interrupted release cannot leave
-the workspace in a half-published shape. The staged manifest is where the
-differences live:
-
-- **`main` and `exports` are repointed at `dist`.** In the workspace they name
-  `src/index.ts`, so editing a package is felt by its dependents with no build
-  step. Consumers need built JS and the declarations beside it.
-- **`workspace:*` becomes a caret range** on the version being published in the
-  same run. The protocol means nothing to the registry, and left as written it
-  names packages that cannot be resolved.
-- **devDependencies and scripts are dropped.** Both are workspace-relative.
-
-Three things the registry punishes quietly:
-
-- A `bin` path written as `./dist/index.js` is stripped on publish, and *only*
-  on publish -- `npm pack` keeps it, so a tarball can install and run perfectly
-  while the published package ships no command at all. Write it `dist/index.js`.
-- A library whose `dist` has no `index.d.ts` publishes happily and is untyped
-  for everyone downstream. The publish script throws instead.
-- The library builds pass `--external '@ossl-dev/*'`, so a sibling stays an import
-  rather than being inlined. Without it each package would carry its own copy
-  of the core, and two `Node` types that are structurally identical but not the
-  same module stop being interchangeable.
-
-## CLI usage
-
-The CLI is the diff, no subcommand:
-
-```bash
-differens                        # diff working tree vs HEAD
-differens a.ts b.ts              # two files
-differens old/ new/              # two directories
-differens main..feature          # commit range
-differens 2a8178e 3a5015f        # two commits by id or branch
-differens a.json b.json --format=llm
-```
-
-Formats: terminal (default), `--format=json`, `--format=markdown`, `--format=llm` (compact JSON for AI tools with containment chains and before/after values).
-
-## Tests
-
-```bash
-bun run test         # 100+ tests across 6 packages (zero failures)
-bun run lint         # Biome lint all packages
-bun run format       # Biome format all packages
-```
-
-Per-package:
-```bash
-bun test packages/core/src/
-bun test packages/tiers/src/
-```
-
-## Architecture notes
-
-**One diff core, many adapters.** There is exactly one tree-matching algorithm (GumTree lineage: top-down isomorphic matching + bottom-up container matching + Chawathe edit scripts). Every tier is a parser that produces a Node tree for that algorithm to consume.
-
-**Graceful degradation.** Unparseable code falls back to generic tree-sitter CST diff. That falls back to LCS line diff. That falls back to byte-level hash comparison. The tool never crashes or refuses to produce an answer.
-
-**64-bit FNV-1a hashing.** Content hash and structure hash are computed bottom-up (Merkle-style) per node. Content hash covers kind + label + value + children's content hashes. Structure hash covers kind + children's structure hashes (ignores label/value). Birthday bound at 50k nodes: ~0.000007% collision chance.
-
-**Deterministic core.** Same inputs produce the same output every time. CI-safe by design. The optional AI layer (post-v1) adds narrative polish on top of the already-computed result.
-
-**Algorithm first, AI optional.** Turning AI off removes only prose style, never a feature or correctness.
-
-## Making changes
-
-1. Pick or open an issue
-2. Branch from `main`
-3. Write code + tests. Every behavior change gets a test
-4. Run `bun run test` -- must be all green
-5. Run `bun run lint` -- must be clean
-6. PR against `main`
-
-**Commit style**: Human-readable, past-tense, lowercase after first word.
-
-Good:
-- `Added Python extractor for async/await node types`
-- `Fixed root-level insertion not emitted when parent is null`
-- `Replaced recursive tree walk with iterative stack to avoid stack overflow`
-
-Avoid:
-- `fix: root insert` (too terse)
-- `Implemented comprehensive solution for edge case handling in the tree matching subsystem` (too verbose)
-
-**Formatting**: Biome handles this. `bun run format` before committing, or let your editor do it on save.
-
-## Adding a language extractor
-
-1. Create `packages/tiers/src/code/<language>.ts`
-2. Implement the `LanguageExtractor` interface from `extractor.ts`
-3. Map tree-sitter node types to canonical concepts (Function, Class, Method, Import, etc.)
-4. Register the extractor in `code/index.ts` `ensureInitialized()`
-5. Add tests in `packages/tiers/src/index.test.ts`
-6. Run `bun test packages/tiers/src/`
-
-Languages without extractors still work at the generic level -- structural diff with raw tree-sitter node type labels. The extractor only adds human-readable concept names.
-
-## Adding a tier adapter
-
-1. Create the adapter in `packages/tiers/src/`
-2. It must produce a `Node` tree (see `packages/core/src/index.ts` for the interface)
-3. Register it in `packages/tiers/src/index.ts` `diffWithTier()` switch statement
-4. Add to `classifyFile()` if it has specific file extensions
-5. The tier number should reflect its position on the abstraction ladder (T0=bytes, T5=code)
-6. Tests in `packages/tiers/src/index.test.ts`
+Format before committing. Keep behavior changes fixture-backed and commits
+reviewable. Dry-run packaging validates artifacts without publishing. Publish
+crates in dependency order only through a deliberate release action. Document
+supported targets from executed tests; cross-compilation alone does not prove
+runtime support.

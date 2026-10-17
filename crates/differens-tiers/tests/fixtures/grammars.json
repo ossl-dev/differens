@@ -1,0 +1,138 @@
+[
+  {
+    "dialect": "javascript",
+    "extension": "js",
+    "path": "javascript.js",
+    "concept": "Function",
+    "label": "run",
+    "source": "function run() { return 1; }\n"
+  },
+  {
+    "dialect": "typescript",
+    "extension": "ts",
+    "path": "typescript.ts",
+    "concept": "Function",
+    "label": "run",
+    "source": "interface Box { value: number; }\nfunction run(): number { return 1; }\n"
+  },
+  {
+    "dialect": "tsx",
+    "extension": "tsx",
+    "path": "tsx.tsx",
+    "concept": "Function",
+    "label": "View",
+    "source": "function View() { return <div title=\"x\">hi</div>; }\n"
+  },
+  {
+    "dialect": "python",
+    "extension": "py",
+    "path": "python.py",
+    "concept": "Function",
+    "label": "run",
+    "source": "def run():\n    return 1\n\n"
+  },
+  {
+    "dialect": "rust",
+    "extension": "rs",
+    "path": "rust.rs",
+    "concept": "Function",
+    "label": "run",
+    "source": "fn run() -> i32 { 1 }\n"
+  },
+  {
+    "dialect": "go",
+    "extension": "go",
+    "path": "go.go",
+    "concept": "Function",
+    "label": "run",
+    "source": "package main\nfunc run() int { return 1 }\n"
+  },
+  {
+    "dialect": "c",
+    "extension": "c",
+    "path": "c.c",
+    "concept": "Function",
+    "label": "run",
+    "source": "int run(void) { return 1; }\n"
+  },
+  {
+    "dialect": "cpp",
+    "extension": "cpp",
+    "path": "cpp.cpp",
+    "concept": "Function",
+    "label": "run",
+    "source": "int run() { return 1; }\n"
+  },
+  {
+    "dialect": "java",
+    "extension": "java",
+    "path": "java.java",
+    "concept": "Method",
+    "label": "run",
+    "source": "class Main { int run() { return 1; } }\n"
+  },
+  {
+    "dialect": "ruby",
+    "extension": "rb",
+    "path": "ruby.rb",
+    "concept": "Method",
+    "label": "run",
+    "source": "def run\n  1\nend\n\n"
+  },
+  {
+    "dialect": "php",
+    "extension": "php",
+    "path": "php.php",
+    "concept": "Function",
+    "label": "run",
+    "source": "<?php function run() { return 1; }\n"
+  },
+  {
+    "dialect": "swift",
+    "extension": "swift",
+    "path": "swift.swift",
+    "concept": "Function",
+    "label": "run",
+    "source": "func run() -> Int { return 1 }\n"
+  },
+  {
+    "dialect": "kotlin",
+    "extension": "kt",
+    "path": "kotlin.kt",
+    "concept": "Function",
+    "label": "run",
+    "source": "fun run(): Int { return 1 }\n"
+  },
+  {
+    "dialect": "csharp",
+    "extension": "cs",
+    "path": "csharp.cs",
+    "concept": "Method",
+    "label": "run",
+    "source": "class Main { int run() { return 1; } }\n"
+  },
+  {
+    "dialect": "scala",
+    "extension": "scala",
+    "path": "scala.scala",
+    "concept": "Function",
+    "label": "run",
+    "source": "object Main { def run(): Int = 1 }\n"
+  },
+  {
+    "dialect": "lua",
+    "extension": "lua",
+    "path": "lua.lua",
+    "concept": "Function",
+    "label": "run",
+    "source": "function run() return 1 end\n"
+  },
+  {
+    "dialect": "bash",
+    "extension": "sh",
+    "path": "bash.sh",
+    "concept": "Function",
+    "label": "run",
+    "source": "run() { echo 1; }\n"
+  }
+]

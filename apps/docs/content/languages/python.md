@@ -1,0 +1,93 @@
+# Python
+
+The Python extractor covers `.py` files. Python has a single grammar construct for functions. Async functions parse as the same `function_definition` node, with the `async` keyword folded into it. Both sync and async `def` become `Function`.
+
+## What it detects
+
+- **Functions**: `def` (sync and async) becomes `Function`
+- **Classes**: `class_definition` becomes `Class`; methods are `Function` nodes nested inside
+- **Decorators**: `decorator` becomes `Decorator`; a decorated definition becomes a `DecoratedDef` wrapper around the underlying function or class
+- **Imports**: `import_statement`, `import_from_statement`, and `future_import_statement` all become `Import`
+- **Assignments**: `assignment` and `augmented_assignment` become `Assignment` / `AugmentedAssignment`. Python has no separate `Variable` concept. A variable's name lives in the declarator of the assignment that binds it, not in a canonical label
+- **Control flow**: if / elif / else, for / while, try / except / finally, with, match / case
+- **Comprehensions and lambdas**: list / dict / set comprehensions, generator expressions, `lambda`
+- **Type annotations**: `type`, `generic_type`, and `union_type` become `TypeAnnotation` / `GenericType` / `UnionType`
+
+## Node type mapping
+
+| tree-sitter node type | Canonical concept |
+| --- | --- |
+| `module` | `file` |
+| `function_definition` | `Function` |
+| `class_definition` | `Class` |
+| `decorated_definition` | `DecoratedDef` |
+| `decorator` | `Decorator` |
+| `import_statement` / `import_from_statement` / `future_import_statement` | `Import` |
+| `assignment` / `augmented_assignment` | `Assignment` / `AugmentedAssignment` |
+| `if_statement` / `elif_clause` / `else_clause` | `IfBlock` / `ElifBlock` / `ElseBlock` |
+| `for_statement` / `while_statement` | `ForLoop` / `WhileLoop` |
+| `try_statement` / `except_clause` / `finally_clause` | `TryBlock` / `ExceptClause` / `FinallyClause` |
+| `with_statement` | `WithBlock` |
+| `match_statement` / `case_clause` | `MatchBlock` / `CaseClause` |
+| `return_statement` / `raise_statement` / `assert_statement` / `yield_statement` | `Return` / `Raise` / `Assert` / `Yield` |
+| `call` / `attribute` / `subscript` | `CallExpression` / `AttributeAccess` / `SubscriptAccess` |
+| `lambda` | `Lambda` |
+| `conditional_expression` / `named_expression` | `TernaryOp` / `WalrusOp` |
+| `binary_operator` / `unary_operator` / `boolean_operator` / `comparison_operator` | `BinaryOp` / `UnaryOp` / `BooleanOp` / `ComparisonOp` |
+| `list` / `tuple` / `dictionary` / `set` | `ListLiteral` / `TupleLiteral` / `DictLiteral` / `SetLiteral` |
+| `list_comprehension` / `dictionary_comprehension` / `set_comprehension` | `ListComp` / `DictComp` / `SetComp` |
+| `generator_expression` | `GeneratorExpr` |
+| `string` / `integer` / `float` | `string_literal` / `integer_literal` / `float_literal` |
+| `true` / `false` / `none` | `boolean_literal` / `boolean_literal` / `null_literal` |
+| `type` / `generic_type` / `union_type` | `TypeAnnotation` / `GenericType` / `UnionType` |
+| `default_parameter` / `keyword_argument` / `list_splat` / `dictionary_splat` | `DefaultParam` / `KeywordArg` / `StarArg` / `DoubleStarArg` |
+| `block` / `parameters` / `argument_list` | `Block` / `Parameters` / `Arguments` |
+| `comment` | `Comment` |
+
+Node types without a mapping keep their raw tree-sitter type name.
+
+**Labels.** Labels come from the `name` field on the definition node.
+
+## Example: refactoring a Python module
+
+Extract `apply_discount` out of `pricing.py` into a new `discounts.py`, rename it to `apply_promo`, and add a `max_discount` parameter:
+
+```python pricing.py (before)
+TAX_RATE = 0.08
+
+def apply_discount(price: float) -> float:
+    return price * (1 - TAX_RATE)
+
+def checkout(total: float) -> float:
+    return apply_discount(total) + 2.99
+```
+```python pricing.py (after)
+TAX_RATE = 0.08
+from discounts import apply_promo
+
+def checkout(total: float) -> float:
+    return apply_promo(total) + 2.99
+```
+```python discounts.py (after)
+def apply_promo(price: float, max_discount: float = 0.5) -> float:
+    return price * (1 - max_discount)
+```
+```text Output
+  cross-file moves:
+  → function `apply_discount` from pricing.py to discounts.py
+  ~ renamed function `apply_discount` to `apply_promo`
+  + added parameter `max_discount` in function `apply_promo`
+  ~ changed value of return expression from `price * (1 - TAX_RATE)` to `price * (1 - max_discount)`
+  ~ changed value of call expression from `apply_discount(total)` to `apply_promo(total)` in function `checkout`
+4 modifications, 1 move
+```
+
+The line diff shows `pricing.py` losing two functions and `discounts.py` gaining one. The semantic diff shows one function moved across files, renamed, and given a defaulted parameter. `checkout` barely changed.
+
+## Known limitations
+
+- **Methods are not distinct**: there is no `Method` concept; a method is a `Function` nested in a `Class`.
+- **No `Variable` concept**: plain assignments become `Assignment`, so a renamed variable shows up as a change in its declarator children, not on a canonical label.
+- **Decorated definitions wrap the definition**: `DecoratedDef` is a wrapper node, so a decorator change and a body change are separate edits.
+- **Lambdas have no label**: `lambda` becomes `Lambda` with no name.
+- **Unmapped node types pass through**: anything outside the map keeps its raw tree-sitter type name.

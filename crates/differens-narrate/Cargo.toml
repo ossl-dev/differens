@@ -1,0 +1,21 @@
+[package]
+name = "differens-narrate"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Deterministic narration and report formats for Differens semantic edits"
+exclude = ["tests/parity.rs"]
+
+[dependencies]
+differens-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+indexmap.workspace = true
+
+[dev-dependencies]
+differens-tiers.workspace = true
+
+[lints]
+workspace = true

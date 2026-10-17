@@ -1,0 +1,53 @@
+{
+  "language": "swift",
+  "npm_package": "tree-sitter-swift",
+  "version": "0.7.1",
+  "origin": "https://registry.npmjs.org/tree-sitter-swift/-/tree-sitter-swift-0.7.1.tgz",
+  "archive_sha256": "abd89284f1b0f1375ba5efaa9ddf99ad4b16ac91fc7751ef10c5f013cca06f8c",
+  "license": "MIT",
+  "files": [
+    {
+      "path": "LICENSE",
+      "sha256": "3533cec129bb4bba015c0d61d86dd7c3b7e82110e4d2ff7837a01eff5bad5ccc",
+      "bytes": 1068
+    },
+    {
+      "path": "src/parser_abi13.c",
+      "sha256": "0b67a4620a531d1e7490dc26854c2741b1cde25feb9474d57b7601f3f69c9bb7",
+      "bytes": 18075807
+    },
+    {
+      "path": "src/parser_abi14.c",
+      "sha256": "6755b1673b0e364e51a137b98e62ba0937c30a461e96767b22f259a267f25207",
+      "bytes": 18224272
+    },
+    {
+      "path": "src/parser.c",
+      "sha256": "6755b1673b0e364e51a137b98e62ba0937c30a461e96767b22f259a267f25207",
+      "bytes": 18224272,
+      "abi": 14
+    },
+    {
+      "path": "src/scanner.c",
+      "sha256": "a30d8d36c2cd5201b5c7d2bf87e3159a7ab9b239c74b910bde37ba51ffae2bc4",
+      "bytes": 29892
+    },
+    {
+      "path": "src/tree_sitter/alloc.h",
+      "sha256": "253b44a7b4313a7afd0c505c2fc6e7ce4b8e78955ebf4be3ea000532ec060673",
+      "bytes": 958
+    },
+    {
+      "path": "src/tree_sitter/array.h",
+      "sha256": "4ff743903dc46f5db6aa54f31c6b4d160a8a9779e5b2ab1ee59ae7ebcd850ea1",
+      "bytes": 10420
+    },
+    {
+      "path": "src/tree_sitter/parser.h",
+      "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a",
+      "bytes": 7039
+    }
+  ],
+  "vendored_archive": "crates/differens-grammar-swift/swift.tar.gz",
+  "vendored_archive_sha256": "209a476968a7b5367ce2bce9483402478fecdf178ba7fff22a53ff422005cd1f"
+}

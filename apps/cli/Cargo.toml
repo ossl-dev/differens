@@ -1,0 +1,29 @@
+[package]
+name = "differens"
+version.workspace = true
+description = "Native semantic diffs for source code and structured data"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "../../README.md"
+include = ["Cargo.toml", "src/**/*.rs", "tests/**/*.rs"]
+default-run = "differens"
+
+[[bin]]
+name = "differens"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+differens-engine.workspace = true
+differens-git.workspace = true
+differens-tiers.workspace = true
+differens-narrate.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

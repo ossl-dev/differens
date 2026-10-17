@@ -1,0 +1,21 @@
+{
+  "id": "a.html-edit",
+  "correction": "B02",
+  "reason": "Retain id as an attribute child, count attributes, and report the real UTF-8 element extent. The text edit and all presentation strings remain unchanged.",
+  "expected": {
+    "changes": [{
+      "type": "Update",
+      "node": {
+        "kind": "div",
+        "label": "root",
+        "value": "world",
+        "children": [{"kind":"attribute","label":"id","value":"root","children":[],"byteRange":[0,0]}],
+        "byteRange": [0,26]
+      },
+      "detail": {"kind":"ValueChanged","from":"hello","to":"world"},
+      "context": [{"kind":"document"}]
+    }],
+    "nodeCount": 6,
+    "tier": 3
+  }
+}

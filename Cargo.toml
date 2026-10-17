@@ -1,0 +1,44 @@
+[workspace]
+members = ["crates/differens-core", "crates/differens-tiers", "crates/differens-git", "crates/differens-narrate", "crates/differens-correlate", "crates/differens-engine", "apps/cli", "xtask", "crates/differens-grammar-swift"]
+resolver = "3"
+
+[workspace.package]
+version = "0.3.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+repository = "https://github.com/ossl-dev/differens"
+authors = ["Mohammed Aman Khan"]
+
+[workspace.dependencies]
+differens-core = { path = "crates/differens-core", version = "0.3.0" }
+differens-tiers = { path = "crates/differens-tiers", version = "0.3.0" }
+differens-git = { path = "crates/differens-git", version = "0.3.0" }
+differens-narrate = { path = "crates/differens-narrate", version = "0.3.0" }
+differens-correlate = { path = "crates/differens-correlate", version = "0.3.0" }
+differens-engine = { path = "crates/differens-engine", version = "0.3.0" }
+indexmap = "2.9"
+serde = { version = "1.0", features = ["derive", "rc"] }
+serde_json = { version = "1.0", features = ["preserve_order"] }
+thiserror = "2.0"
+tree-sitter = "=0.25.1"
+tree-sitter-language = "=0.1.5"
+cc = "1.2"
+toml = "0.8"
+yaml-rust2 = "0.10"
+json5 = "0.4"
+walkdir = "2.5"
+tempfile = "3.20"
+clap = { version = "4.5", features = ["derive"] }
+rayon = "1.10"
+
+[workspace.lints.rust]
+unsafe_code = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

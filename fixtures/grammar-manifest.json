@@ -1,0 +1,725 @@
+{
+  "runtime": "tree-sitter 0.25.1",
+  "strategy": "Compile exact frozen generated C artifacts; never regenerate during builds.",
+  "grammars": [
+    {
+      "language": "javascript",
+      "npm_package": "tree-sitter-javascript",
+      "version": "0.25.0",
+      "origin": "https://registry.npmjs.org/tree-sitter-javascript/-/tree-sitter-javascript-0.25.0.tgz",
+      "archive_sha256": "6214ce23d03aba525ba8edd6ca7caf365c969f2c2dbfc353e376ca54507ffb92",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "LICENSE",
+          "sha256": "2e0110e07abef7c2548b26ec9d6969775617ca539a0dc8dbeeb14d6452c711d1",
+          "bytes": 1080
+        },
+        {
+          "path": "src/parser.c",
+          "sha256": "67209ca7ef6e1a4f74e29e48b5928455f892fe1821a3960fbcd62f4e972f7384",
+          "bytes": 2855934,
+          "abi": 15
+        },
+        {
+          "path": "src/scanner.c",
+          "sha256": "b3d3f64284d97bf80749c026862427782cf7ecc0b7dc094e6698ab311c9a42c7",
+          "bytes": 10576
+        },
+        {
+          "path": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea",
+          "bytes": 985
+        },
+        {
+          "path": "src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94",
+          "bytes": 10431
+        },
+        {
+          "path": "src/tree_sitter/parser.h",
+          "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2",
+          "bytes": 7624
+        }
+      ],
+      "vendored_archive": "crates/differens-tiers/grammars/javascript.tar.gz",
+      "vendored_archive_sha256": "5f4b737c4a1144795b72e7c873d606ebe4f9aaf929f9cfec435c2111e37cd585"
+    },
+    {
+      "language": "typescript",
+      "npm_package": "tree-sitter-typescript",
+      "version": "0.23.2",
+      "origin": "https://registry.npmjs.org/tree-sitter-typescript/-/tree-sitter-typescript-0.23.2.tgz",
+      "archive_sha256": "0fdf63c35930a75885145d75ee63cb879da2d49db9bfe454bd8e60b08ba778a1",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "LICENSE",
+          "sha256": "49bf33cf78ef5897e4e161ce1517df7de1ae5042a65b6bcfd44401e0fc606559",
+          "bytes": 1080
+        },
+        {
+          "path": "tsx/src/parser.c",
+          "sha256": "1902cb53fa7ff5179df89b2eea863165e84c8cc866226419dc26921d8c055885",
+          "bytes": 8769870,
+          "abi": 14
+        },
+        {
+          "path": "typescript/src/parser.c",
+          "sha256": "74fe453edd70f4eae9af0a1050cbd7943d8971d59165b6aaebbaa0a0b716d1aa",
+          "bytes": 8745894,
+          "abi": 14
+        },
+        {
+          "path": "tsx/src/scanner.c",
+          "sha256": "d563cd30b2f39718c9ae4292795c5ce03a2ad01954ba3a86ef84c2781a736673",
+          "bytes": 538
+        },
+        {
+          "path": "typescript/src/scanner.c",
+          "sha256": "9125013b42cb888379d9be909f1d73dfb75a37626c2cdbf4122718a2b431a6d3",
+          "bytes": 573
+        },
+        {
+          "path": "tsx/src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea",
+          "bytes": 985
+        },
+        {
+          "path": "typescript/src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea",
+          "bytes": 985
+        },
+        {
+          "path": "tsx/src/tree_sitter/array.h",
+          "sha256": "4ff743903dc46f5db6aa54f31c6b4d160a8a9779e5b2ab1ee59ae7ebcd850ea1",
+          "bytes": 10420
+        },
+        {
+          "path": "typescript/src/tree_sitter/array.h",
+          "sha256": "4ff743903dc46f5db6aa54f31c6b4d160a8a9779e5b2ab1ee59ae7ebcd850ea1",
+          "bytes": 10420
+        },
+        {
+          "path": "tsx/src/tree_sitter/parser.h",
+          "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a",
+          "bytes": 7039
+        },
+        {
+          "path": "typescript/src/tree_sitter/parser.h",
+          "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a",
+          "bytes": 7039
+        },
+        {
+          "path": "common/scanner.h",
+          "sha256": "da66ef2bd14a3f7ea743e25ba068c6c9aae2c3509db200ff80c4a0e6116e564c",
+          "bytes": 10097
+        }
+      ],
+      "vendored_archive": "crates/differens-tiers/grammars/typescript.tar.gz",
+      "vendored_archive_sha256": "57424314b1af8555affb43c26e986a0eb033585ab0c9e0814e2f5f303c2ba617"
+    },
+    {
+      "language": "python",
+      "npm_package": "tree-sitter-python",
+      "version": "0.25.0",
+      "origin": "https://registry.npmjs.org/tree-sitter-python/-/tree-sitter-python-0.25.0.tgz",
+      "archive_sha256": "63b76b3fa8181fd79eaad4abcdb21e2babcb504dbfc7710a89934fa456d26096",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "LICENSE",
+          "sha256": "d724405ce238a22c0d35769c5a36b386ad5958192efe8bbb304fb2896254575f",
+          "bytes": 1080
+        },
+        {
+          "path": "src/parser.c",
+          "sha256": "a895f10b3cf7b2608f3283b43cd5cfed70971c7ee4a0136abbaaccbc4a7a25e0",
+          "bytes": 3439646,
+          "abi": 15
+        },
+        {
+          "path": "src/scanner.c",
+          "sha256": "6db82134ac2d4c90a1a1475487a625cface02662ebda9b7478cad9c7147e9afe",
+          "bytes": 15470
+        },
+        {
+          "path": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea",
+          "bytes": 985
+        },
+        {
+          "path": "src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94",
+          "bytes": 10431
+        },
+        {
+          "path": "src/tree_sitter/parser.h",
+          "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2",
+          "bytes": 7624
+        }
+      ],
+      "vendored_archive": "crates/differens-tiers/grammars/python.tar.gz",
+      "vendored_archive_sha256": "2f6a4c9889799f00428d347fe242463d1f5e3f122a0d3132c00545d3e79e7771"
+    },
+    {
+      "language": "rust",
+      "npm_package": "tree-sitter-rust",
+      "version": "0.24.0",
+      "origin": "https://registry.npmjs.org/tree-sitter-rust/-/tree-sitter-rust-0.24.0.tgz",
+      "archive_sha256": "4248da0b9ea40fec13ef010822e7b92a9d1ebdf74f6f2733539b1dbbb086c5bb",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "LICENSE",
+          "sha256": "31d5b6f4243d5c7c6e1c4ebbbb9f6407bd1457a08bcc4f706521710341acba36",
+          "bytes": 1080
+        },
+        {
+          "path": "src/parser.c",
+          "sha256": "a0f424079fd2ba8fe6ae29538e4a773e43c7a1271e6962eb6e8185f67a5c0db9",
+          "bytes": 6456284,
+          "abi": 15
+        },
+        {
+          "path": "src/scanner.c",
+          "sha256": "77faa4943da96dcb17d9c2a735bdbf7702287b52a1d2971117b167e47e318620",
+          "bytes": 12209
+        },
+        {
+          "path": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea",
+          "bytes": 985
+        },
+        {
+          "path": "src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94",
+          "bytes": 10431
+        },
+        {
+          "path": "src/tree_sitter/parser.h",
+          "sha256": "11b654fbba7770b1c710cc14b169be2deb5d89c0f87233d4605037c26c1ff657",
+          "bytes": 7678
+        }
+      ],
+      "vendored_archive": "crates/differens-tiers/grammars/rust.tar.gz",
+      "vendored_archive_sha256": "25455227dcfc9c8ef43844b9d2afc037a2760b1317b6ca8b53d0851d2ca0e0ec"
+    },
+    {
+      "language": "go",
+      "npm_package": "tree-sitter-go",
+      "version": "0.25.0",
+      "origin": "https://registry.npmjs.org/tree-sitter-go/-/tree-sitter-go-0.25.0.tgz",
+      "archive_sha256": "f7265544d6b297797dc3675c02b76fb182c177ce29fda10ac1f36e9ab33fd90e",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "LICENSE",
+          "sha256": "2e0110e07abef7c2548b26ec9d6969775617ca539a0dc8dbeeb14d6452c711d1",
+          "bytes": 1080
+        },
+        {
+          "path": "src/parser.c",
+          "sha256": "3dbf6ed1238b5dfcf2be4d2f2d4cb27a14d34f34d7784eccccbfd532fd4a6d85",
+          "bytes": 1572685,
+          "abi": 15
+        },
+        {
+          "path": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea",
+          "bytes": 985
+        },
+        {
+          "path": "src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94",
+          "bytes": 10431
+        },
+        {
+          "path": "src/tree_sitter/parser.h",
+          "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2",
+          "bytes": 7624
+        }
+      ],
+      "vendored_archive": "crates/differens-tiers/grammars/go.tar.gz",
+      "vendored_archive_sha256": "367eb5c5991db9eaeeb18e0e59c89928c2cb362a8eab9cd1a812442ed1412865"
+    },
+    {
+      "language": "c",
+      "npm_package": "tree-sitter-c",
+      "version": "0.24.1",
+      "origin": "https://registry.npmjs.org/tree-sitter-c/-/tree-sitter-c-0.24.1.tgz",
+      "archive_sha256": "8e9ecd7687665d2fa1b3c07fbd1f4380b7d285850d6954629e2156e1b757451e",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "LICENSE",
+          "sha256": "2e0110e07abef7c2548b26ec9d6969775617ca539a0dc8dbeeb14d6452c711d1",
+          "bytes": 1080
+        },
+        {
+          "path": "src/parser.c",
+          "sha256": "e1b618bc80b8983b43893f98ce1bd8a23a3ccc7d726bed6624b5c4c6c85d5e1c",
+          "bytes": 3872063,
+          "abi": 15
+        },
+        {
+          "path": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea",
+          "bytes": 985
+        },
+        {
+          "path": "src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94",
+          "bytes": 10431
+        },
+        {
+          "path": "src/tree_sitter/parser.h",
+          "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2",
+          "bytes": 7624
+        }
+      ],
+      "vendored_archive": "crates/differens-tiers/grammars/c.tar.gz",
+      "vendored_archive_sha256": "d9d398d58ad9de074c892ad00e78c53aab133712e3de7ebb4b7bdd82756042ea"
+    },
+    {
+      "language": "cpp",
+      "npm_package": "tree-sitter-cpp",
+      "version": "0.23.4",
+      "origin": "https://registry.npmjs.org/tree-sitter-cpp/-/tree-sitter-cpp-0.23.4.tgz",
+      "archive_sha256": "615d152f70e7a6bed8f15a93c3c0c264c40dc71c1b6a1445646fff9439e776bc",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "LICENSE",
+          "sha256": "2e0110e07abef7c2548b26ec9d6969775617ca539a0dc8dbeeb14d6452c711d1",
+          "bytes": 1080
+        },
+        {
+          "path": "src/parser.c",
+          "sha256": "2a35a43b4af6c9f7b69624ac00c2c50808912591450dc79c05dea03ac1bae814",
+          "bytes": 17299078,
+          "abi": 14
+        },
+        {
+          "path": "src/scanner.c",
+          "sha256": "cf60387d290271f4d2fb558d0569b2b9ef879cb72206a9df5cc73b0b1a4b20ff",
+          "bytes": 5169
+        },
+        {
+          "path": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea",
+          "bytes": 985
+        },
+        {
+          "path": "src/tree_sitter/array.h",
+          "sha256": "4ff743903dc46f5db6aa54f31c6b4d160a8a9779e5b2ab1ee59ae7ebcd850ea1",
+          "bytes": 10420
+        },
+        {
+          "path": "src/tree_sitter/parser.h",
+          "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a",
+          "bytes": 7039
+        }
+      ],
+      "vendored_archive": "crates/differens-tiers/grammars/cpp.tar.gz",
+      "vendored_archive_sha256": "a1e4edccdce62ef044377a4ad977b696a7950f378a6668a78b90015efc6bab26"
+    },
+    {
+      "language": "java",
+      "npm_package": "tree-sitter-java",
+      "version": "0.23.5",
+      "origin": "https://registry.npmjs.org/tree-sitter-java/-/tree-sitter-java-0.23.5.tgz",
+      "archive_sha256": "6b6c1b62605f9d8bb80efd2ebe5951a87b182faafa3eeb67c460a667818551b6",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "LICENSE",
+          "sha256": "52ed137b039cd9c46409bc22e89938af911c95b157feae2d040b51e6084369a7",
+          "bytes": 1069
+        },
+        {
+          "path": "src/parser.c",
+          "sha256": "4add5150cf4531eb5dd97f3343dcf65cd11704c84711348b328582b83424a0e4",
+          "bytes": 2561266,
+          "abi": 14
+        },
+        {
+          "path": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea",
+          "bytes": 985
+        },
+        {
+          "path": "src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94",
+          "bytes": 10431
+        },
+        {
+          "path": "src/tree_sitter/parser.h",
+          "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a",
+          "bytes": 7039
+        }
+      ],
+      "vendored_archive": "crates/differens-tiers/grammars/java.tar.gz",
+      "vendored_archive_sha256": "4e093c538e2e59bf40b64a9fe788b1ba25632dc7a5e3969dde544554c90572f7"
+    },
+    {
+      "language": "ruby",
+      "npm_package": "tree-sitter-ruby",
+      "version": "0.23.1",
+      "origin": "https://registry.npmjs.org/tree-sitter-ruby/-/tree-sitter-ruby-0.23.1.tgz",
+      "archive_sha256": "1f0f0c100e31ddf650962ebb1f1fb8420bdbabccd49582f6e731ea7478db639d",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "LICENSE",
+          "sha256": "ee006f02a3d856df282e409be2a86e24a65bb573a98b9c28343771141351bb6b",
+          "bytes": 1075
+        },
+        {
+          "path": "src/parser.c",
+          "sha256": "4ce468358b6f4e25a35c8cf6bc0eaf60665bc22d602f8c939323c2347255cd15",
+          "bytes": 15277808,
+          "abi": 14
+        },
+        {
+          "path": "src/scanner.c",
+          "sha256": "e7a6196d6e78bf4c6728502e924c867dee5d851c6253e43fcdb8ba169009bc58",
+          "bytes": 37230
+        },
+        {
+          "path": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea",
+          "bytes": 985
+        },
+        {
+          "path": "src/tree_sitter/array.h",
+          "sha256": "4ff743903dc46f5db6aa54f31c6b4d160a8a9779e5b2ab1ee59ae7ebcd850ea1",
+          "bytes": 10420
+        },
+        {
+          "path": "src/tree_sitter/parser.h",
+          "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a",
+          "bytes": 7039
+        }
+      ],
+      "vendored_archive": "crates/differens-tiers/grammars/ruby.tar.gz",
+      "vendored_archive_sha256": "2c2d3bff3686a3dcea6f9e54f9cb09e514bcee206de6c3501eb7a89b139fb835"
+    },
+    {
+      "language": "php",
+      "npm_package": "tree-sitter-php",
+      "version": "0.24.2",
+      "origin": "https://registry.npmjs.org/tree-sitter-php/-/tree-sitter-php-0.24.2.tgz",
+      "archive_sha256": "fdd22530d3845540ba74a1199d3f67204a608c99994bb423645d3f0cfdaead94",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "LICENSE",
+          "sha256": "664764fabf40c0b318e06324a5a12379092a2df25b8cbf2415f71bc0bb352346",
+          "bytes": 1166
+        },
+        {
+          "path": "php/src/parser.c",
+          "sha256": "59ad8e5e4fde3fe60687a488ab8420612840cc966b83739af1b3a4317ed27ec6",
+          "bytes": 7211136,
+          "abi": 15
+        },
+        {
+          "path": "php/src/scanner.c",
+          "sha256": "58c92cafe4ebda509c3ad3864fa6fc0e9877bbac26e17a03d23ea2101c291ad5",
+          "bytes": 595
+        },
+        {
+          "path": "php/src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea",
+          "bytes": 985
+        },
+        {
+          "path": "php/src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94",
+          "bytes": 10431
+        },
+        {
+          "path": "php/src/tree_sitter/parser.h",
+          "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2",
+          "bytes": 7624
+        },
+        {
+          "path": "common/scanner.h",
+          "sha256": "de8eb36bc8f517ab9f3eaf82e3825d7b3e11b62e9471545f4c906100cfce0e07",
+          "bytes": 17991
+        }
+      ],
+      "vendored_archive": "crates/differens-tiers/grammars/php.tar.gz",
+      "vendored_archive_sha256": "f43084ce2b727f56038bcaef7e4932afcb4d008fcf85cf0542eb6e8307c6d93e"
+    },
+    {
+      "language": "swift",
+      "npm_package": "tree-sitter-swift",
+      "version": "0.7.1",
+      "origin": "https://registry.npmjs.org/tree-sitter-swift/-/tree-sitter-swift-0.7.1.tgz",
+      "archive_sha256": "abd89284f1b0f1375ba5efaa9ddf99ad4b16ac91fc7751ef10c5f013cca06f8c",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "LICENSE",
+          "sha256": "3533cec129bb4bba015c0d61d86dd7c3b7e82110e4d2ff7837a01eff5bad5ccc",
+          "bytes": 1068
+        },
+        {
+          "path": "src/parser_abi13.c",
+          "sha256": "0b67a4620a531d1e7490dc26854c2741b1cde25feb9474d57b7601f3f69c9bb7",
+          "bytes": 18075807
+        },
+        {
+          "path": "src/parser_abi14.c",
+          "sha256": "6755b1673b0e364e51a137b98e62ba0937c30a461e96767b22f259a267f25207",
+          "bytes": 18224272
+        },
+        {
+          "path": "src/parser.c",
+          "sha256": "6755b1673b0e364e51a137b98e62ba0937c30a461e96767b22f259a267f25207",
+          "bytes": 18224272,
+          "abi": 14
+        },
+        {
+          "path": "src/scanner.c",
+          "sha256": "a30d8d36c2cd5201b5c7d2bf87e3159a7ab9b239c74b910bde37ba51ffae2bc4",
+          "bytes": 29892
+        },
+        {
+          "path": "src/tree_sitter/alloc.h",
+          "sha256": "253b44a7b4313a7afd0c505c2fc6e7ce4b8e78955ebf4be3ea000532ec060673",
+          "bytes": 958
+        },
+        {
+          "path": "src/tree_sitter/array.h",
+          "sha256": "4ff743903dc46f5db6aa54f31c6b4d160a8a9779e5b2ab1ee59ae7ebcd850ea1",
+          "bytes": 10420
+        },
+        {
+          "path": "src/tree_sitter/parser.h",
+          "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a",
+          "bytes": 7039
+        }
+      ],
+      "vendored_archive": "crates/differens-grammar-swift/swift.tar.gz",
+      "vendored_archive_sha256": "209a476968a7b5367ce2bce9483402478fecdf178ba7fff22a53ff422005cd1f"
+    },
+    {
+      "language": "kotlin",
+      "npm_package": "tree-sitter-kotlin",
+      "version": "0.3.8",
+      "origin": "https://registry.npmjs.org/tree-sitter-kotlin/-/tree-sitter-kotlin-0.3.8.tgz",
+      "archive_sha256": "e2da896c8316af1d491afc69b49173da97373bb757d07f11c455a0963c62e6b0",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "LICENSE",
+          "sha256": "948495f61768f7de26bcc61113d8cd95f50bbc15adb678c28c941c6c8fcd5903",
+          "bytes": 1071
+        },
+        {
+          "path": "src/parser.c",
+          "sha256": "54104a7ef1555c265b746c790e0f8bb953cc17806e9df0c3af82f7f62c06a70a",
+          "bytes": 23649909,
+          "abi": 14
+        },
+        {
+          "path": "src/scanner.c",
+          "sha256": "27f73337ec357fc341fa57538f34c14277b0346980c3405dc30beab6202ec6d0",
+          "bytes": 13783
+        },
+        {
+          "path": "src/tree_sitter/alloc.h",
+          "sha256": "253b44a7b4313a7afd0c505c2fc6e7ce4b8e78955ebf4be3ea000532ec060673",
+          "bytes": 958
+        },
+        {
+          "path": "src/tree_sitter/array.h",
+          "sha256": "4ff743903dc46f5db6aa54f31c6b4d160a8a9779e5b2ab1ee59ae7ebcd850ea1",
+          "bytes": 10420
+        },
+        {
+          "path": "src/tree_sitter/parser.h",
+          "sha256": "a3eb18ef034b3f4255b965a26caa276f9cfe13a79573b402f1a12dc5018052aa",
+          "bytes": 6988
+        }
+      ],
+      "vendored_archive": "crates/differens-tiers/grammars/kotlin.tar.gz",
+      "vendored_archive_sha256": "2701bcf82a8ce4dd80c8b3981fecc63f29973ca9d38a837df569342c00f05881"
+    },
+    {
+      "language": "c-sharp",
+      "npm_package": "tree-sitter-c-sharp",
+      "version": "0.23.5",
+      "origin": "https://registry.npmjs.org/tree-sitter-c-sharp/-/tree-sitter-c-sharp-0.23.5.tgz",
+      "archive_sha256": "dde5d56fe441a7d64616462c8d741ab4af7874484de6aa74548ac5770c50c414",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "LICENSE",
+          "sha256": "778fb7d63b8c1844da315648c02f325c4713a6f4a5d19644fd413421422776d3",
+          "bytes": 1133
+        },
+        {
+          "path": "src/parser.c",
+          "sha256": "0a2651e49de7c7237c535c41a132a7ec0424da79d12f197f1df3edd7d6ea4427",
+          "bytes": 29664333,
+          "abi": 15
+        },
+        {
+          "path": "src/scanner.c",
+          "sha256": "00920daa0fdf3050d441475e8effe996b60ee8acc1bdbcbbc4c83d56a6987705",
+          "bytes": 14206
+        },
+        {
+          "path": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea",
+          "bytes": 985
+        },
+        {
+          "path": "src/tree_sitter/array.h",
+          "sha256": "31e60a1bff6f715afacce03b5b70efe42b58371b4f9595dd4af52a577ff9608c",
+          "bytes": 13269
+        },
+        {
+          "path": "src/tree_sitter/parser.h",
+          "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2",
+          "bytes": 7624
+        }
+      ],
+      "vendored_archive": "crates/differens-tiers/grammars/c-sharp.tar.gz",
+      "vendored_archive_sha256": "decadf9d3739bb8a05ce625c4db39a98fef5d0a1fbdabf926d1eec730edc7e1e"
+    },
+    {
+      "language": "scala",
+      "npm_package": "tree-sitter-scala",
+      "version": "0.24.0",
+      "origin": "https://registry.npmjs.org/tree-sitter-scala/-/tree-sitter-scala-0.24.0.tgz",
+      "archive_sha256": "af83daf86c49a880bc931f1c6e1ae5b099fb48ee51d6d41f18edb5837e1ef61d",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "LICENSE",
+          "sha256": "1f95ed26e1f4074074c9c7083e61c0a9e4c3b9f435745044995f3beb4ed28575",
+          "bytes": 1091
+        },
+        {
+          "path": "src/parser.c",
+          "sha256": "6c0708c6b4b2af402c8b83404544519d3eabfe2c24100de3498c878348a0c332",
+          "bytes": 26580851,
+          "abi": 14
+        },
+        {
+          "path": "src/scanner.c",
+          "sha256": "31e35d41f721624bc7fae9b97475219c93bcba70cef0e15f5c2801d9d4af0af5",
+          "bytes": 14724
+        },
+        {
+          "path": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea",
+          "bytes": 985
+        },
+        {
+          "path": "src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94",
+          "bytes": 10431
+        },
+        {
+          "path": "src/tree_sitter/parser.h",
+          "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a",
+          "bytes": 7039
+        }
+      ],
+      "vendored_archive": "crates/differens-tiers/grammars/scala.tar.gz",
+      "vendored_archive_sha256": "010c8e03d6e44b786bb7fdb328ede6ff5e6bb80b24240c9f05ab05bcc4ee02bf"
+    },
+    {
+      "language": "lua",
+      "npm_package": "@tree-sitter-grammars/tree-sitter-lua",
+      "version": "0.4.1",
+      "origin": "https://registry.npmjs.org/@tree-sitter-grammars/tree-sitter-lua/-/tree-sitter-lua-0.4.1.tgz",
+      "archive_sha256": "5029b9b0bfa1d73db8ae288347da5e012316ecc544c1b8f06349c9c1dd247c89",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "src/parser.c",
+          "sha256": "b34a362e43f0311f405721f3089e94f97f31da403b154d456d093e64609a4081",
+          "bytes": 326909,
+          "abi": 15
+        },
+        {
+          "path": "src/scanner.c",
+          "sha256": "35bbd630b5a7421d46d2e91185eeea09bf78565d44cb676b63ca20d0f1b54bbd",
+          "bytes": 4559
+        },
+        {
+          "path": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea",
+          "bytes": 985
+        },
+        {
+          "path": "src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94",
+          "bytes": 10431
+        },
+        {
+          "path": "src/tree_sitter/parser.h",
+          "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2",
+          "bytes": 7624
+        },
+        {
+          "path": "LICENSE.md",
+          "sha256": "9a32b02e4c917b1ce6b5e79d8ea81e25cefd7f27d89c7235f2afb262c06cf32e",
+          "bytes": 1079
+        }
+      ],
+      "vendored_archive": "crates/differens-tiers/grammars/lua.tar.gz",
+      "vendored_archive_sha256": "c137ed5a23737e9714dfe9c8bd680eeabae577e9f5937324df8297e72c5ce44f"
+    },
+    {
+      "language": "bash",
+      "npm_package": "tree-sitter-bash",
+      "version": "0.25.1",
+      "origin": "https://registry.npmjs.org/tree-sitter-bash/-/tree-sitter-bash-0.25.1.tgz",
+      "archive_sha256": "d4b2819508ea97cb8953fff7e304a610d443007bd395c8f03a15de9a8ae4a6f9",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "LICENSE",
+          "sha256": "49bf33cf78ef5897e4e161ce1517df7de1ae5042a65b6bcfd44401e0fc606559",
+          "bytes": 1080
+        },
+        {
+          "path": "src/parser.c",
+          "sha256": "0021866dd2a7fccdfc94fafdca7d9863a891b5577b9eacdde1b6030585d3e186",
+          "bytes": 9912254,
+          "abi": 15
+        },
+        {
+          "path": "src/scanner.c",
+          "sha256": "7cc25d70626f8939b35ecd504bf724e2001b817412aa29bceb4c4955a91558a9",
+          "bytes": 45602
+        },
+        {
+          "path": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea",
+          "bytes": 985
+        },
+        {
+          "path": "src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94",
+          "bytes": 10431
+        },
+        {
+          "path": "src/tree_sitter/parser.h",
+          "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2",
+          "bytes": 7624
+        }
+      ],
+      "vendored_archive": "crates/differens-tiers/grammars/bash.tar.gz",
+      "vendored_archive_sha256": "7ab9f55a24a42ce7f88f35408cdc8249cb8ab5a3cf5784dc7bee5615a93c2f7e"
+    }
+  ]
+}

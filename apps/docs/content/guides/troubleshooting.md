@@ -1,0 +1,34 @@
+# Troubleshooting
+
+## Build fails
+
+```bash
+rustup show
+cargo build --workspace --locked
+```
+
+Use the repository's pinned toolchain and install a C/C++ compiler for Tree-sitter/scanners. Initial builds need access to Cargo dependencies. Keep `Cargo.lock` unchanged unless deliberately updating dependencies. Report the compiler error and target platform.
+
+## A code file uses line diff
+
+Run `differens languages`. Code classification does not guarantee a linked grammar. Unsupported extensions, parser failures, source/depth limits, and tree node budgets can trigger line fallback. Check stderr diagnostics or machine-output fallback metadata. Raising a budget may increase time and memory costs.
+
+## Changes appear as deletion and insertion
+
+Matching uses structural evidence and conservative recovery. A major rewrite or changed declaration shape may not establish identity. JSON exposes underlying actions, while human formats group them into readable constructs. A move or extraction cannot always be inferred safely.
+
+## Git comparison fails
+
+Check the repository and refs with Git itself, then rerun from the intended checkout. Read errors and Git command failures return nonzero instead of silently producing an unchanged result. Direct file and directory modes work outside repositories.
+
+## Driver stopped working after reinstall
+
+`install-git-driver` records the executable path in local Git configuration. Run it again after moving or replacing the binary. Existing unrelated `.gitattributes` rules are retained.
+
+## Memory grows on a large changeset
+
+Native workers process bounded windows, but a single large file and retained cross-file candidates can still be large. `--jobs=1` reduces simultaneous parser work. NDJSON begins reporting before the entire changeset completes; it does not imply constant memory for correlation.
+
+## Machine output has an unexpected shape
+
+Standalone file JSON is an array; directory/repository JSON is an envelope. NDJSON emits file objects and an optional cross-file trailer. Empty outputs remain valid machine output. Read [machine outputs](/guides/machine-outputs.html) before consuming it.

@@ -1,0 +1,53 @@
+# differens-core
+
+Immutable postorder arenas, verified matching, and typed edit scripts. This crate has no filesystem, Git, Tree-sitter, or worker runtime dependency. The optional `serde` feature is enabled by default.
+
+## Build trees
+
+```rust
+use differens_core::{NodeSpec, TreeBuilder, MatchOptions, diff_trees};
+
+fn tree(value: &str) -> std::sync::Arc<differens_core::Tree> {
+    let mut builder = TreeBuilder::new();
+    let mut child = NodeSpec::new("number");
+    child.value = Some(value.to_owned());
+    let child = builder.push(child).unwrap();
+    let mut root = NodeSpec::new("document");
+    root.children.push(child);
+    let root = builder.push(root).unwrap();
+    builder.finish(root).unwrap()
+}
+
+let result = diff_trees(&tree("1"), &tree("2"), MatchOptions::default());
+assert_eq!(result.changes[0].action_type(), "Update");
+```
+
+`TreeBuilder::push(NodeSpec)` returns a `Result<NodeId, BuildError>`. Children must precede their parent, in source order, with contiguous postorder ranges. Shared children, invalid byte ranges, zero source lines, and disconnected forests are rejected. `finish(root)` returns `Result<Arc<Tree>, BuildError>`.
+
+`Tree::node(NodeId)` borrows immutable metadata. `root_ref()` on `Arc<Tree>` returns an owned `NodeRef`; it holds the tree alive and exposes `children()` and `parent()`. An ID belongs to one tree. Spans use UTF-8 byte offsets; lines are one-based.
+
+## Compare
+
+```rust
+use differens_core::{MatchOptions, Tree};
+use std::sync::Arc;
+fn compare(old: &Arc<Tree>, new: &Arc<Tree>) -> differens_core::DiffResult {
+    differens_core::diff_trees(old, new, MatchOptions {
+        min_height: 2,
+        bottom_up_ratio: 0.5,
+        max_nodes: 50_000,
+    })
+}
+```
+
+`DiffResult` has `changes`, `node_count`, and optional `fallback`. A tree larger than `max_nodes` returns empty changes and `Some(Fallback::Lines)`. The default core limit is `usize::MAX`; callers choose their budget.
+
+`EditAction` variants are `Insert`, `Delete`, `Update`, and `Move`. Each owns node references and a nearest-first `Vec<NodeContext>`. Updates carry `UpdateDetail::Renamed { from, to }` or `ValueChanged { from, to }`. A scalar type transition qualifies the values with their types. Missing values remain `None`.
+
+Actions are ordered updates, moves, deletions, insertions. Subtree additions/removals absorb descendant edits; sibling reorders use a longest increasing subsequence. This is a deterministic heuristic edit script, not a guarantee of a globally minimal tree edit distance.
+
+## Hashes and serialization
+
+`hash_text(&str) -> u64` preserves the legacy 53-bit folded FNV hash over UTF-16 code units. Content and structure fingerprints select candidates; full topology and field checks verify them. `trees_equal(&NodeRef, &NodeRef)` uses iterative exact equality.
+
+Node serialization preserves nested legacy JSON. `NodeRef::shallow()` emits metadata with empty children while retaining the owning tree internally. Flat ownership and iterative traversal avoid recursive stack growth for deep construction, equality, matching, JSON encoding, and drop.

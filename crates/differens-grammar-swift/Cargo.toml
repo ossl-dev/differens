@@ -1,0 +1,20 @@
+[package]
+name = "differens-grammar-swift"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "MIT"
+repository.workspace = true
+build = "build.rs"
+description = "Frozen tree-sitter Swift 0.7.1 generated parser for Differens"
+
+[dependencies]
+tree-sitter-language.workspace = true
+
+[build-dependencies]
+cc.workspace = true
+flate2 = "1.1"
+tar = "0.4"
+
+[lints]
+workspace = true

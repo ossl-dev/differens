@@ -1,0 +1,146 @@
+[
+  {
+    "title": "Installation",
+    "slug": "getting-started/installation"
+  },
+  {
+    "title": "Quickstart",
+    "slug": "getting-started/quickstart"
+  },
+  {
+    "title": "Benchmarks",
+    "slug": "guides/benchmarks"
+  },
+  {
+    "title": "Contributing",
+    "slug": "guides/contributing"
+  },
+  {
+    "title": "Git Integration",
+    "slug": "guides/git-integration"
+  },
+  {
+    "title": "Machine Outputs",
+    "slug": "guides/machine-outputs"
+  },
+  {
+    "title": "Native migration",
+    "slug": "guides/native-migration"
+  },
+  {
+    "title": "Troubleshooting",
+    "slug": "guides/troubleshooting"
+  },
+  {
+    "title": "Architecture",
+    "slug": "how-it-works/architecture"
+  },
+  {
+    "title": "Cross-file correlation",
+    "slug": "how-it-works/cross-file-correlation"
+  },
+  {
+    "title": "Tier pipeline",
+    "slug": "how-it-works/tier-pipeline"
+  },
+  {
+    "title": "Tree matching",
+    "slug": "how-it-works/tree-matching"
+  },
+  {
+    "title": "Differens",
+    "slug": "index"
+  },
+  {
+    "title": "Shell",
+    "slug": "languages/bash"
+  },
+  {
+    "title": "C",
+    "slug": "languages/c"
+  },
+  {
+    "title": "C++",
+    "slug": "languages/cpp"
+  },
+  {
+    "title": "C#",
+    "slug": "languages/csharp"
+  },
+  {
+    "title": "Go",
+    "slug": "languages/go"
+  },
+  {
+    "title": "Java",
+    "slug": "languages/java"
+  },
+  {
+    "title": "Kotlin",
+    "slug": "languages/kotlin"
+  },
+  {
+    "title": "Lua",
+    "slug": "languages/lua"
+  },
+  {
+    "title": "Language support",
+    "slug": "languages/overview"
+  },
+  {
+    "title": "PHP",
+    "slug": "languages/php"
+  },
+  {
+    "title": "Python",
+    "slug": "languages/python"
+  },
+  {
+    "title": "Ruby",
+    "slug": "languages/ruby"
+  },
+  {
+    "title": "Rust",
+    "slug": "languages/rust"
+  },
+  {
+    "title": "Scala",
+    "slug": "languages/scala"
+  },
+  {
+    "title": "Swift",
+    "slug": "languages/swift"
+  },
+  {
+    "title": "Tier adapters",
+    "slug": "languages/tiers"
+  },
+  {
+    "title": "TypeScript / JavaScript",
+    "slug": "languages/typescript"
+  },
+  {
+    "title": "Command line",
+    "slug": "reference/cli"
+  },
+  {
+    "title": "differens-core",
+    "slug": "reference/core"
+  },
+  {
+    "title": "differens-correlate",
+    "slug": "reference/correlate"
+  },
+  {
+    "title": "differens-git",
+    "slug": "reference/git"
+  },
+  {
+    "title": "differens-narrate",
+    "slug": "reference/narrate"
+  },
+  {
+    "title": "differens-tiers",
+    "slug": "reference/tiers"
+  }
+]
