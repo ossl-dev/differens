@@ -133,6 +133,44 @@ pub(crate) fn qualified_label<'a>(
     Cow::Borrowed(label)
 }
 
+#[derive(Debug)]
+pub(crate) struct InlineCode<'a>(&'a str);
+
+impl std::fmt::Display for InlineCode<'_> {
+    fn fmt(&self, output: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = self.0;
+        if value.is_empty() {
+            return output.write_str("`\"\"`");
+        }
+        let width = value
+            .as_bytes()
+            .split(|&byte| byte != b'`')
+            .map(<[u8]>::len)
+            .max()
+            .unwrap_or(0)
+            + 1;
+        let padding = if value.starts_with('`') || value.ends_with('`') {
+            " "
+        } else {
+            ""
+        };
+        for _ in 0..width {
+            output.write_str("`")?;
+        }
+        output.write_str(padding)?;
+        output.write_str(value)?;
+        output.write_str(padding)?;
+        for _ in 0..width {
+            output.write_str("`")?;
+        }
+        Ok(())
+    }
+}
+
+pub(crate) fn code_quote(value: &str) -> InlineCode<'_> {
+    InlineCode(value)
+}
+
 /// Describe one edit without hiding its containing scope.
 #[must_use]
 pub fn narrate_action(action: &EditAction) -> String {
@@ -143,13 +181,16 @@ pub fn narrate_action(action: &EditAction) -> String {
         .as_deref()
         .map(|label| qualified_label(&node.kind, label, node.match_key()));
     let name = preview(label.as_deref(), 100).or_else(|| preview(node.value.as_deref(), 40));
-    let what = name.map_or_else(|| kind.clone(), |name| format!("{kind} `{name}`"));
+    let what = name.map_or_else(
+        || kind.clone(),
+        |name| format!("{kind} {}", code_quote(&name)),
+    );
     let context = scope(action);
     let phrase = context.map_or_else(String::new, |ctx| {
         format!(
-            " in {} `{}`",
+            " in {} {}",
             humanize_kind(&ctx.kind),
-            ctx.label.as_deref().unwrap_or_default()
+            code_quote(ctx.label.as_deref().unwrap_or_default())
         )
     });
     match action {
@@ -158,9 +199,9 @@ pub fn narrate_action(action: &EditAction) -> String {
             || format!("removed {what}"),
             |ctx| {
                 format!(
-                    "removed {what} from {} `{}`",
+                    "removed {what} from {} {}",
                     humanize_kind(&ctx.kind),
-                    ctx.label.as_deref().unwrap_or_default()
+                    code_quote(ctx.label.as_deref().unwrap_or_default())
                 )
             },
         ),
@@ -168,9 +209,9 @@ pub fn narrate_action(action: &EditAction) -> String {
             detail: UpdateDetail::Renamed { from, to },
             ..
         } => format!(
-            "renamed {kind} `{}` to `{}`{phrase}",
-            qualified_label(&node.kind, from, node.match_key()),
-            qualified_label(&node.kind, to, node.match_key())
+            "renamed {kind} {} to {}{phrase}",
+            code_quote(&qualified_label(&node.kind, from, node.match_key())),
+            code_quote(&qualified_label(&node.kind, to, node.match_key()))
         ),
         EditAction::Update {
             detail: UpdateDetail::ValueChanged { from, to },
@@ -178,17 +219,21 @@ pub fn narrate_action(action: &EditAction) -> String {
         } => {
             let target = label.as_ref().map_or_else(
                 || kind.clone(),
-                |label| format!("value of {kind} `{label}`"),
+                |label| format!("value of {kind} {}", code_quote(label)),
             );
             match (from, to) {
                 (Some(from), Some(to)) => {
                     let (from, to) = value_previews(from, to, 40);
-                    format!("changed {target} from `{from}` to `{to}`{phrase}")
+                    format!(
+                        "changed {target} from {} to {}{phrase}",
+                        code_quote(&from),
+                        code_quote(&to)
+                    )
                 }
                 (Some(_), None) => format!("removed {target}{phrase}"),
                 (None, Some(to)) => format!(
-                    "set {target} to `{}`{phrase}",
-                    preview(Some(to), 40).unwrap_or_default()
+                    "set {target} to {}{phrase}",
+                    code_quote(&preview(Some(to), 40).unwrap_or_default())
                 ),
                 _ => format!("modified {what}{phrase}"),
             }

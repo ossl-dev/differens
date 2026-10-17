@@ -16,6 +16,7 @@ indexmap.workspace = true
 
 [dev-dependencies]
 differens-tiers.workspace = true
+pulldown-cmark.workspace = true
 
 [lints]
 workspace = true

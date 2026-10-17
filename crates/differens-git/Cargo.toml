@@ -5,6 +5,7 @@ description = "Byte-preserving Git and filesystem inputs for Differens"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
 
 [dependencies]
 thiserror.workspace = true

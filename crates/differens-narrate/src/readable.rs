@@ -1,5 +1,5 @@
 use crate::{
-    action_index, declaration, humanize_kind, is_declaration, narrate_action, preview,
+    action_index, code_quote, declaration, humanize_kind, is_declaration, narrate_action, preview,
     qualified_label, value_previews,
 };
 use differens_core::{EditAction, NodeContext, SemanticChange, UpdateDetail};
@@ -36,14 +36,14 @@ fn details(changes: &[SemanticChange]) -> String {
             .map(|c| {
                 let node = declaration(c.action.node()).expect("declaration checked above");
                 format!(
-                    "{} {} `{}`",
+                    "{} {} {}",
                     if matches!(c.action, EditAction::Insert { .. }) {
                         "added"
                     } else {
                         "removed"
                     },
                     humanize_kind(&node.kind),
-                    node.label.as_deref().unwrap_or_default()
+                    code_quote(node.label.as_deref().unwrap_or_default())
                 )
             })
             .collect::<Vec<_>>()
@@ -73,7 +73,7 @@ fn details(changes: &[SemanticChange]) -> String {
                 (Some(from), Some(to)) => value_previews(from, to, 36),
                 (from, to) => (short(from), short(to)),
             };
-            format!("`{from}` → `{to}`")
+            format!("{} → {}", code_quote(&from), code_quote(&to))
         })
         .collect::<Vec<_>>();
     if updates.len() < changes.len() {
@@ -146,13 +146,13 @@ pub fn readable_changes(changes: &[SemanticChange], limit: usize) -> Vec<Semanti
                 },
                 |ctx| {
                     format!(
-                        "{} `{}`",
+                        "{} {}",
                         if member {
                             "property".into()
                         } else {
                             humanize_kind(&ctx.kind)
                         },
-                        scope_label(ctx, identity)
+                        code_quote(&scope_label(ctx, identity))
                     )
                 },
             );

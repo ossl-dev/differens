@@ -344,3 +344,31 @@ fn same_named_go_methods_keep_distinct_receiver_summaries() {
     assert!(output.contains("method `B.Flush`"), "{output}");
     assert_eq!(readable_changes(&changes, 20).len(), 2, "{output}");
 }
+
+#[test]
+fn markdown_values_with_backticks_round_trip_as_inline_code() {
+    use pulldown_cmark::{Event, Parser};
+    let old = "use `req.accepted`";
+    let new = "use ``req.accepts()``";
+    let action = update(Some(old), Some(new));
+    let markdown =
+        format_changes(&[change(action, Some("api.json"))], OutputFormat::Markdown).unwrap();
+    let spans = Parser::new(&markdown)
+        .filter_map(|event| match event {
+            Event::Code(value) => Some(value.into_string()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert!(spans.iter().any(|text| text == old), "{markdown}");
+    assert!(spans.iter().any(|text| text == new), "{markdown}");
+    let empty = format_changes(
+        &[change(update(Some("x"), Some("")), None)],
+        OutputFormat::Markdown,
+    )
+    .unwrap();
+    assert!(
+        Parser::new(&empty)
+            .any(|event| matches!(event,Event::Code(value) if value.as_ref()=="\"\"")),
+        "{empty}"
+    );
+}

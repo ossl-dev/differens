@@ -278,6 +278,7 @@ dependencies = [
  "differens-core",
  "differens-tiers",
  "indexmap",
+ "pulldown-cmark",
  "serde",
  "serde_json",
 ]
