@@ -26,6 +26,12 @@ ranges, shared children, and disconnected or reordered subtrees. `NodeId` belong
 to one tree; use `NodeRef` when a node must keep its tree alive. Matching state
 never mutates tree content.
 
+`NodeSpec::match_key` can disambiguate same-named containers, such as Go methods
+on different receiver types. Keys live in a sparse tree-level map and participate
+in named-container matching paths. They are hints, not content: legacy hashes,
+JSON, and `trees_equal` ignore them. Detached nodes and flat snapshots retain
+their applicable keys.
+
 Actions are `Insert`, `Delete`, `Update`, or `Move`. Rename and value updates
 precede moves, deletions, and insertions. Added or removed subtrees produce one
 action. Sibling reorders retain a longest increasing subsequence to minimize
@@ -41,7 +47,8 @@ Adapters preserving the legacy JSON coordinate contract call
 Node fields remain UTF-8 byte spans; their serialized `byteRange` values use
 UTF-16 code units. A shared map stores only non-ASCII character boundaries, with
 no source-text retention or ASCII map allocation. Detachment and flat snapshots
-retain this conversion metadata.
+compact conversion metadata to retained node boundaries, preserving absolute
+UTF-16 coordinates without retaining unrelated source maps.
 
 The default `serde` feature serializes legacy nested JSON without recursive tree
 traversal. `NodeRef::shallow()` projects a node's metadata with no serialized

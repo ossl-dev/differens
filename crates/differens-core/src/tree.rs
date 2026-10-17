@@ -1,4 +1,4 @@
-use std::{ops::Deref, sync::Arc};
+use std::{collections::BTreeMap, ops::Deref, sync::Arc};
 
 use crate::hash::Hasher;
 
@@ -18,6 +18,9 @@ pub struct NodeSpec {
     pub label: Option<String>,
     pub value: Option<String>,
     pub scalar_type: Option<String>,
+    /// Optional scoped identity for same-named containers (for example a Go
+    /// method's receiver type). This is a matching hint, not serialized content.
+    pub match_key: Option<String>,
     pub children: Vec<NodeId>,
     pub byte_range: [usize; 2],
     pub line: Option<usize>,
@@ -34,6 +37,7 @@ impl NodeSpec {
             label: None,
             value: None,
             scalar_type: None,
+            match_key: None,
             children: Vec::new(),
             byte_range: [0, 0],
             line: None,
@@ -79,10 +83,11 @@ impl Node {
 }
 
 /// One complete validated tree, stored in source-order postorder.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Tree {
     pub(crate) nodes: Vec<Node>,
     legacy_offsets: Option<Arc<[(usize, usize)]>>,
+    match_keys: BTreeMap<NodeId, String>,
 }
 
 impl Tree {
@@ -116,6 +121,7 @@ impl Tree {
     }
     /// Map UTF-8 byte boundaries to legacy UTF-16 code-unit boundaries when the
     /// producing adapter supplied its source. Unmapped trees retain byte spans.
+    /// Detached projections retain mappings for their node boundaries only.
     #[must_use]
     pub fn legacy_range(&self, byte_range: [usize; 2]) -> [usize; 2] {
         let Some(offsets) = self.legacy_offsets.as_deref() else {
@@ -125,6 +131,56 @@ impl Tree {
             let index = offsets.partition_point(|&(end, _)| end <= byte);
             byte - index.checked_sub(1).map_or(0, |index| offsets[index].1)
         })
+    }
+    /// Optional adapter identity, separate from content, hashes, and JSON.
+    #[must_use]
+    pub fn match_key(&self, id: NodeId) -> Option<&str> {
+        self.match_keys.get(&id).map(String::as_str)
+    }
+    /// Conservative retained bytes for shared offset maps and sparse identities.
+    /// Counting this per detached candidate can overcount shared map ownership,
+    /// which is preferable when enforcing a retained-memory budget.
+    #[must_use]
+    pub fn auxiliary_heap_bytes(&self) -> usize {
+        let offsets = self.legacy_offsets.as_ref().map_or(0, |offsets| {
+            offsets
+                .len()
+                .saturating_mul(std::mem::size_of::<(usize, usize)>())
+                .saturating_add(64)
+        });
+        self.match_keys.values().fold(offsets, |bytes, key| {
+            // Budget a complete B-tree node per key, including sparse occupancy
+            // and allocator overhead, rather than relying on average fill.
+            bytes
+                .saturating_add(key.capacity())
+                .saturating_add(16 * std::mem::size_of::<(NodeId, String)>() + 64)
+        })
+    }
+    fn projected_offsets(&self, nodes: &[Node]) -> Option<Arc<[(usize, usize)]>> {
+        let source = self.legacy_offsets.as_deref()?;
+        let mut boundaries = Vec::with_capacity(nodes.len() * 2);
+        for node in nodes {
+            boundaries.extend(node.byte_range);
+        }
+        boundaries.sort_unstable();
+        boundaries.dedup();
+        let mut projected = Vec::new();
+        let mut previous_difference = 0;
+        for byte in boundaries {
+            let index = source.partition_point(|&(end, _)| end <= byte);
+            let difference = index.checked_sub(1).map_or(0, |index| source[index].1);
+            if difference != previous_difference {
+                projected.push((byte, difference));
+                previous_difference = difference;
+            }
+        }
+        if projected.is_empty() {
+            None
+        } else if projected.as_slice() == source {
+            self.legacy_offsets.clone()
+        } else {
+            Some(projected.into())
+        }
     }
     pub(crate) fn lo(&self, id: usize) -> usize {
         id + 1 - self.nodes[id].size
@@ -156,6 +212,7 @@ pub enum BuildError {
 pub struct TreeBuilder {
     nodes: Vec<Node>,
     legacy_offsets: Option<Arc<[(usize, usize)]>>,
+    match_keys: BTreeMap<NodeId, String>,
 }
 
 impl TreeBuilder {
@@ -168,6 +225,7 @@ impl TreeBuilder {
         Self {
             nodes: Vec::with_capacity(nodes),
             legacy_offsets: None,
+            match_keys: BTreeMap::new(),
         }
     }
 
@@ -285,6 +343,9 @@ impl TreeBuilder {
             position: 0,
             size,
         });
+        if let Some(key) = spec.match_key {
+            self.match_keys.insert(id, key);
+        }
         Ok(id)
     }
 
@@ -301,6 +362,7 @@ impl TreeBuilder {
         Ok(Arc::new(Tree {
             nodes: self.nodes,
             legacy_offsets: self.legacy_offsets,
+            match_keys: self.match_keys,
         }))
     }
 }
@@ -338,6 +400,11 @@ impl NodeRef {
     pub fn is_shallow(&self) -> bool {
         self.shallow
     }
+    /// Adapter identity used to disambiguate same-labeled containers.
+    #[must_use]
+    pub fn match_key(&self) -> Option<&str> {
+        self.tree.match_key(self.id)
+    }
     /// Copy this subtree into an independent arena, releasing unrelated nodes.
     /// Shallow references copy only their projected node.
     #[must_use]
@@ -346,7 +413,13 @@ impl NodeRef {
             return self.detached_shallow();
         }
         let start = self.tree.lo(self.id.0);
-        if start == 0 && self.id == self.tree.root() {
+        let legacy_offsets = self
+            .tree
+            .projected_offsets(&self.tree.nodes[start..=self.id.0]);
+        if start == 0
+            && self.id == self.tree.root()
+            && legacy_offsets.as_deref() == self.tree.legacy_offsets.as_deref()
+        {
             return self.clone();
         }
         let mut nodes = self.tree.nodes[start..=self.id.0].to_vec();
@@ -365,7 +438,13 @@ impl NodeRef {
         Self::new(
             Arc::new(Tree {
                 nodes,
-                legacy_offsets: self.tree.legacy_offsets.clone(),
+                legacy_offsets,
+                match_keys: self
+                    .tree
+                    .match_keys
+                    .range(NodeId(start)..=self.id)
+                    .map(|(id, key)| (NodeId(id.0 - start), key.clone()))
+                    .collect(),
             }),
             root,
         )
@@ -392,10 +471,16 @@ impl NodeRef {
             position: 0,
             size: 1,
         };
+        let legacy_offsets = self.tree.projected_offsets(std::slice::from_ref(&node));
         Self {
             tree: Arc::new(Tree {
                 nodes: vec![node],
-                legacy_offsets: self.tree.legacy_offsets.clone(),
+                legacy_offsets,
+                match_keys: self
+                    .match_key()
+                    .map(|key| (NodeId(0), key.to_owned()))
+                    .into_iter()
+                    .collect(),
             }),
             id: NodeId(0),
             shallow: true,
@@ -425,6 +510,8 @@ pub struct FlatSnapshot {
     shallow: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     legacy_offsets: Option<Arc<[(usize, usize)]>>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    match_keys: BTreeMap<NodeId, String>,
 }
 
 #[cfg(feature = "serde")]
@@ -432,10 +519,11 @@ impl NodeRef {
     #[must_use]
     pub fn snapshot(&self) -> FlatSnapshot {
         let detached = self.detached();
+        let tree = Arc::unwrap_or_clone(detached.tree);
         FlatSnapshot {
-            legacy_offsets: detached.tree.legacy_offsets.clone(),
-            nodes: Arc::try_unwrap(detached.tree)
-                .map_or_else(|tree| tree.nodes.clone(), |tree| tree.nodes),
+            legacy_offsets: tree.legacy_offsets,
+            match_keys: tree.match_keys,
+            nodes: tree.nodes,
             root: detached.id,
             shallow: detached.shallow,
         }
@@ -455,13 +543,15 @@ impl FlatSnapshot {
         if self.nodes.is_empty() || self.root.0 != self.nodes.len() - 1 {
             return Err(BuildError::InvalidRoot);
         }
+        if self.match_keys.keys().any(|id| id.0 >= self.nodes.len()) {
+            return Err(BuildError::InvalidSnapshot);
+        }
         if let Some(offsets) = self.legacy_offsets.as_deref() {
             let mut previous = (0, 0);
             for &(byte, difference) in offsets {
                 if byte <= previous.0
                     || difference <= previous.1
                     || difference > byte
-                    || difference - previous.1 > 2
                     || byte - previous.0 < difference - previous.1 + 1
                 {
                     return Err(BuildError::InvalidSnapshot);
@@ -470,12 +560,13 @@ impl FlatSnapshot {
             }
         }
         let mut builder = TreeBuilder::with_capacity(self.nodes.len());
-        for node in &self.nodes {
+        for (index, node) in self.nodes.iter().enumerate() {
             builder.push(NodeSpec {
                 kind: node.kind.clone(),
                 label: node.label.clone(),
                 value: node.value.clone(),
                 scalar_type: node.scalar_type.clone(),
+                match_key: self.match_keys.get(&NodeId(index)).cloned(),
                 children: node.children.clone(),
                 byte_range: node.byte_range,
                 line: node.line,
@@ -510,6 +601,7 @@ impl FlatSnapshot {
             tree: Arc::new(Tree {
                 nodes: self.nodes,
                 legacy_offsets: self.legacy_offsets,
+                match_keys: self.match_keys,
             }),
             id: self.root,
             shallow: self.shallow,

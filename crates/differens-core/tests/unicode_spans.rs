@@ -116,3 +116,45 @@ fn malformed_offset_maps_cannot_underflow_or_reorder_legacy_coordinates() {
         assert!(snapshot.into_node_ref().is_err());
     }
 }
+
+#[cfg(feature = "serde")]
+#[test]
+fn detached_spans_do_not_retain_unrelated_unicode_prefix_maps() {
+    let prefix = format!("//{}\n", "é".repeat(100_000));
+    let source = format!("{prefix}fn tiny() {{}}\n");
+    let mut builder = TreeBuilder::with_source(&source);
+    let mut comment = NodeSpec::new("comment");
+    comment.byte_range = [0, prefix.len()];
+    let comment = builder.push(comment).unwrap();
+    let mut function = NodeSpec::new("Function");
+    function.label = Some("tiny".to_owned());
+    function.byte_range = [prefix.len(), source.len()];
+    let function = builder.push(function).unwrap();
+    let mut root = NodeSpec::new("file");
+    root.byte_range = [0, source.len()];
+    root.children = vec![comment, function];
+    let root = builder.push(root).unwrap();
+    let tree = builder.finish(root).unwrap();
+    let original = differens_core::NodeRef::new(Arc::clone(&tree), function);
+    let expected = original.to_json().unwrap();
+    let detached = original.detached();
+    let bytes = serde_json::to_vec(&detached.snapshot()).unwrap();
+    println!(
+        "unicode_prefix original_aux={} detached_aux={} snapshot_bytes={}",
+        tree.auxiliary_heap_bytes(),
+        detached.tree.auxiliary_heap_bytes(),
+        bytes.len()
+    );
+    assert_eq!(detached.to_json().unwrap(), expected);
+    assert!(tree.auxiliary_heap_bytes() > 1_000_000);
+    assert!(detached.tree.auxiliary_heap_bytes() < 1_024);
+    assert!(bytes.len() < 1_024);
+    for projected in [original.detached_shallow(), tree.root_ref().detached()] {
+        assert!(projected.tree.auxiliary_heap_bytes() < 1_024);
+    }
+    let restored = serde_json::from_slice::<differens_core::FlatSnapshot>(&bytes)
+        .unwrap()
+        .into_node_ref()
+        .unwrap();
+    assert_eq!(restored.to_json().unwrap(), expected);
+}

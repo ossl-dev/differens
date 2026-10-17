@@ -1,7 +1,7 @@
 //! Lazy correlation over bounded, optionally disk-backed candidate storage.
 use crate::{
-    ActionId, CorrelateOptions, CrossFileMatch, compatible_file_similarity, named_node, similarity,
-    tokens,
+    ActionId, CorrelateOptions, CrossFileMatch, compatible_declaration_identity,
+    compatible_file_similarity, named_node, similarity, tokens,
 };
 use differens_core::{NodeRef, NodeSpec, TreeBuilder, trees_equal};
 
@@ -52,6 +52,26 @@ pub trait CandidateStore {
         &self,
         group: CandidateGroup,
     ) -> Result<CandidateIndices<'_, Self::Error>, Self::Error>;
+    /// Stream insertions with the requested structure and declaration label in
+    /// ingestion order. Indexed stores may return name-fingerprint collisions;
+    /// correlation verifies original labels before counting or matching them.
+    /// The default filters the existing insertion stream by the exact label.
+    ///
+    /// # Errors
+    /// Returns candidate-index and metadata errors, including iterator errors.
+    fn named_candidates<'a>(
+        &'a self,
+        structure_hash: u64,
+        label: Option<&'a str>,
+    ) -> Result<CandidateIndices<'a, Self::Error>, Self::Error> {
+        let candidates = self.candidates(CandidateGroup::Insertions(structure_hash))?;
+        Ok(Box::new(candidates.filter_map(move |candidate| {
+            match candidate.and_then(|index| self.metadata(index).map(|meta| (index, meta))) {
+                Ok((index, meta)) => (meta.label.as_deref() == label).then_some(Ok(index)),
+                Err(error) => Some(Err(error)),
+            }
+        })))
+    }
     /// # Errors
     /// Returns claim-record I/O errors.
     fn is_claimed(&self, index: usize) -> Result<bool, Self::Error>;
@@ -91,33 +111,33 @@ fn similar<S: CandidateStore>(
     old: &CandidateMeta,
     old_node: &NodeRef,
     threshold: f64,
+    initial_candidates: &[usize],
 ) -> Result<Option<(usize, f64, bool)>, S::Error> {
     if old.kind == "file" && old_node.scalar_type.as_deref() == Some("bytes") {
         return Ok(None);
     }
-    let mut count = 0usize;
-    for index in store.candidates(CandidateGroup::Insertions(old.structure_hash))? {
-        index?;
-        count += 1;
-        if count > 64 {
-            break;
+    let mut named = Vec::new();
+    let candidates = if initial_candidates.len() > 64 {
+        for index in store.named_candidates(old.structure_hash, old.label.as_deref())? {
+            let index = index?;
+            // An index may use a finite-width name fingerprint. Verify the real
+            // label before counting candidates or allowing a similarity match.
+            if store.metadata(index)?.label != old.label {
+                continue;
+            }
+            if named.len() == 64 {
+                return Ok(None);
+            }
+            named.push(index);
         }
-    }
-    let mut candidates = Vec::with_capacity(count.min(64));
-    for index in store.candidates(CandidateGroup::Insertions(old.structure_hash))? {
-        let index = index?;
-        if count > 64 && store.metadata(index)?.label != old.label {
-            continue;
-        }
-        if candidates.len() == 64 {
-            return Ok(None);
-        }
-        candidates.push(index);
-    }
+        &named
+    } else {
+        initial_candidates
+    };
     let old_tokens = tokens(old_node);
     let mut best = None;
     let mut best_score = 0.0;
-    for index in candidates {
+    for &index in candidates {
         if store.is_claimed(index)? {
             continue;
         }
@@ -126,7 +146,9 @@ fn similar<S: CandidateStore>(
             continue;
         }
         let new_node = store.load(index)?;
-        if old.kind == "file" && !compatible_file_similarity(old_node, &new_node) {
+        if !compatible_declaration_identity(old_node, &new_node)
+            || (old.kind == "file" && !compatible_file_similarity(old_node, &new_node))
+        {
             continue;
         }
         let similarity_score = similarity(&old_tokens, &tokens(&new_node));
@@ -156,11 +178,12 @@ pub fn correlate_store<S: CandidateStore>(
     let mut moves = Vec::new();
     for hash in store.groups()? {
         let hash = hash?;
-        match store.candidates(CandidateGroup::Insertions(hash))?.next() {
-            None => continue,
-            Some(value) => {
-                value?;
-            }
+        let initial_candidates = store
+            .candidates(CandidateGroup::Insertions(hash))?
+            .take(65)
+            .collect::<Result<Vec<_>, _>>()?;
+        if initial_candidates.is_empty() {
+            continue;
         }
         for index in store.candidates(CandidateGroup::Deletions(hash))? {
             let index = index?;
@@ -168,7 +191,13 @@ pub fn correlate_store<S: CandidateStore>(
             let old_node = store.load(index)?;
             let matched = match exact(store, &old, &old_node)? {
                 Some(matched) => Some(matched),
-                None => similar(store, &old, &old_node, options.rename_similarity_threshold)?,
+                None => similar(
+                    store,
+                    &old,
+                    &old_node,
+                    options.rename_similarity_threshold,
+                    &initial_candidates,
+                )?,
             };
             if let Some((new_index, score, modified)) = matched {
                 let new = store.metadata(new_index)?;

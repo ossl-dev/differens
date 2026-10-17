@@ -161,6 +161,12 @@ fn compatible_file_similarity(old: &NodeRef, new: &NodeRef) -> bool {
     old.scalar_type == new.scalar_type && old.scalar_type.as_deref() != Some("bytes")
 }
 
+fn compatible_declaration_identity(old: &NodeRef, new: &NodeRef) -> bool {
+    let old = named_node(old);
+    let new = named_node(new);
+    !matches!((old.match_key(), new.match_key()), (Some(old), Some(new)) if old != new)
+}
+
 #[derive(Default)]
 struct TokenCache {
     deleted: HashMap<ActionId, HashSet<String>>,
@@ -222,6 +228,7 @@ fn similar_insertion(
             || (deleted.node.kind != "file" && name.label != named_node(inserted.node).label)
             || (deleted.node.kind == "file"
                 && !compatible_file_similarity(deleted.node, inserted.node))
+            || !compatible_declaration_identity(deleted.node, inserted.node)
         {
             continue;
         }

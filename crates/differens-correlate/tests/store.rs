@@ -14,6 +14,7 @@ struct MemoryStore {
     metadata: Vec<CandidateMeta>,
     claimed: RefCell<Vec<bool>>,
     reads: Cell<usize>,
+    metadata_reads: Cell<usize>,
 }
 
 impl MemoryStore {
@@ -45,6 +46,7 @@ impl MemoryStore {
             metadata,
             claimed,
             reads: Cell::new(0),
+            metadata_reads: Cell::new(0),
         }
     }
 }
@@ -55,6 +57,7 @@ impl CandidateStore for MemoryStore {
         self.nodes.len()
     }
     fn metadata(&self, index: usize) -> Result<CandidateMeta, Self::Error> {
+        self.metadata_reads.set(self.metadata_reads.get() + 1);
         Ok(self.metadata[index].clone())
     }
     fn load(&self, index: usize) -> Result<NodeRef, Self::Error> {
@@ -96,6 +99,205 @@ impl CandidateStore for MemoryStore {
     fn claim(&self, index: usize) -> Result<(), Self::Error> {
         self.claimed.borrow_mut()[index] = true;
         Ok(())
+    }
+}
+
+struct IndexedStore {
+    base: MemoryStore,
+    groups: std::collections::HashMap<(u8, u64), Vec<usize>>,
+    names: std::collections::HashMap<(u64, Option<String>), Vec<usize>>,
+    use_names: bool,
+    collide_names: bool,
+}
+
+impl IndexedStore {
+    fn new(files: &[FileChanges], use_names: bool) -> Self {
+        let base = MemoryStore::new(files);
+        let mut groups: std::collections::HashMap<_, Vec<_>> = std::collections::HashMap::new();
+        let mut names: std::collections::HashMap<_, Vec<_>> = std::collections::HashMap::new();
+        for (index, meta) in base.metadata.iter().enumerate() {
+            if meta.deleted {
+                groups
+                    .entry((0, meta.structure_hash))
+                    .or_default()
+                    .push(index);
+            } else {
+                groups
+                    .entry((1, meta.structure_hash))
+                    .or_default()
+                    .push(index);
+                groups.entry((2, meta.exact_key)).or_default().push(index);
+                names
+                    .entry((meta.structure_hash, meta.label.clone()))
+                    .or_default()
+                    .push(index);
+            }
+        }
+        Self {
+            base,
+            groups,
+            names,
+            use_names,
+            collide_names: false,
+        }
+    }
+}
+
+impl CandidateStore for IndexedStore {
+    type Error = Infallible;
+    fn len(&self) -> usize {
+        self.base.len()
+    }
+    fn metadata(&self, index: usize) -> Result<CandidateMeta, Self::Error> {
+        self.base.metadata(index)
+    }
+    fn load(&self, index: usize) -> Result<NodeRef, Self::Error> {
+        self.base.load(index)
+    }
+    fn groups(&self) -> Result<StructureGroups<'_, Self::Error>, Self::Error> {
+        self.base.groups()
+    }
+    fn candidates(
+        &self,
+        group: CandidateGroup,
+    ) -> Result<CandidateIndices<'_, Self::Error>, Self::Error> {
+        let key = match group {
+            CandidateGroup::Deletions(hash) => (0, hash),
+            CandidateGroup::Insertions(hash) => (1, hash),
+            CandidateGroup::ExactInsertions(hash) => (2, hash),
+        };
+        Ok(Box::new(
+            self.groups
+                .get(&key)
+                .map_or(&[][..], Vec::as_slice)
+                .iter()
+                .copied()
+                .map(Ok),
+        ))
+    }
+    fn named_candidates<'a>(
+        &'a self,
+        structure_hash: u64,
+        label: Option<&'a str>,
+    ) -> Result<CandidateIndices<'a, Self::Error>, Self::Error> {
+        if !self.use_names {
+            return self.base.named_candidates(structure_hash, label);
+        }
+        if self.collide_names {
+            return self.candidates(CandidateGroup::Insertions(structure_hash));
+        }
+        Ok(Box::new(
+            self.names
+                .get(&(structure_hash, label.map(str::to_owned)))
+                .map_or(&[][..], Vec::as_slice)
+                .iter()
+                .copied()
+                .map(Ok),
+        ))
+    }
+    fn is_claimed(&self, index: usize) -> Result<bool, Self::Error> {
+        self.base.is_claimed(index)
+    }
+    fn claim(&self, index: usize) -> Result<(), Self::Error> {
+        self.base.claim(index)
+    }
+}
+
+fn modified_declarations(count: usize) -> Vec<FileChanges> {
+    let mut old = Vec::new();
+    let mut new = Vec::new();
+    for index in 0..count {
+        for (destination, value) in [
+            (&mut old, "return input alpha beta gamma"),
+            (&mut new, "return input alpha beta delta"),
+        ] {
+            let mut builder = TreeBuilder::new();
+            let mut spec = NodeSpec::new("Function");
+            spec.label = Some(format!("function{index}"));
+            spec.value = Some(value.to_owned());
+            let root = builder.push(spec).unwrap();
+            destination.push(builder.finish(root).unwrap().root_ref());
+        }
+    }
+    vec![
+        FileChanges {
+            file_path: "old.rs".to_owned(),
+            actions: old
+                .into_iter()
+                .map(|node| EditAction::Delete {
+                    node,
+                    context: vec![],
+                })
+                .collect(),
+        },
+        FileChanges {
+            file_path: "new.rs".to_owned(),
+            actions: new
+                .into_iter()
+                .map(|node| EditAction::Insert {
+                    parent: node.clone(),
+                    node,
+                    position: 0,
+                    context: vec![],
+                })
+                .collect(),
+        },
+    ]
+}
+
+#[test]
+fn name_indexes_preserve_moves_with_linear_metadata_reads() {
+    let files = modified_declarations(256);
+    let expected = correlate(&files, CorrelateOptions::default());
+    let store = IndexedStore::new(&files, true);
+    let actual = correlate_store(&store, CorrelateOptions::default()).unwrap();
+    assert_eq!(actual.len(), 256);
+    assert!(store.base.metadata_reads.get() < 8 * 256);
+    for (actual, expected) in actual.iter().zip(&expected) {
+        assert_eq!(actual.deletion, expected.deletion);
+        assert_eq!(actual.insertion, expected.insertion);
+        assert_eq!(actual.node.label, expected.node.label);
+        assert_eq!(actual.similarity, expected.similarity);
+        assert!(actual.modified);
+    }
+}
+
+#[test]
+fn name_hash_collisions_do_not_consume_the_candidate_cap() {
+    let files = modified_declarations(70);
+    let mut store = IndexedStore::new(&files, true);
+    store.collide_names = true;
+    let result = correlate_store(&store, CorrelateOptions::default()).unwrap();
+    assert_eq!(result.len(), 70);
+    assert!(
+        result
+            .iter()
+            .all(|movement| movement.deletion.action == movement.insertion.action)
+    );
+}
+
+#[test]
+#[ignore = "manual release benchmark; compares indexed versus streaming name lookup"]
+fn modified_declaration_correlation() {
+    for count in [100, 500, 1_000] {
+        let files = modified_declarations(count);
+        for use_names in [false, true] {
+            let mut durations = Vec::new();
+            let mut metadata_reads = 0;
+            for _ in 0..5 {
+                let store = IndexedStore::new(&files, use_names);
+                let start = std::time::Instant::now();
+                let result = correlate_store(&store, CorrelateOptions::default()).unwrap();
+                durations.push(start.elapsed().as_secs_f64() * 1_000.0);
+                assert_eq!(result.len(), count);
+                metadata_reads = store.base.metadata_reads.get();
+            }
+            durations.sort_by(f64::total_cmp);
+            println!(
+                "modified_moves count={count} indexed={use_names} median_ms={:.3} metadata_reads={metadata_reads}",
+                durations[2]
+            );
+        }
     }
 }
 
@@ -203,4 +405,65 @@ fn eager_and_lazy_option_validation_agrees_including_exact_matches() {
             1
         );
     }
+}
+
+fn method(receiver: Option<&str>, body: &str, wrapped: bool) -> NodeRef {
+    let mut builder = TreeBuilder::new();
+    let mut spec = NodeSpec::new("Method");
+    spec.label = Some("Flush".to_owned());
+    spec.match_key = receiver.map(str::to_owned);
+    spec.value = Some(body.to_owned());
+    let mut root = builder.push(spec).unwrap();
+    if wrapped {
+        let mut export = NodeSpec::new("Export");
+        export.children.push(root);
+        root = builder.push(export).unwrap();
+    }
+    builder.finish(root).unwrap().root_ref()
+}
+
+#[test]
+fn fuzzy_receiver_methods_require_compatible_identity_hints_in_eager_and_lazy_stores() {
+    for wrapped in [false, true] {
+        for (old, new, expected) in [
+            (Some("go::FirstWriter"), Some("go::SecondWriter"), 0),
+            (Some("go::FirstWriter"), Some("go::FirstWriter"), 1),
+            (Some("go::FirstWriter"), None, 1),
+            (None, Some("go::SecondWriter"), 1),
+            (None, None, 1),
+        ] {
+            let changes = files(
+                method(old, "return common state original", wrapped),
+                method(new, "return common state modified", wrapped),
+            );
+            let options = CorrelateOptions::default();
+            let eager = correlate(&changes, options);
+            let lazy = correlate_store(&MemoryStore::new(&changes), options).unwrap();
+            assert_eq!(
+                eager.len(),
+                expected,
+                "eager {old:?} -> {new:?}, wrapped={wrapped}"
+            );
+            assert_eq!(
+                lazy.len(),
+                expected,
+                "lazy {old:?} -> {new:?}, wrapped={wrapped}"
+            );
+            if expected == 1 {
+                assert!(eager[0].modified);
+                assert!(lazy[0].modified);
+            }
+        }
+    }
+    // Hints are only fuzzy identity advice: identical verified content still
+    // represents an exact move even if its owner hint changes.
+    let changes = files(
+        method(Some("go::FirstWriter"), "same body", false),
+        method(Some("go::SecondWriter"), "same body", false),
+    );
+    assert!(!correlate(&changes, CorrelateOptions::default())[0].modified);
+    assert!(
+        !correlate_store(&MemoryStore::new(&changes), CorrelateOptions::default()).unwrap()[0]
+            .modified
+    );
 }

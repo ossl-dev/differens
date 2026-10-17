@@ -26,6 +26,8 @@ assert_eq!(result.changes[0].action_type(), "Update");
 
 `Tree::node(NodeId)` borrows immutable metadata. `root_ref()` on `Arc<Tree>` returns an owned `NodeRef`; it holds the tree alive and exposes `children()` and `parent()`. An ID belongs to one tree. Spans use UTF-8 byte offsets; lines are one-based.
 
+`NodeSpec::match_key: Option<String>` supplies an internal identity hint for same-named containers, such as `go::basicWriter` for an overloaded Go method. `Tree::match_key(id)` and `NodeRef::match_key()` expose it. Keys occupy a sparse tree-level map and distinguish named-container paths; they do not change labels, legacy JSON, hashes, or exact content equality. Detachment and flat snapshots preserve the applicable keys.
+
 ## Compare
 
 ```rust
@@ -51,3 +53,5 @@ Actions are ordered updates, moves, deletions, insertions. Subtree additions/rem
 `hash_text(&str) -> u64` preserves the legacy 53-bit folded FNV hash over UTF-16 code units. Content and structure fingerprints select candidates; full topology and field checks verify them. `trees_equal(&NodeRef, &NodeRef)` uses iterative exact equality.
 
 Node serialization preserves nested legacy JSON. `NodeRef::shallow()` emits metadata with empty children while retaining the owning tree internally. Flat ownership and iterative traversal avoid recursive stack growth for deep construction, equality, matching, JSON encoding, and drop.
+
+Adapters using `TreeBuilder::with_source` or `set_legacy_source` keep native UTF-8 byte spans while serializing legacy UTF-16 code-unit spans. Detached nodes and flat snapshots retain only the coordinate deltas needed by their node boundaries. A small candidate no longer retains or serializes the Unicode offset map of an unrelated file prefix. `Tree::auxiliary_heap_bytes()` exposes a conservative retained-size estimate for offset and identity maps.

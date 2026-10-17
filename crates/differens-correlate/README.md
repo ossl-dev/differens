@@ -13,3 +13,10 @@ Generic syntax fragments and variables inside named declarations are excluded.
 Whole-file renames compare content independently of path labels; modified
 non-file candidates retain their declaration name. Similarity is a conservative
 heuristic and does not prove behavioral equivalence.
+
+`correlate_store` accepts a fallible `CandidateStore` for bounded, optionally
+disk-backed payloads. Implement `named_candidates` with an ordered name index to
+avoid rescanning every insertion for each modified declaration in large
+structure buckets. The default streams and filters the ordinary insertion index
+for compatibility. Actual labels are verified before candidate caps or matches,
+so name-fingerprint collisions do not hide candidates.
