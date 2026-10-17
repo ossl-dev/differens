@@ -191,3 +191,38 @@ fn dense_fallback_preserves_trailing_deletions() {
         bb
     );
 }
+
+#[test]
+fn dense_edits_and_insertions_do_not_turn_unchanged_lines_into_updates() {
+    let old = (0..8000).map(|i| format!("entry {i}")).collect::<Vec<_>>();
+    let mut new = Vec::new();
+    for (i, line) in old.iter().enumerate() {
+        if i % 80 == 0 {
+            new.push(format!("inserted before {i}"));
+        }
+        new.push(if i % 8 == 0 {
+            format!("{line} edited")
+        } else {
+            line.clone()
+        });
+    }
+    new.push("added footer".into());
+    let hunks = diff_lines(&old.join("\n"), &new.join("\n"));
+    assert!(hunks.len() <= 1200, "{} noisy edits", hunks.len());
+    for hunk in &hunks {
+        // Seven out of every eight lines are unchanged and must not appear in edits.
+        for text in [
+            hunk.old_text.as_deref(),
+            hunk.new_text.as_deref(),
+            Some(hunk.text.as_str()),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            for line in text.lines().filter(|line| line.starts_with("entry ")) {
+                let index: usize = line.split_whitespace().nth(1).unwrap().parse().unwrap();
+                assert_eq!(index % 8, 0, "unchanged line falsely edited: {line}");
+            }
+        }
+    }
+}

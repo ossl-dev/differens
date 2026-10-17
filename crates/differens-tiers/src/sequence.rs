@@ -1,5 +1,5 @@
 //! Bounded exact LCS and linear-space Myers sequence alignment.
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SeqKind {
@@ -61,7 +61,7 @@ pub fn diff_sequences(a: &[&str], b: &[&str], join: &str) -> Vec<SeqOp> {
     if myers_split(a, b, OPS_BUDGET, &mut ops) {
         ops
     } else {
-        zip_fallback(a, b, join)
+        anchored_fallback(a, b, join)
     }
 }
 fn lcs(a: &[&str], b: &[&str]) -> Vec<SeqOp> {
@@ -240,6 +240,72 @@ fn bisect(left: &[&str], right: &[&str], budget: &mut usize) -> Option<(usize, u
     }
     None
 }
+// When exact alignment exhausts its budget, unique unchanged lines still make
+// reliable anchors. Their increasing subsequence avoids pairing every line
+// after an insertion with the wrong neighbor. Gaps keep the bounded positional
+// fallback; this path deliberately makes no global minimality claim.
+fn anchored_fallback(a: &[&str], b: &[&str], join: &str) -> Vec<SeqOp> {
+    fn unique_positions<'a>(tokens: &[&'a str]) -> HashMap<&'a str, Option<usize>> {
+        let mut positions = HashMap::with_capacity(tokens.len());
+        for (index, &token) in tokens.iter().enumerate() {
+            positions
+                .entry(token)
+                .and_modify(|position| *position = None)
+                .or_insert(Some(index));
+        }
+        positions
+    }
+    let old = unique_positions(a);
+    let new = unique_positions(b);
+    let candidates: Vec<_> = a
+        .iter()
+        .enumerate()
+        .filter_map(|(index, token)| {
+            (old.get(token) == Some(&Some(index)))
+                .then(|| {
+                    new.get(token)
+                        .copied()
+                        .flatten()
+                        .map(|other| (index, other))
+                })
+                .flatten()
+        })
+        .collect();
+    let mut previous = vec![usize::MAX; candidates.len()];
+    let mut tails: Vec<usize> = Vec::new();
+    for (index, &(_, position)) in candidates.iter().enumerate() {
+        let slot = tails.partition_point(|&tail| candidates[tail].1 < position);
+        if slot != 0 {
+            previous[index] = tails[slot - 1];
+        }
+        if slot == tails.len() {
+            tails.push(index);
+        } else {
+            tails[slot] = index;
+        }
+    }
+    if tails.len() < 2 {
+        return zip_fallback(a, b, join);
+    }
+    let mut anchors = Vec::with_capacity(tails.len());
+    let mut cursor = *tails.last().expect("at least two unique anchors");
+    while cursor != usize::MAX {
+        anchors.push(candidates[cursor]);
+        cursor = previous[cursor];
+    }
+    anchors.reverse();
+    let mut ops = Vec::new();
+    let (mut left, mut right) = (0, 0);
+    for (x, y) in anchors {
+        ops.extend(zip_fallback(&a[left..x], &b[right..y], join));
+        ops.push(op(SeqKind::Equal, a[x]));
+        left = x + 1;
+        right = y + 1;
+    }
+    ops.extend(zip_fallback(&a[left..], &b[right..], join));
+    ops
+}
+
 fn zip_fallback(a: &[&str], b: &[&str], join: &str) -> Vec<SeqOp> {
     let mut ops = Vec::new();
     let mut equals = 0;
