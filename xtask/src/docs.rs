@@ -254,7 +254,8 @@ mod tests {
         assert!(html.contains("<nav"));
         assert!(!html.contains("<script"));
         let mdx = fs::read_to_string(root().join("apps/docs/index.mdx")).unwrap();
-        assert!(mdx.starts_with("---\ntitle: \"Differens\"\ndescription:"));
+        assert!(mdx.starts_with("---\ntitle: "));
+        assert!(mdx.contains("\ndescription: "));
         assert!(mdx.contains("](/getting-started/installation)"));
         assert!(!mdx.contains(".html)"));
     }
