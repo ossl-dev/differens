@@ -58,6 +58,72 @@ fn render(source: &str) -> String {
     html::push_html(&mut output, events.into_iter());
     output
 }
+
+fn mintlify_page(source: &str, title: &str) -> Result<String> {
+    let heading = format!("# {title}\n");
+    let body = source.strip_prefix(&heading).unwrap_or(source).trim_start();
+    let description = Parser::new_ext(body, Options::ENABLE_TABLES)
+        .skip_while(|event| !matches!(event, Event::Start(Tag::Paragraph)))
+        .skip(1)
+        .take_while(|event| !matches!(event, Event::End(TagEnd::Paragraph)))
+        .filter_map(|event| match event {
+            Event::Text(text) | Event::Code(text) => Some(text.into_string()),
+            Event::SoftBreak | Event::HardBreak => Some(" ".to_owned()),
+            _ => None,
+        })
+        .collect::<String>();
+    let mut edits = Vec::new();
+    for (event, range) in Parser::new_ext(body, Options::ENABLE_TABLES).into_offset_iter() {
+        if let Event::Start(Tag::Link { dest_url, .. }) = event {
+            let path = dest_url.split('#').next().unwrap_or(&dest_url);
+            if path.starts_with('/') && path.strip_suffix(".html").is_some() {
+                let destination = dest_url.replacen(".html", "", 1);
+                if let Some(offset) = body[range.clone()].rfind(dest_url.as_ref()) {
+                    let start = range.start + offset;
+                    edits.push((start, start + dest_url.len(), destination));
+                }
+            }
+        }
+    }
+    let mut body = body.to_owned();
+    for (start, end, destination) in edits.into_iter().rev() {
+        body.replace_range(start..end, &destination);
+    }
+    Ok(format!(
+        "---\ntitle: {}\ndescription: {}\n---\n\n{body}",
+        serde_json::to_string(title)?,
+        serde_json::to_string(&description)?,
+    ))
+}
+
+fn validate_mintlify_navigation(docs: &Path, pages: &[PathBuf]) -> Result<()> {
+    let config: serde_json::Value = serde_json::from_slice(&fs::read(docs.join("docs.json"))?)?;
+    let mut pending = vec![&config["navigation"]];
+    let mut registered = std::collections::BTreeSet::new();
+    while let Some(value) = pending.pop() {
+        match value {
+            serde_json::Value::Object(object) => {
+                if let Some(pages) = object.get("pages").and_then(serde_json::Value::as_array) {
+                    registered.extend(pages.iter().filter_map(serde_json::Value::as_str));
+                }
+                pending.extend(object.values());
+            }
+            serde_json::Value::Array(array) => pending.extend(array),
+            _ => {}
+        }
+    }
+    let expected = pages
+        .iter()
+        .map(|path| {
+            path.strip_prefix(docs.join("content"))
+                .map(|path| path.with_extension("").to_string_lossy().replace('\\', "/"))
+        })
+        .collect::<std::result::Result<std::collections::BTreeSet<_>, _>>()?;
+    if !expected.iter().map(String::as_str).eq(registered) {
+        return Err("Mintlify docs.json navigation must include every documentation source, with no missing pages".into());
+    }
+    Ok(())
+}
 fn page_paths(source: &Path) -> Result<Vec<PathBuf>> {
     let mut pages = Vec::new();
     for entry in walkdir::WalkDir::new(source).sort_by_file_name() {
@@ -131,6 +197,7 @@ pub fn build(root: &Path) -> Result<()> {
     let source = docs.join("content");
     let destination = root.join("target/site");
     let pages = page_paths(&source)?;
+    validate_mintlify_navigation(&docs, &pages)?;
     let nav = navigation(&docs)?;
     for path in &pages {
         let source = fs::read_to_string(path)?;
@@ -139,6 +206,11 @@ pub fn build(root: &Path) -> Result<()> {
             .lines()
             .find_map(|line| line.strip_prefix("# "))
             .unwrap_or("Differens");
+        let mintlify_target = docs
+            .join(path.strip_prefix(docs.join("content"))?)
+            .with_extension("mdx");
+        fs::create_dir_all(mintlify_target.parent().ok_or("MDX output has no parent")?)?;
+        fs::write(mintlify_target, mintlify_page(&source, title)?)?;
         let target = destination
             .join(path.strip_prefix(docs.join("content"))?)
             .with_extension("html");
@@ -156,7 +228,7 @@ pub fn build(root: &Path) -> Result<()> {
     fs::copy(docs.join("routes.json"), destination.join("routes.json"))?;
     fs::copy(docs.join("skill.md"), destination.join("skill.md"))?;
     println!(
-        "built {} documentation pages in {}",
+        "generated {} Mintlify MDX pages and built static documentation in {}",
         pages.len(),
         destination.display()
     );
@@ -181,5 +253,21 @@ mod tests {
         let html = fs::read_to_string(root().join("target/site/index.html")).unwrap();
         assert!(html.contains("<nav"));
         assert!(!html.contains("<script"));
+        let mdx = fs::read_to_string(root().join("apps/docs/index.mdx")).unwrap();
+        assert!(mdx.starts_with("---\ntitle: \"Differens\"\ndescription:"));
+        assert!(mdx.contains("](/getting-started/installation)"));
+        assert!(!mdx.contains(".html)"));
+    }
+    #[test]
+    fn mintlify_links_use_page_slugs_without_changing_code() {
+        let page = mintlify_page(
+            "# Example\n\nA page.\n\n[CLI](/reference/cli.html#configuration)\n\n`[code](/reference/cli.html)`\n\n```text\n[code](/reference/cli.html)\n```\n",
+            "Example",
+        )
+        .unwrap();
+        assert!(page.contains("[CLI](/reference/cli#configuration)"));
+        assert!(page.contains("`[code](/reference/cli.html)`"));
+        assert!(page.contains("```text\n[code](/reference/cli.html)\n```"));
+        assert!(!page.contains("# Example"));
     }
 }

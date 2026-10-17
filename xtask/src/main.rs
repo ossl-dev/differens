@@ -29,7 +29,7 @@ enum Task {
         #[arg(long, default_value_t = 20)]
         samples: usize,
     },
-    /// Build the static documentation without JavaScript tooling.
+    /// Generate Mintlify MDX pages and a static preview from `CommonMark` sources.
     Docs,
     /// Produce a native release archive and checksums; never publish.
     Package {

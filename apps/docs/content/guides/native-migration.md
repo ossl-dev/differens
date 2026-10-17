@@ -2,7 +2,9 @@
 
 Differens 0.3.0 uses Rust for the CLI, libraries, tests, and maintenance tools.
 The TypeScript packages, Bun build, and JavaScript workers have been removed from
-this checkout. Documentation is CommonMark rendered by `cargo xtask docs`.
+this checkout. Documentation remains deployed on Mintlify. `cargo xtask docs`
+generates the checked-in MDX pages from CommonMark sources and builds an optional
+static preview; `apps/docs/docs.json` configures the deployed site.
 
 ## Switch the CLI
 

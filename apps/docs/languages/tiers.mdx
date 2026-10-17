@@ -1,0 +1,19 @@
+---
+title: "Tier adapters"
+description: "classify_file assigns an initial tier from the path. is_parseable checks semantic-parser availability. Code/data/markup parser failure or analysis limits fall directly to raw lines. Numbered tiers describe abstraction levels, not a mandatory parser cascade."
+---
+
+| Tier | Formats | Analysis |
+| --- | --- | --- |
+| T5 | Registered source dialects | CST structure and semantic concepts |
+| T4 | JSON/JSONC/JSON5, YAML, TOML, INI, ENV | Typed keys, values, and containers |
+| T3 | HTML/XML and related markup | Elements, attributes, and text |
+| T2 | Plain text/logs and selected extensionless documents | Word changes and paragraph moves |
+| T1 | Markdown, other textual formats, unsupported code | Raw line sequence |
+| T0 | Binary extensions or undecodable bytes | Changed bytes or optional plugin |
+
+`classify_file` assigns an initial tier from the path. `is_parseable` checks semantic-parser availability. Code/data/markup parser failure or analysis limits fall directly to raw lines. Numbered tiers describe abstraction levels, not a mandatory parser cascade.
+
+Data parsing is format-directed. Scalar type changes, nested YAML edits, and non-label HTML attribute changes remain visible. Original byte comparisons preserve binary differences that text decoding could erase.
+
+See the [tier reference](/reference/tiers) for Rust APIs and [pipeline](/how-it-works/tier-pipeline) for fallback details.

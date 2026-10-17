@@ -1,0 +1,117 @@
+---
+title: "Quickstart"
+description: "Create two TypeScript files to see how Differens reports a rename and body edits. Install the CLI before running the examples."
+---
+
+Create two TypeScript files to see how Differens reports a rename and body edits.
+[Install the CLI](/getting-started/installation) before running the examples.
+
+## Create two files
+
+Save this as `before.ts`:
+
+```typescript
+export function computeTotal(items: Item[]): number {
+  return items.reduce((acc, item) => acc + item.price, 0);
+}
+
+export const TAX_RATE = 0.08;
+```
+
+Save this as `after.ts`:
+
+```typescript
+export function calculateTotalAmount(items: Item[], discount: number): number {
+  const base = items.reduce((acc, item) => acc + item.price, 0);
+  return base - discount;
+}
+
+export const TAX_RATE = 0.08;
+```
+
+## Compare them
+
+```bash
+differens before.ts after.ts
+```
+
+From a source checkout, use `cargo run -p differens -- before.ts after.ts`.
+The native CLI prints:
+
+```text
+  ~ renamed function `computeTotal` to `calculateTotalAmount`
+  ~ modified function `computeTotal` (1 removal)
+  ~ modified function `calculateTotalAmount` (3 additions)
+```
+
+The rename appears on its own line. Body and parameter edits are grouped under
+the function that contains them. Removals use the old name; additions use the new
+name. The unchanged `TAX_RATE` declaration produces no output.
+
+Terminal and Markdown reports group related edits for reading. JSON keeps the
+individual actions, so its action count can be larger than the displayed summary.
+
+## Read the underlying actions
+
+```bash
+differens before.ts after.ts --format=json
+```
+
+Each array entry has an `action`, a `description`, and a `filePath`. The action
+contains its `type` (`Insert`, `Delete`, `Update`, or `Move`), node metadata, and
+nearest-first `context`. To inspect the rename without printing its full tree:
+
+```bash
+differens before.ts after.ts --format=json | jq '.[0] | {description, filePath, type: .action.type, detail: .action.detail}'
+```
+
+```json
+{
+  "description": "renamed function `computeTotal` to `calculateTotalAmount`",
+  "filePath": "before.ts",
+  "type": "Update",
+  "detail": {
+    "kind": "Renamed",
+    "from": "computeTotal",
+    "to": "calculateTotalAmount"
+  }
+}
+```
+
+For a compact report with source lines, use `--format=llm`:
+
+```text
+differens/1 1 files 5 changes 3 named
+# before.ts
+~ function calculateTotalAmount :1 computeTotal -> calculateTotalAmount
+~ modified function computeTotal (1 removal) :2
+~ modified function calculateTotalAmount (3 additions) :3
+```
+
+See [machine outputs](/guides/machine-outputs) for schemas, streaming records,
+and source-coordinate conventions.
+
+## Compare a repository or directories
+
+Inside a Git repository, running `differens` without arguments compares the
+working tree against `HEAD`, including staged, unstaged, and untracked files.
+
+```bash
+differens
+differens main..feature
+differens HEAD~1 HEAD
+```
+
+To compare two directory snapshots:
+
+```bash
+differens old/ new/
+```
+
+Repository and directory comparisons can detect moves across files. Exact moves
+need matching content; modified declaration moves must keep the same name and
+meet the similarity threshold. A move combined with a rename or major rewrite
+may remain an addition and a removal.
+
+See the [CLI reference](/reference/cli) for options and configuration, or
+[Git integration](/guides/git-integration) to use Differens through `git diff`.

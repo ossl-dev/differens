@@ -26,4 +26,4 @@ Tree-sitter's runtime and generated grammar scanners are native upstream C/C++ d
 
 ## Distribution and documentation
 
-The CLI links its selected grammars at build time. Core-only library consumers avoid the grammar dependency graph. `cargo doc --workspace --no-deps` builds API documentation; `cargo xtask docs` renders these CommonMark pages to static HTML without a client script or JavaScript build step.
+The CLI links its selected grammars at build time. Core-only library consumers avoid the grammar dependency graph. `cargo doc --workspace --no-deps` builds API documentation; `cargo xtask docs` generates Mintlify MDX pages from CommonMark sources and an optional static HTML preview. Mintlify deploys the checked-in MDX pages using `apps/docs/docs.json`. The Rust generator does not require Node; Mintlify's preview and validation tools do.

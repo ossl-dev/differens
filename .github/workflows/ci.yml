@@ -49,10 +49,33 @@ jobs:
         run: cargo test -p differens-core --no-default-features --locked
       - name: Test adapters without native grammars
         run: cargo test -p differens-tiers --no-default-features --locked
-      - name: API and static documentation
+      - name: API and Mintlify source generation
         run: |
           cargo doc --workspace --no-deps --locked
           cargo xtask docs
+      - name: Verify committed Mintlify pages match their sources
+        run: |
+          if [ -n "$(git status --porcelain -- apps/docs)" ]; then
+            echo "Run cargo xtask docs and commit the generated MDX pages."
+            git status --short -- apps/docs
+            exit 1
+          fi
+
+  mintlify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/docs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate Mintlify deployment sources
+        run: npm exec --yes --package=mint@4.2.1059 -- mint validate
+      - name: Check Mintlify links
+        run: npm exec --yes --package=mint@4.2.1059 -- mint broken-links
 
   coverage:
     runs-on: ubuntu-latest

@@ -38,4 +38,15 @@ Follow existing human-readable past-tense subjects, such as `Added Python extrac
 
 ## Documentation and packaging
 
-Edit CommonMark under `apps/docs/content`, then run `cargo xtask docs`. Keep navigation/routes and crate API examples consistent with source. `cargo xtask package --dry-run` validates packaging; publishing registries or releases is a separate deliberate action.
+The documentation is deployed on Mintlify. Keep `apps/docs/docs.json` and its
+navigation in sync with the pages. Edit CommonMark under `apps/docs/content`, then
+run `cargo xtask docs` and commit the generated MDX pages under `apps/docs` with
+your changes. The same command builds an optional static preview in `target/site`.
+The generator checks page coverage; CI checks that generated files match their
+sources.
+
+Run `mint validate` and `mint broken-links` from `apps/docs` with the Mintlify CLI
+installed. Use `mint dev` for a local Mintlify preview. Keep page slugs, static
+preview navigation/routes, and crate API examples consistent with the source.
+`cargo xtask package --dry-run` validates application packaging; publishing crates
+or releases is a separate action.

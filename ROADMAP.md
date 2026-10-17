@@ -13,7 +13,8 @@ remain below.
 - File, directory, working-tree, and commit-range inputs with explicit errors and
   presence values; Git driver registration preserving unrelated attributes.
 - Cross-file exact/modified moves, narration/grouping, five output formats,
-  native workers, configuration, ordered reports, and static Rust-built docs.
+  native workers, configuration, ordered reports, and Mintlify documentation
+  generated from CommonMark with Rust.
 - Frozen compatibility fixtures, corrective regression cases, and native
   build/test/package tooling.
 

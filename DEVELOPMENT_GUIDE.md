@@ -81,11 +81,24 @@ invariants and source-span conventions.
 
 ## Documentation
 
-Edit `apps/docs/content/*.md` and nested CommonMark pages. Preserve existing page
-slugs when possible and update `apps/docs/navigation.json` and `routes.json` when
-adding or moving a page. `cargo xtask docs` builds static HTML under `target/site`
-with Rust; API docs use `cargo doc`. No client JavaScript or external documentation
-runtime is required. Source-language examples remain legitimate documentation.
+The deployed documentation uses Mintlify, configured by `apps/docs/docs.json`.
+Keep that file and the checked-in MDX pages: Mintlify reads them directly from Git.
+
+Edit CommonMark sources under `apps/docs/content`, then run `cargo xtask docs`.
+The command generates MDX pages at their original paths under `apps/docs`, adds
+frontmatter, converts internal links to Mintlify page slugs, and builds an optional
+static preview in `target/site`. Commit the generated MDX with the source edits.
+Do not edit the generated pages directly.
+
+Preserve page URLs when possible. Add new pages to `apps/docs/docs.json` and
+`navigation.json`; update `routes.json` for the static preview. The generator
+checks that Mintlify navigation covers every source page. CI checks that generated
+pages are committed and match their sources.
+
+For Mintlify validation and preview, run `mint validate`, `mint broken-links`, or
+`mint dev` from `apps/docs` with the Mintlify CLI installed. Node is needed for
+those Mintlify tools; the application build and Rust documentation generator use
+Cargo. Rust API documentation still uses `cargo doc`.
 
 ## Commits and delivery
 

@@ -124,8 +124,10 @@ cargo xtask bench
 cargo xtask package --dry-run
 ```
 
-Static documentation is generated from [CommonMark pages](apps/docs/content/index.md)
-into `target/site`. See the [development guide](DEVELOPMENT_GUIDE.md),
+Documentation is deployed on Mintlify using [docs.json](apps/docs/docs.json).
+`cargo xtask docs` generates the checked-in MDX pages from
+[CommonMark sources](apps/docs/content/index.md) and an optional static preview in
+`target/site`. See the [development guide](DEVELOPMENT_GUIDE.md),
 [roadmap](ROADMAP.md), and [migration notes](apps/docs/content/guides/native-migration.md).
 
 ## License
