@@ -37,6 +37,34 @@ Running `differens old.swift new.swift`:
   ~ renamed function `total` to `sum` in class `Counter`
 ```
 
+## Example: change the body
+
+Keep the declaration name and change what it does:
+
+<CodeGroup>
+
+```swift body-before.swift
+class Counter { func total(n: Int) -> Int { return n + 1 } }
+```
+
+```swift body-after.swift
+class Counter { func total(n: Int) -> Int { return n + 2 } }
+```
+
+</CodeGroup>
+
+```bash
+differens body-before.swift body-after.swift
+```
+
+```text
+  ~ changed function `total` (`1` → `2`)
+```
+
+The report groups the value edit under its containing declaration. Use
+`--format=json` to inspect the underlying action and context, or `--format=llm`
+for a compact report with source locations.
+
 ## Known limitations
 
 - Property observers (`didSet`, `willSet`) are bodies; their edits report as body changes on the property.

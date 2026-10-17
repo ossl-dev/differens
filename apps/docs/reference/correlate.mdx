@@ -5,6 +5,17 @@ description: "Find declaration and whole-file moves between per-file edit lists.
 
 Find declaration and whole-file moves between per-file edit lists.
 
+## Main exports
+
+| Rust API | Purpose |
+| --- | --- |
+| `correlate`, `FileChanges`, `CorrelateOptions` | Correlate an in-memory list of per-file edits |
+| `CrossFileMatch`, `ActionId` | Inspect the pair and its original file/action positions |
+| `is_move_candidate` | Check candidate eligibility |
+| `CandidateStore`, `correlate_store` | Supply indexed candidate storage for larger changesets |
+
+## Options and results
+
 ```rust
 use differens_correlate::{correlate, FileChanges, CorrelateOptions};
 
@@ -24,3 +35,47 @@ A match includes `node`, `from_file`, `to_file`, `modified`, `similarity`, and s
 Exact matching verifies full content/topology behind every hash match. Whole-file renames can match identical contents despite different path labels. Modified matching uses token-set Jaccard similarity, with the default threshold 0.6. Declaration names must agree for modified moves; whole-file path names do not affect similarity. Structure buckets exceeding 64 candidates are filtered by name and skipped if still ambiguous.
 
 A similarity match is a heuristic. Unmatched edits remain ordinary insertions/deletions. Reporting a move does not prove a code extraction or a behavioral equivalence.
+
+## Correlate real per-file diffs
+
+Keep unchanged declarations in both files so each source is parsed as an existing
+file. The function moves from `utils.ts` into an existing `pricing.ts`:
+
+```rust
+use differens_correlate::{CorrelateOptions, FileChanges, correlate};
+use differens_tiers::{SourcePresence, diff_with_tier};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let function = "export function formatPrice(price: number) { return price.toFixed(2); }\n";
+    let inputs = [
+        ("utils.ts", format!("{function}export const TAX_RATE = 0.08;\n"),
+                     "export const TAX_RATE = 0.08;\n".to_owned()),
+        ("pricing.ts", "export const CURRENCY = \"USD\";\n".to_owned(),
+                       format!("export const CURRENCY = \"USD\";\n{function}")),
+    ];
+    let files: Vec<_> = inputs.into_iter().map(|(path, old, new)| {
+        let diff = diff_with_tier(old.as_bytes(), new.as_bytes(), path, path, SourcePresence::default());
+        FileChanges { file_path: path.to_owned(), actions: diff.changes }
+    }).collect();
+    let moves = correlate(&files, CorrelateOptions::default());
+    for movement in moves {
+        println!("{} {} -> {} edited={} similarity={:.2}",
+            movement.node.label.as_deref().unwrap_or(""),
+            movement.from_file, movement.to_file, movement.modified, movement.similarity);
+    }
+    Ok(())
+}
+```
+
+```text
+formatPrice utils.ts -> pricing.ts edited=false similarity=1.00
+```
+
+`rename_similarity_threshold` defaults to `0.6` and must be finite and in
+`0.0..=1.0`; invalid options produce no matches. Exact matches use similarity
+`1.0` and `modified = false`. A similarity match sets `modified = true`, even if
+the token sets happen to score `1.0` after some non-token edit.
+
+Whole-file matches are reported as file renames. For a complete CLI example,
+including a moved function edited in transit, see the
+[cross-file walkthrough](/how-it-works/cross-file-correlation#try-an-exact-move).

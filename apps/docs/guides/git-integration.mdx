@@ -15,6 +15,15 @@ From your repository, run:
 differens install-git-driver
 ```
 
+For the full grammar build, the installer prints the following (with your
+repository path):
+
+```text
+git diff driver installed.
+wrote /private/your/repo/.gitattributes: 24 extensions now use the differens driver.
+`git diff` narrates those files instead of printing hunks.
+```
+
 The installer records the current executable path in local Git configuration and
 writes `diff=differens` rules to `.gitattributes`. By default it registers every
 extension listed by `differens languages`. Set `driverExtensions` in
@@ -44,6 +53,25 @@ git config --local --unset-all diff.differens.command
 Remove `diff=differens` from the affected `.gitattributes` rules too, keeping any
 other attributes on those lines. See the [Git API reference](/reference/git)
 for the underlying Rust functions.
+
+## Read a Git driver report
+
+For the TypeScript rename and body edit in the
+[quickstart](/getting-started/quickstart), save the original as the committed
+`src/checkout.ts`, make the new edit, then run:
+
+```bash
+git diff -- src/checkout.ts
+```
+
+```text
+  ~ renamed function `computeTotal` to `calculateTotalAmount`
+  ~ modified function `computeTotal` (1 removal)
+  ~ modified function `calculateTotalAmount` (3 additions)
+```
+
+The driver describes this one file pair. For a whole changeset with cross-file
+moves, invoke `differens` directly rather than running one driver per file.
 
 ## Compare the working tree
 
@@ -75,6 +103,17 @@ by any cross-file moves. Modified declaration moves must retain the same name
 and pass the similarity threshold. A move combined with a rename or substantial
 rewrite can remain an addition and a removal.
 
+For a repository whose latest commit contains that same example, the command
+`differens HEAD~1 HEAD` produces:
+
+```text
+  ~ renamed function `computeTotal` to `calculateTotalAmount`
+  ~ modified function `computeTotal` (1 removal)
+  ~ modified function `calculateTotalAmount` (3 additions)
+
+3 modifications
+```
+
 ## Compare directory snapshots
 
 ```bash
@@ -101,3 +140,17 @@ the same; read the source or a line diff when reviewing behavior.
 Formatting-only edits often disappear when the parsed structure stays the same.
 Parsing, matching, and output still take time; see [benchmarks](/guides/benchmarks)
 for measured workloads.
+
+## Choosing a line diff or semantic report
+
+| Question | Useful view |
+| --- | --- |
+| Which exact text was replaced? | A normal Git line diff |
+| Which declaration was renamed or edited? | Differens terminal or Markdown summary |
+| Did a supported declaration move between files? | A whole-changeset Differens report |
+| Which raw actions and scopes did matching produce? | `--format=json` |
+| Which source lines should an agent inspect? | `--format=llm` |
+
+Reformatting can disappear when the parsed structure stays the same, but
+semantic comparison still costs parsing and matching. See
+[benchmarks](/guides/benchmarks) for measured native results.

@@ -37,6 +37,34 @@ Running `differens old.scala new.scala`:
   ~ renamed function `total` to `sum` in class `Counter`
 ```
 
+## Example: change the body
+
+Keep the declaration name and change what it does:
+
+<CodeGroup>
+
+```scala body-before.scala
+class Counter { def total(n: Int): Int = n + 1 }
+```
+
+```scala body-after.scala
+class Counter { def total(n: Int): Int = n + 2 }
+```
+
+</CodeGroup>
+
+```bash
+differens body-before.scala body-after.scala
+```
+
+```text
+  ~ changed function `total` (`1` → `2`)
+```
+
+The report groups the value edit under its containing declaration. Use
+`--format=json` to inspect the underlying action and context, or `--format=llm`
+for a compact report with source locations.
+
 ## Known limitations
 
 - Implicits and given clauses are structure: adding one reports as an insert on the declaration.

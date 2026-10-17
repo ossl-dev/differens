@@ -42,6 +42,36 @@ Running `differens old.php new.php`:
   ~ renamed method `total` to `sum` in class `Counter`
 ```
 
+## Example: change the body
+
+Keep the declaration name and change what it does:
+
+<CodeGroup>
+
+```php body-before.php
+<?php
+class Counter { function total($n) { return $n + 1; } }
+```
+
+```php body-after.php
+<?php
+class Counter { function total($n) { return $n + 2; } }
+```
+
+</CodeGroup>
+
+```bash
+differens body-before.php body-after.php
+```
+
+```text
+  ~ changed method `total` (`1` → `2`)
+```
+
+The report groups the value edit under its containing declaration. Use
+`--format=json` to inspect the underlying action and context, or `--format=llm`
+for a compact report with source locations.
+
 ## Known limitations
 
 - Heredoc and nowdoc bodies are string literals; changes inside them report as value changes, not line edits.

@@ -41,6 +41,38 @@ Running `differens old.lua new.lua`:
   ~ renamed function `total` to `sum`
 ```
 
+## Example: change the body
+
+Keep the declaration name and change what it does:
+
+<CodeGroup>
+
+```lua body-before.lua
+function total(n)
+  return n + 1
+end
+```
+
+```lua body-after.lua
+function total(n)
+  return n + 2
+end
+```
+
+</CodeGroup>
+
+```bash
+differens body-before.lua body-after.lua
+```
+
+```text
+  ~ changed function `total` (`1` → `2`)
+```
+
+The report groups the value edit under its containing declaration. Use
+`--format=json` to inspect the underlying action and context, or `--format=llm`
+for a compact report with source locations.
+
 ## Known limitations
 
 - Lua has no int/float split; every number literal reports as `number_literal`.

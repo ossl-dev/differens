@@ -62,6 +62,42 @@ and deletions keep their subtrees. Standalone file actions retain full nodes.
 An unchanged standalone comparison returns `[]`. An unchanged repository or
 directory comparison returns `{"perFile":[],"crossFileMoves":[]}`.
 
+### A complete standalone example
+
+Save `{"retries":3}` as `before.json` and `{"retries":5}` as `after.json`, then run:
+
+```bash
+differens before.json after.json --format=json
+```
+
+```json
+[
+  {
+    "action": {
+      "type": "Update",
+      "node": {"kind":"leaf","label":"retries","value":"5","scalarType":"number","byteRange":[0,1],"height":1,"contentHash":4110650987891553,"structureHash":1347011982717991,"children":[]},
+      "detail": {
+        "kind": "ValueChanged",
+        "from": "3",
+        "to": "5"
+      },
+      "context": [
+        {
+          "kind": "object",
+          "label": "root"
+        }
+      ]
+    },
+    "filePath": "before.json",
+    "description": "changed value of leaf `retries` from `3` to `5` in object `root`"
+  }
+]
+```
+
+This is the actual standalone shape, including node metadata. The `context`
+places `retries` inside the root object. Directory/repository mode wraps such
+changes in `perFile` and can add cross-file summaries.
+
 ### Fallback diagnostics
 
 If semantic analysis falls back to lines, the CLI writes a note to stderr.
@@ -79,9 +115,9 @@ tally. The [quickstart](/getting-started/quickstart) produces:
 ```text
 differens/1 1 files 5 changes 3 named
 # before.ts
-~ function calculateTotalAmount :1 computeTotal -> calculateTotalAmount
-~ modified function computeTotal (1 removal) :2
-~ modified function calculateTotalAmount (3 additions) :3
+~ function calculateTotalAmount :3 computeTotal -> calculateTotalAmount
+~ modified function computeTotal (1 removal) :4
+~ modified function calculateTotalAmount (3 additions) :5
 ```
 
 The header's `changes` count records the underlying actions before presentation
@@ -116,6 +152,19 @@ differens main..feature --format=llm | llm "summarize this changeset"
 
 The `llm` command in this example is an external tool. Differens itself runs the
 matching and narration locally without a model.
+
+For the modified function move in the
+[cross-file walkthrough](/how-it-works/cross-file-correlation#try-an-exact-move),
+`differens old/ new/ --format=llm` prints:
+
+```text
+differens/1 2 files 1 changes 1 named
+# cross-file
+> formatPrice src/utils.ts -> src/pricing.ts edited
+```
+
+Here the body contains only a cross-file entry. Both endpoints still contribute
+to the header's file count.
 
 ## Markdown
 
@@ -154,6 +203,13 @@ object contains their summaries:
 
 ```json
 {"crossFileMoves":[{"kind":"Function","name":"formatPrice","fromFile":"src/old/utils.ts","toFile":"src/new/utils.ts","modified":false}]}
+```
+
+For the same two JSON files, `differens before.json after.json --format=ndjson`
+prints one complete record:
+
+```json
+{"filePath":"before.json","changes":[{"description":"changed value of leaf `retries` from `3` to `5` in object `root`","action":{"type":"Update","node":{"kind":"leaf","label":"retries","value":"5","scalarType":"number","byteRange":[0,1],"height":1,"contentHash":4110650987891553,"structureHash":1347011982717991,"children":[]},"detail":{"kind":"ValueChanged","from":"3","to":"5"},"context":[{"kind":"object","label":"root"}]}}]}
 ```
 
 Read file records with `select(.filePath)` and the trailer with

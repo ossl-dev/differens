@@ -37,6 +37,34 @@ Running `differens old.cpp new.cpp`:
   ~ changed function `sum` (`total` → `sum`)
 ```
 
+## Example: change the body
+
+Keep the declaration name and change what it does:
+
+<CodeGroup>
+
+```cpp body-before.cpp
+class Counter { int total(int n) { return n + 1; } };
+```
+
+```cpp body-after.cpp
+class Counter { int total(int n) { return n + 2; } };
+```
+
+</CodeGroup>
+
+```bash
+differens body-before.cpp body-after.cpp
+```
+
+```text
+  ~ changed function `total` (`1` → `2`)
+```
+
+The report groups the value edit under its containing declaration. Use
+`--format=json` to inspect the underlying action and context, or `--format=llm`
+for a compact report with source locations.
+
 ## Known limitations
 
 - Preprocessor macros are tokens, not structure; conditional compilation does not expand before diffing.

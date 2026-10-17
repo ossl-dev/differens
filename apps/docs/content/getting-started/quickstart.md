@@ -8,6 +8,8 @@ Create two TypeScript files to see how Differens reports a rename and body edits
 Save this as `before.ts`:
 
 ```typescript
+type Item = { price: number };
+
 export function computeTotal(items: Item[]): number {
   return items.reduce((acc, item) => acc + item.price, 0);
 }
@@ -18,6 +20,8 @@ export const TAX_RATE = 0.08;
 Save this as `after.ts`:
 
 ```typescript
+type Item = { price: number };
+
 export function calculateTotalAmount(items: Item[], discount: number): number {
   const base = items.reduce((acc, item) => acc + item.price, 0);
   return base - discount;
@@ -80,9 +84,9 @@ For a compact report with source lines, use `--format=llm`:
 ```text
 differens/1 1 files 5 changes 3 named
 # before.ts
-~ function calculateTotalAmount :1 computeTotal -> calculateTotalAmount
-~ modified function computeTotal (1 removal) :2
-~ modified function calculateTotalAmount (3 additions) :3
+~ function calculateTotalAmount :3 computeTotal -> calculateTotalAmount
+~ modified function computeTotal (1 removal) :4
+~ modified function calculateTotalAmount (3 additions) :5
 ```
 
 See [machine outputs](/guides/machine-outputs.html) for schemas, streaming records,
@@ -112,3 +116,42 @@ may remain an addition and a removal.
 
 See the [CLI reference](/reference/cli.html) for options and configuration, or
 [Git integration](/guides/git-integration.html) to use Differens through `git diff`.
+
+## See the same edit in a working tree
+
+If the original function is committed in `src/checkout.ts` and you make the edit
+above, run `differens` from the repository root. The report groups the edits
+and adds a changeset summary:
+
+```text
+  ~ renamed function `computeTotal` to `calculateTotalAmount`
+  ~ modified function `computeTotal` (1 removal)
+  ~ modified function `calculateTotalAmount` (3 additions)
+
+3 modifications
+```
+
+To compare committed work, use `differens main..feature` or
+`differens HEAD~1 HEAD`. Direct file comparisons do not need a Git repository.
+
+## Follow a move between directories
+
+A directory comparison uses matching relative paths, then checks additions and
+removals for cross-file moves. For example, moving an unchanged `formatPrice`
+between two existing files produces:
+
+```bash
+differens old/ new/
+```
+
+```text
+
+  cross-file moves:
+  → function `formatPrice` from src/utils.ts to src/pricing.ts
+
+1 cross-file move
+```
+
+The [cross-file walkthrough](/how-it-works/cross-file-correlation.html#try-an-exact-move)
+includes every file needed to reproduce this example and then edits the moved
+function to show a modified move.

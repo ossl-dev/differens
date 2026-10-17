@@ -41,6 +41,34 @@ Running `differens old.kt new.kt`:
   ~ renamed function `total` to `sum` in class `Counter`
 ```
 
+## Example: change the body
+
+Keep the declaration name and change what it does:
+
+<CodeGroup>
+
+```kotlin body-before.kt
+class Counter { fun total(n: Int): Int { return n + 1 } }
+```
+
+```kotlin body-after.kt
+class Counter { fun total(n: Int): Int { return n + 2 } }
+```
+
+</CodeGroup>
+
+```bash
+differens body-before.kt body-after.kt
+```
+
+```text
+  ~ changed function `total` (`1` → `2`)
+```
+
+The report groups the value edit under its containing declaration. Use
+`--format=json` to inspect the underlying action and context, or `--format=llm`
+for a compact report with source locations.
+
 ## Known limitations
 
 - The grammar's missing field names mean label recovery is positional: a declaration with two identifier children can mislabel in exotic syntax.

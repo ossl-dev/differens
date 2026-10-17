@@ -2,6 +2,19 @@
 
 File, directory, and Git inputs with original source bytes and explicit file presence. This crate discovers inputs; parsing and semantic analysis live in other crates.
 
+## Main exports
+
+| Rust API | Purpose |
+| --- | --- |
+| `GitRepository`, `is_git_repo` | Discover and inspect a repository |
+| `FilePair`, `read_file_pair` | Read two standalone file inputs as bytes |
+| `diff_directories_stream`, `diff_directories` | Collect directory changes lazily or eagerly |
+| `diff_driver_command`, `DRIVER_FLAG` | Build a quoted external diff command |
+| `generate_git_attributes` | Produce extension rules |
+| Repository methods `install_git_driver`, `write_git_attributes` | Configure a driver and preserve existing attribute rules |
+
+## Read inputs
+
 ```rust
 use differens_git::{GitRepository, read_file_pair};
 
@@ -44,3 +57,65 @@ The installer removes obsolete `diff.differens.textconv` and
 `diff.differens.cachetextconv` settings. To uninstall, unset
 `diff.differens.command` and remove `diff=differens` attributes while keeping the
 rest of each rule. See [Git integration](/guides/git-integration.html).
+
+## Working tree and commit-range usage
+
+```rust
+use differens_git::GitRepository;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let repo = GitRepository::discover(".")?;
+    for pair in repo.diff_working_tree_stream()? {
+        let pair = pair?;
+        println!("{}: {} -> {} bytes", pair.new_path, pair.old_source.len(), pair.new_source.len());
+    }
+    let committed = repo.diff_commit_range("HEAD~1..HEAD")?;
+    println!("{} committed file pair(s)", committed.len());
+    Ok(())
+}
+```
+
+Working-tree streams include staged, unstaged, and untracked files. Commit ranges
+resolve to two trees. These functions return byte pairs and errors, not semantic
+actions; pass their results to the engine or tiers crate for comparison.
+
+## How the Git driver works
+
+Git's external driver receives seven arguments:
+
+```text
+path old-file old-hex old-mode new-file new-hex new-mode
+```
+
+`path` is the original file path. The old/new file arguments are temporary blob
+files, whose names may lack extensions. Driver mode uses the original path to
+select the parser and reads those temporary files directly. Standalone repository
+comparisons use batched Git blob reads instead; they do not invoke the driver for
+each file.
+
+To register a native command through the Rust API:
+
+```rust
+use differens_git::{DRIVER_FLAG, GitRepository, diff_driver_command};
+
+fn register(repo: &GitRepository, executable: &str) -> differens_git::Result<()> {
+    let command = diff_driver_command(executable, &[DRIVER_FLAG]);
+    repo.install_git_driver(&command)?;
+    repo.write_git_attributes(&["ts", "tsx", "py", "rs"])?;
+    Ok(())
+}
+```
+
+The helper quotes executable paths and arguments for Git's shell. Register the
+installed native binary's path, not a JavaScript runtime or source file.
+
+## Removing the driver
+
+```bash
+git config --local --unset-all diff.differens.command
+```
+
+Remove the `diff=differens` attributes you installed while preserving other rules.
+If obsolete `textconv` or `cachetextconv` settings remain from a previous version,
+unset those local keys too. An absent key can make `git config --unset-all` return
+nonzero; it does not mean that a driver remains installed.

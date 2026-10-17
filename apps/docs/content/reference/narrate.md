@@ -2,6 +2,19 @@
 
 Describe typed edits and render human or machine output without parsing files again.
 
+## Main exports
+
+| Rust API | Purpose |
+| --- | --- |
+| `narrate`, `narrate_action` | Describe a list of edits or one action |
+| `format_changes`, `OutputFormat` | Render a change list in five formats |
+| `readable_changes` | Group details under declarations for presentation |
+| `summarize` | Count additions, removals, modifications, and moves |
+| `humanize_kind` | Turn canonical/CST kinds into display text |
+| `format_llm_report`, `LlmReportContext` | Include externally rendered cross-file entries in LLM counts |
+
+## Narrate actions
+
 ```rust
 use differens_narrate::{narrate, format_changes, OutputFormat};
 use differens_core::EditAction;
@@ -19,3 +32,57 @@ fn render(actions: &[EditAction]) -> Result<String, serde_json::Error> {
 `SemanticChange` owns an action, description, optional file path, and optional cross-file paths. Its `grouped` flag is internal presentation state and is skipped in JSON. Grouping does not redefine the underlying matching result.
 
 For repository/directory envelopes, ordered file streaming, and cross-file correlation, use `differens-engine::report`. Single-file JSON is a change array; changeset JSON is an envelope. See [machine outputs](/guides/machine-outputs.html).
+
+## Vocabulary
+
+Concepts are assigned by the parser adapters, then converted to display names.
+For example, `humanize_kind("CallExpression")` returns `"call expression"`.
+
+| Canonical kind | Examples of source nodes |
+| --- | --- |
+| `Function` | Rust `function_item`, Python `function_definition`, Go `function_declaration`, TS `function_declaration` |
+| `Class` | Python/TS `class_definition` or `class_declaration`, Java `class_declaration` |
+| `Variable` | TS lexical declarations, Rust `let_declaration`, Go variable declarations |
+| `Assignment` | Python assignments; these retain their left-hand labels |
+| `Import` | TS/Python import statements, Rust `use_declaration`, Java imports |
+
+Descriptions include a useful named scope, such as a containing class or
+function. Go method descriptions include the receiver type. Related edits may
+be grouped under a declaration, but narration does not change the core matching
+result. Some name-token duplicates are suppressed; not every grammar produces
+one displayed line for every rename.
+
+## Parse, narrate, and render
+
+This example is self-contained with `differens-tiers` and `differens-narrate`
+dependencies. It prints terminal output followed by the compact LLM report:
+
+```rust
+use differens_tiers::{SourcePresence, diff_with_tier};
+use differens_narrate::{OutputFormat, format_changes, narrate};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let result = diff_with_tier(
+        b"export function total(a: number, b: number) { return a + b; }\n",
+        b"export function sum(a: number, b: number) { return a + b; }\n",
+        "math.ts", "math.ts", SourcePresence::default(),
+    );
+    let changes = narrate(&result.changes, Some("math.ts"));
+    for format in [OutputFormat::Terminal, OutputFormat::Llm] {
+        println!("{}", format_changes(&changes, format)?);
+    }
+    Ok(())
+}
+```
+
+```text
+  ~ renamed function `total` to `sum`
+differens/1 1 files 1 changes 1 named
+# math.ts
+~ function sum :1 total -> sum
+```
+
+`format_changes(..., OutputFormat::Ndjson)` serializes individual changes as
+lines. The CLI's file-record NDJSON contract comes from the engine reporting
+layer, which also handles cross-file trailers. Use
+`differens-engine::report` when you need that full changeset format.

@@ -1,7 +1,10 @@
 ---
 title: "Troubleshooting"
-description: "Use the repository's pinned toolchain and install a C/C++ compiler for Tree-sitter/scanners. Initial builds need access to Cargo dependencies. Keep Cargo.lock unchanged unless deliberately updating dependencies. Report the compiler error and target platform."
+description: "If a report looks wrong, start with a small file pair and compare terminal and JSON output. Keep stderr too: semantic fallback notes are separate from stdout."
 ---
+
+If a report looks wrong, start with a small file pair and compare terminal and
+JSON output. Keep stderr too: semantic fallback notes are separate from stdout.
 
 ## Build fails
 
@@ -39,3 +42,85 @@ Standalone file JSON is an array; directory/repository JSON is an envelope. An
 unchanged comparison produces `[]` or empty envelope arrays. NDJSON emits file
 objects and an optional cross-file trailer; unchanged inputs produce no records.
 Read [machine outputs](/guides/machine-outputs) before consuming it.
+
+## Diff is slower than expected
+
+Compare a focused file pair to separate parsing/matching cost from repository
+I/O. For a large changeset, try one worker and streaming output:
+
+```bash
+differens main..feature --jobs=1 --format=ndjson > changes.ndjson
+```
+
+Lower concurrency reduces simultaneous parser work; it is not guaranteed to be
+faster. The default chooses one or two workers. Windows contain at most 24 files
+with a soft 64 MiB source budget, and each worker has a bounded parse cache.
+Cross-file candidates spill after an 8 MiB accounted cache, so temporary-disk
+capacity and I/O can also matter. Use the [benchmark guide](/guides/benchmarks)
+to measure a release build rather than infer a speedup from the implementation
+language.
+
+## Deep nesting falls back to lines
+
+Core tree ownership, traversal, matching, and cleanup use flat storage or explicit
+stacks. Parsers have their own limits: semantic code routing uses a 50,000-node
+limit per tree and a 1,000,000-byte source limit per side, and code conversion
+has a depth budget. Data and markup parsers also enforce construction/depth
+budgets. A safe core does not make every parser accept unlimited nesting.
+
+A note such as this means the CLI compared lines instead:
+
+```text
+note: fell back to lines diff
+```
+
+Retain the fallback metadata and a reduced input when reporting a parser issue.
+The CLI has no flag to raise those limits.
+
+## YAML nesting looks wrong
+
+The native YAML parser accepts valid four-space nesting; it no longer relies on
+a two-space-only subset. Tabs used for YAML indentation remain invalid YAML.
+Compare the actual file paths and inspect stderr to see whether parsing fell
+back. A `.txt` file containing YAML is still classified as prose.
+
+The [structured-data example](/languages/tiers#structured-data-change-one-setting)
+shows four-space YAML nesting with captured output. Keep valid YAML unchanged
+when reducing a reproducer; reformatting it first can hide the issue.
+
+## Markup attributes look wrong
+
+Quoted `>` characters are handled as part of attribute values, and non-label
+attributes such as `href` are compared. The old advice to escape every quoted
+`>` is not needed for the native tokenizer. See the
+[markup example](/languages/tiers#markup-change-an-attribute).
+
+The markup parser is lenient rather than a full browser parser. If malformed
+markup produces a surprising tree, preserve the smallest failing document and
+compare its JSON actions. A parse failure can use lines; a partial parsed tree
+may instead contain structural edits.
+
+## Rust compiler or editor errors
+
+Run the workspace compiler check, then a focused test:
+
+```bash
+cargo check --workspace --locked
+cargo test -p differens-tiers --locked --test labels
+```
+
+A changed shared API can break consumers in several crates. Keep the pinned
+toolchain and lockfile when reproducing the failure. Node/Bun typecheck and build
+commands from historical releases do not apply to this workspace.
+
+## Still stuck?
+
+Open an [issue](https://github.com/ossl-dev/differens/issues) with:
+
+- `differens --version`, your platform, and whether you built from source.
+- The exact command and whether it compared files, directories, or Git refs.
+- Minimal input files, expected output, observed output, and stderr notes.
+- The JSON actions if the human grouping hides the detail you need to explain.
+
+The roadmap tracks product limits; the [migration guide](/guides/native-migration)
+lists intentional differences from the earlier implementation.

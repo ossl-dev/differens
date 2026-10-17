@@ -67,6 +67,8 @@ Rename `computeTotal` to `calculateTotalAmount`, add a `discount` parameter, and
 change the function body:
 
 ```typescript before.ts
+type Item = { price: number };
+
 export function computeTotal(items: Item[]): number {
   return items.reduce((acc, item) => acc + item.price, 0);
 }
@@ -75,6 +77,8 @@ export const TAX_RATE = 0.08;
 ```
 
 ```typescript after.ts
+type Item = { price: number };
+
 export function calculateTotalAmount(items: Item[], discount: number): number {
   const base = items.reduce((acc, item) => acc + item.price, 0);
   return base - discount;
@@ -96,6 +100,54 @@ Use `--format=json` to read each action. When comparing directories or repositor
 revisions, Differens can also detect moves across files. Modified declaration
 moves must keep the same name; moving and renaming a function together may
 produce an addition and a removal.
+
+## Example: move and edit a helper across files
+
+Compare two directory snapshots. The destination module already exists, and the
+helper keeps its name while its body changes. This separates a modified move from
+the within-file rename example above:
+
+```typescript old/src/utils.ts
+export function formatPrice(price: number): string {
+  return "$" + price.toFixed(2);
+}
+
+export const TAX_RATE = 0.08;
+```
+
+```typescript new/src/utils.ts
+export const TAX_RATE = 0.08;
+```
+
+```typescript old/src/pricing.ts
+export const CURRENCY = "USD";
+```
+
+```typescript new/src/pricing.ts
+export const CURRENCY = "USD";
+
+export function formatPrice(price: number): string {
+  return "USD " + price.toFixed(2);
+}
+```
+
+```bash
+differens old/ new/
+```
+
+```text
+
+  cross-file moves:
+  → function `formatPrice` from src/utils.ts to src/pricing.ts
+
+1 cross-file move
+```
+
+Terminal output names the move; LLM output adds `edited` for a modified
+declaration move, and JSON exposes `modified: true`. The move summary pairs the
+supported declaration edits. Other edits, such as a
+new import, remain in the report. Renaming the helper during the move can prevent
+that pairing; use the original per-file JSON actions when investigating it.
 
 ## Known limitations
 

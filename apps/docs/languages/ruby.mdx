@@ -49,6 +49,42 @@ Running `differens old.rb new.rb`:
   ~ renamed method `total` to `sum` in class `Counter`
 ```
 
+## Example: change the body
+
+Keep the declaration name and change what it does:
+
+<CodeGroup>
+
+```ruby body-before.rb
+class Counter
+  def total(n)
+    n + 1
+  end
+end
+```
+
+```ruby body-after.rb
+class Counter
+  def total(n)
+    n + 2
+  end
+end
+```
+
+</CodeGroup>
+
+```bash
+differens body-before.rb body-after.rb
+```
+
+```text
+  ~ changed method `total` (`1` → `2`)
+```
+
+The report groups the value edit under its containing declaration. Use
+`--format=json` to inspect the underlying action and context, or `--format=llm`
+for a compact report with source locations.
+
 ## Known limitations
 
 - Dynamic method definition (`define_method`) is a call, not a method: names built at runtime are invisible to the extractor.

@@ -38,6 +38,34 @@ Running `differens old.c new.c`:
   ~ changed function `sum` (`total` → `sum`)
 ```
 
+## Example: change the body
+
+Keep the declaration name and change what it does:
+
+<CodeGroup>
+
+```c body-before.c
+int total(int n) { return n + 1; }
+```
+
+```c body-after.c
+int total(int n) { return n + 2; }
+```
+
+</CodeGroup>
+
+```bash
+differens body-before.c body-after.c
+```
+
+```text
+  ~ changed function `total` (`1` → `2`)
+```
+
+The report groups the value edit under its containing declaration. Use
+`--format=json` to inspect the underlying action and context, or `--format=llm`
+for a compact report with source locations.
+
 ## Known limitations
 
 - Preprocessor macros are tokens, not structure: a macro that generates code does not expand before diffing.

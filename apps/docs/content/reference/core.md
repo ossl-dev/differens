@@ -2,24 +2,42 @@
 
 Immutable postorder arenas, verified matching, and typed edit scripts. This crate has no filesystem, Git, Tree-sitter, or worker runtime dependency. The optional `serde` feature is enabled by default.
 
+## Main exports
+
+| Rust API | Purpose |
+| --- | --- |
+| `TreeBuilder`, `NodeSpec` | Construct and validate a flat immutable tree |
+| `Tree`, `Node`, `NodeId`, `NodeRef` | Own a tree, inspect metadata, and retain node references |
+| `diff_trees` | Match two `Arc<Tree>` values and generate actions |
+| `MatchOptions`, `DiffResult`, `Fallback` | Configure matching and inspect its result |
+| `EditAction`, `UpdateDetail`, `NodeContext` | Read typed edits and containment context |
+| `hash_text`, `trees_equal` | Fingerprint text and verify node content/topology |
+| `SemanticChange` | Pair an action with narration and optional file paths |
+
+Data conversion belongs to `differens-tiers::tree_from_value`; core consumers do
+not need to depend on the parsers if they construct their own trees.
+
 ## Build trees
 
 ```rust
 use differens_core::{NodeSpec, TreeBuilder, MatchOptions, diff_trees};
 
-fn tree(value: &str) -> std::sync::Arc<differens_core::Tree> {
-    let mut builder = TreeBuilder::new();
-    let mut child = NodeSpec::new("number");
-    child.value = Some(value.to_owned());
-    let child = builder.push(child).unwrap();
-    let mut root = NodeSpec::new("document");
-    root.children.push(child);
-    let root = builder.push(root).unwrap();
-    builder.finish(root).unwrap()
-}
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    fn tree(value: &str) -> std::sync::Arc<differens_core::Tree> {
+        let mut builder = TreeBuilder::new();
+        let mut child = NodeSpec::new("number");
+        child.value = Some(value.to_owned());
+        let child = builder.push(child).unwrap();
+        let mut root = NodeSpec::new("document");
+        root.children.push(child);
+        let root = builder.push(root).unwrap();
+        builder.finish(root).unwrap()
+    }
 
-let result = diff_trees(&tree("1"), &tree("2"), MatchOptions::default());
-assert_eq!(result.changes[0].action_type(), "Update");
+    let result = diff_trees(&tree("1"), &tree("2"), MatchOptions::default());
+    assert_eq!(result.changes[0].action_type(), "Update");
+    Ok(())
+}
 ```
 
 `TreeBuilder::push(NodeSpec)` returns a `Result<NodeId, BuildError>`. Children must precede their parent, in source order, with contiguous postorder ranges. Shared children, invalid byte ranges, zero source lines, and disconnected forests are rejected. `finish(root)` returns `Result<Arc<Tree>, BuildError>`.
@@ -55,3 +73,72 @@ Actions are ordered updates, moves, deletions, insertions. Subtree additions/rem
 Node serialization preserves nested legacy JSON. `NodeRef::shallow()` emits metadata with empty children while retaining the owning tree internally. Flat ownership and iterative traversal avoid recursive stack growth for deep construction, equality, matching, JSON encoding, and drop.
 
 Adapters using `TreeBuilder::with_source` or `set_legacy_source` keep native UTF-8 byte spans while serializing legacy UTF-16 code-unit spans. Detached nodes and flat snapshots retain only the coordinate deltas needed by their node boundaries. A small candidate retains only the coordinate metadata needed for its subtree, even after a large Unicode prefix. `Tree::auxiliary_heap_bytes()` exposes a conservative retained-size estimate for offset and identity maps.
+
+## Matching options
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `min_height` | `2` | Height threshold for top-down subtree anchoring |
+| `bottom_up_ratio` | `0.5` | Required Dice score for bottom-up container matching |
+| `max_nodes` | `usize::MAX` | Per-input node limit; exceeding it requests line fallback |
+
+`DiffResult::node_count` is the sum of both input tree sizes. A fallback result
+has no actions; it does not mean that the sources are equal. The caller must
+compare lines, or use `diff_with_tier` to handle that step.
+
+## Node metadata
+
+| Field | Rust type | Meaning |
+| --- | --- | --- |
+| `kind` | `String` | Canonical or adapter-specific concept |
+| `label`, `value`, `scalar_type` | `Option<String>` | Name, content, and scalar type when present |
+| `children` | `Vec<NodeId>` | Child IDs in the owning tree |
+| `byte_range` | `[usize; 2]` | Native UTF-8 byte range, or an adapter's synthetic range |
+| `line` | `Option<usize>` | One-based source line when known |
+| `height`, `size` | `usize` | Height and number of nodes in the subtree |
+| `content_hash`, `structure_hash` | `u64` | Candidate fingerprints within the 53-bit compatibility range |
+| `parent`, `position` | `Option<NodeId>`, `usize` | Parent and sibling position |
+
+`NodeRef` keeps the tree alive through shared ownership. Child IDs do not own
+nested nodes, so dropping a deeply nested tree does not recurse through one heap
+allocation per node. Use `NodeSpec` as builder input; finished node metadata is
+immutable.
+
+## Action fields
+
+| Variant | Fields |
+| --- | --- |
+| `Insert` | `node`, `parent`, `position`, `context` |
+| `Delete` | `node`, `context` |
+| `Update` | `node`, `detail`, `context` |
+| `Move` | `node`, `from_parent`, `to_parent`, `from_position`, `to_position`, `context` |
+
+`context` is a nearest-ancestor-first vector of `NodeContext { kind, label }`.
+Use `action.node()`, `action.context()`, and `action.action_type()` when you do
+not need to match every variant. Rename details contain `from` and `to` strings;
+value details retain optional values. JSON uses camelCase names for move fields.
+
+## Compare typed value trees
+
+```rust
+use differens_core::{MatchOptions, diff_trees};
+use differens_tiers::tree_from_value;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let old = tree_from_value(&serde_json::json!({"host": "localhost", "port": 8080}))?;
+    let new = tree_from_value(&serde_json::json!({"host": "0.0.0.0", "port": 8080}))?;
+    let result = diff_trees(&old, &new, MatchOptions::default());
+    for action in result.changes {
+        println!("{} {}", action.action_type(), action.node().label.as_deref().unwrap_or(""));
+    }
+    Ok(())
+}
+```
+
+```text
+Update host
+```
+
+For source parsing and typed data construction, add a `differens-tiers`
+dependency. The [installation guide](/getting-started/installation.html#install-the-libraries)
+shows path dependencies for an unpublished checkout.

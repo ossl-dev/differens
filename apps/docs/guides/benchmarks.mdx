@@ -110,3 +110,56 @@ repository speedups. The first two exclude tree construction and parsing.
 Detached metadata for a tiny node after 100,000 non-ASCII characters fell from
 1,600,064 to 80 bytes, while preserving the legacy JSON projection. Those figures
 describe that retained metadata, not peak process memory.
+
+## Run and inspect native measurements
+
+```bash
+cargo xtask bench --samples 20
+jq '{case, samples, warmupRuns, medianMs, p95Ms}' target/benchmarks.json
+```
+
+For example, a local macOS arm64 run with `--samples 7` produced the following
+selected fields (times rounded to two decimals):
+
+```json
+{
+  "case": "200 TypeScript functions, one rename",
+  "samples": 7,
+  "warmupRuns": 1,
+  "medianMs": 10.56,
+  "p95Ms": 11.86
+}
+```
+
+These numbers describe that run; use your own samples to assess your machine or
+compare implementations.
+
+The runner prints a JSON result and saves the same metadata, all measured samples,
+input sizes, platform, and measurement scope. Median and p95 are elapsed process
+times; the warmup is excluded. Use `--samples` with at least two samples.
+
+For a real-repository audit, including named-change and output checks:
+
+```bash
+cargo xtask audit-repos --repos-dir target/audit-repos --fetch --samples 7
+```
+
+The manifest pins source revisions and expected reports. It fetches Git objects;
+it does not install or execute the audited projects. See the
+[contributor guide](/guides/contributing) for the workspace checks.
+
+## What tends to dominate
+
+| Workload | Costs to inspect |
+| --- | --- |
+| A tiny file comparison | Process and grammar startup can outweigh matching |
+| Large supported code | Parsing, CST conversion, matching, and full JSON serialization |
+| Many Git files | Discovery, blob reads, worker windows, and report volume |
+| Moves across many files | Candidate projection, spill I/O, and token similarity |
+| Repeated content in one process | Byte equality and the thread-local parse cache can avoid repeated work |
+| Unsupported or over-budget syntax | Raw sequence work and fallback output volume |
+
+A line diff answers a different review question and avoids semantic parsing.
+Use both when you need exact changed text alongside a structural summary. The
+recorded native/legacy measurements above replace the old Bun-only single-run
+figures; they do not establish a universal speed or memory ratio.

@@ -89,6 +89,60 @@ The class assignment keeps its name, and the decorated function keeps its class
 scope. Local assignment edits are grouped with their containing function in human
 reports. JSON retains the underlying assignment actions.
 
+## Example: move and edit a helper across files
+
+Compare two directory snapshots. The destination module already exists, and the
+helper keeps its name while its body changes. This separates a modified move from
+the within-file rename example above:
+
+```python old/pricing.py
+TAX_RATE = 0.08
+
+def apply_discount(price: float) -> float:
+    return price * 0.9
+
+def checkout(total: float) -> float:
+    return apply_discount(total) + 2.99
+```
+
+```python new/pricing.py
+TAX_RATE = 0.08
+from discounts import apply_discount
+
+def checkout(total: float) -> float:
+    return apply_discount(total) + 2.99
+```
+
+```python old/discounts.py
+MAX_DISCOUNT = 0.5
+```
+
+```python new/discounts.py
+MAX_DISCOUNT = 0.5
+
+def apply_discount(price: float) -> float:
+    return price * 0.8
+```
+
+```bash
+differens old/ new/
+```
+
+```text
+  ~ modified file content (1 addition)
+
+  cross-file moves:
+  → function `apply_discount` from pricing.py to discounts.py
+
+1 modification, 1 cross-file move
+```
+
+Terminal output names the move; LLM output adds `edited` for a modified
+declaration move, and JSON exposes `modified: true`. The move summary pairs the
+supported declaration edits. Other edits, such as a
+new import, remain in the report. Renaming the helper during the move can prevent
+that pairing; use the original per-file JSON actions when investigating it.
+
 ## Known limitations
 
 - Methods are not distinct: there is no `Method` concept; a method is a `Function` nested in a `Class`.

@@ -41,7 +41,37 @@ Running `differens old.sh new.sh`:
   ~ changed function `sum` (`total` → `sum`)
 ```
 
+## Example: change the body
+
+Keep the declaration name and change what it does:
+
+<CodeGroup>
+
+```bash body-before.sh
+total() { echo ready; }
+```
+
+```bash body-after.sh
+total() { echo done; }
+```
+
+</CodeGroup>
+
+```bash
+differens body-before.sh body-after.sh
+```
+
+```text
+  ~ changed function `total` (`ready` → `done`)
+```
+
+The report groups the value edit under its containing declaration. Use
+`--format=json` to inspect the underlying action and context, or `--format=llm`
+for a compact report with source locations.
+
 ## Known limitations
+
+- Shell support uses the Bash grammar. Zsh-specific syntax may retain error nodes or produce a partial structural comparison.
 
 - Heredoc bodies are strings; edits inside them report as value changes.
 - Command substitutions and pipelines are structure: a pipeline reordering reports as a reorder of call expressions.

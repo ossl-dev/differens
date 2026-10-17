@@ -37,6 +37,34 @@ Running `differens old.java new.java`:
   ~ renamed method `total` to `sum` in class `Counter`
 ```
 
+## Example: change the body
+
+Keep the declaration name and change what it does:
+
+<CodeGroup>
+
+```java body-before.java
+class Counter { int total(int n) { return n + 1; } }
+```
+
+```java body-after.java
+class Counter { int total(int n) { return n + 2; } }
+```
+
+</CodeGroup>
+
+```bash
+differens body-before.java body-after.java
+```
+
+```text
+  ~ changed method `total` (`1` → `2`)
+```
+
+The report groups the value edit under its containing declaration. Use
+`--format=json` to inspect the underlying action and context, or `--format=llm`
+for a compact report with source locations.
+
 ## Known limitations
 
 - Lambda bodies are diffed structurally; a lambda extracted to a named method reports as an addition plus a body change, not an extraction.

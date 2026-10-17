@@ -40,6 +40,34 @@ Running `differens old.cs new.cs`:
   ~ renamed method `Total` to `Sum` in class `Counter`
 ```
 
+## Example: change the body
+
+Keep the declaration name and change what it does:
+
+<CodeGroup>
+
+```csharp body-before.cs
+class Counter { int Total(int n) { return n + 1; } }
+```
+
+```csharp body-after.cs
+class Counter { int Total(int n) { return n + 2; } }
+```
+
+</CodeGroup>
+
+```bash
+differens body-before.cs body-after.cs
+```
+
+```text
+  ~ changed method `Total` (`1` → `2`)
+```
+
+The report groups the value edit under its containing declaration. Use
+`--format=json` to inspect the underlying action and context, or `--format=llm`
+for a compact report with source locations.
+
 ## Known limitations
 
 - Partial classes across files are correlated per file; the cross-file correlator pairs moved members when the whole changeset is diffed at once.

@@ -4,7 +4,17 @@ Build Differens with the Rust toolchain pinned in `rust-toolchain.toml`, Cargo,
 and a C/C++ compiler for Tree-sitter and its grammar scanners. Install Git to
 compare repositories or register the Git diff driver.
 
-## From a checkout
+## Prerequisites
+
+- Rust and Cargo. With rustup installed, commands in this checkout use the version
+  pinned in `rust-toolchain.toml`.
+- A C/C++ compiler for the linked Tree-sitter runtime and grammar scanners.
+- Git for cloning the repository, repository comparisons, and Git driver setup.
+
+Node and Bun are not needed to build or run the application. The installed
+executable includes its grammars and performs comparisons locally.
+
+## Install from a checkout
 
 ```bash
 git clone https://github.com/ossl-dev/differens.git
@@ -27,7 +37,21 @@ cargo install differens --locked
 
 Use the checkout installation for an unpublished revision. Previous npm releases remain historical releases and do not contain the native migration. Existing JavaScript library imports must migrate to Rust crate APIs.
 
-## Libraries
+## Build a standalone executable
+
+To build without installing into Cargo's binary directory:
+
+```bash
+cargo build --release --locked -p differens
+./target/release/differens --version
+```
+
+Use `target/release/differens` on the build platform. The binary does not need a
+JavaScript runtime or grammar files beside it. Native libraries required by its
+build target still apply; building locally does not verify another platform.
+`cargo xtask package` produces a native archive and checksum in `target/packages`.
+
+## Install the libraries
 
 The workspace contains `differens-core`, `differens-tiers`, `differens-narrate`, `differens-correlate`, `differens-git`, and `differens-engine`. Depend on the stages you need. `differens-core` supports `default-features = false` for consumers that do not need JSON serialization or parsers.
 
@@ -35,3 +59,78 @@ Start with the [core reference](/reference/core.html) for tree construction or
 [tiers](/reference/tiers.html) to compare source bytes. If you used an npm release,
 follow the [migration guide](/guides/native-migration.html) for CLI replacement,
 Git driver setup, and the Rust equivalents of the JavaScript packages.
+
+## Choose a crate
+
+| Crate | Use it for |
+| --- | --- |
+| `differens-core` | Build trees, match nodes, inspect typed actions |
+| `differens-tiers` | Parse source bytes and select code/data/text adapters |
+| `differens-narrate` | Describe edits and format change lists |
+| `differens-correlate` | Pair declaration and file moves across per-file diffs |
+| `differens-git` | Collect files, directories, Git trees, and driver inputs |
+| `differens-engine` | Schedule native workers and write changeset reports |
+
+For an integration against an unpublished checkout, add path dependencies to your
+application's `Cargo.toml`. Replace the paths with the location of your clone
+and keep the dependencies your example imports. Some examples also use
+`serde_json` to construct data or handle serialization errors:
+
+```toml
+[dependencies]
+differens-core = { path = "/path/to/differens/crates/differens-core" }
+differens-tiers = { path = "/path/to/differens/crates/differens-tiers" }
+differens-narrate = { path = "/path/to/differens/crates/differens-narrate" }
+differens-correlate = { path = "/path/to/differens/crates/differens-correlate" }
+differens-git = { path = "/path/to/differens/crates/differens-git" }
+differens-engine = { path = "/path/to/differens/crates/differens-engine" }
+serde_json = "1"
+```
+
+After the corresponding native crates are published, versioned dependencies can
+replace those paths. Historical npm packages use the JavaScript APIs; they are
+not a way to install the native crates.
+
+The reference pages include complete `main` programs as well as reusable helper
+functions. Copy a complete program into `src/main.rs` of a Cargo application with
+the matching dependencies, then run `cargo run`. If you construct trees without
+parsers, depend on `differens-core` alone; `default-features = false` also omits
+its optional serialization support.
+
+## Verify the installation
+
+```bash
+differens --help
+```
+
+```text
+A semantic diffing engine
+
+Usage: differens [OPTIONS] [INPUTS]...
+
+Arguments:
+  [INPUTS]...  File paths, directories, commit refs, or an old..new range
+
+Options:
+      --format <FORMAT>  Output format: terminal, json, markdown, llm, ndjson
+  -j, --json
+      --markdown
+  -l, --llm
+      --all              Show every file in large comparisons
+      --jobs <JOBS>      Native worker threads; 0 selects up to two workers [default: 0]
+  -v, --version          Show version number
+  -h, --help             Print help
+
+Commands: diff, languages, install-git-driver
+Examples:
+  differens                       diff working tree vs HEAD
+  differens old.ts new.ts          diff files
+  differens old/ new/              diff directories
+  differens main..feature          diff commit range
+  differens HEAD~1 HEAD            diff two commits
+```
+
+`differens languages` lists the grammars compiled into your binary. If the command
+still runs an older installation, inspect `type -a differens` and check your
+`PATH`. Continue with the [quickstart](/getting-started/quickstart.html) to compare
+files and read the output.

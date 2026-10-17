@@ -23,9 +23,12 @@ Two versions of a Go package. The second version moves the method body into a ne
 ```go old.go
 package users
 
-type Store struct {
-    db *sql.DB
-}
+import (
+    "errors"
+    "strings"
+)
+
+type Store struct{}
 
 func (s *Store) ValidateEmail(email string) error {
     if !strings.Contains(email, "@") {
@@ -41,9 +44,12 @@ func (s *Store) ValidateEmail(email string) error {
 ```go new.go
 package users
 
-type Store struct {
-    db *sql.DB
-}
+import (
+    "errors"
+    "strings"
+)
+
+type Store struct{}
 
 func (s *Store) ValidateEmail(email string) error {
     return validateEmail(email)
