@@ -1,0 +1,28 @@
+{
+  "sourceCommit": "66f292a15bd494d30ff2311ecc02868262dae870",
+  "runtime": "Bun1.4.0",
+  "architecture": "arm64",
+  "cpu": "Apple M2 Pro",
+  "os": "macOS26.6.2",
+  "testResult": {
+    "passed": 452,
+    "failed": 0,
+    "assertions": 24625,
+    "files": 34,
+    "seconds": 9.28
+  },
+  "singleRunBenchmarksMs": {
+    "50Functions": 20.1,
+    "200Functions": 57.6,
+    "800FunctionsFallback": 105.5,
+    "200ReorderedFunctions": 50.6,
+    "200WidelyEditedFunctions": 99.3,
+    "10000SiblingsCoreOnly": 4.3,
+    "100000RawLines": 5.8,
+    "60000ProseWords": 29.3,
+    "20000RewrittenLines": 3.2,
+    "200000DeepChainCoreOnly": 143.3,
+    "5701632RawBytes": 5.8
+  },
+  "limitations": "Historical single-run observations; old source parsed before timer; excludes narration/output/startup/Git. Not comparable with native end-to-end measurements."
+}

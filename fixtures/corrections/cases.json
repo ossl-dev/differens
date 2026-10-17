@@ -1,0 +1,6 @@
+[
+  {"id":"B01","path":"a.bin","oldBytes":[128],"newBytes":[129],"requirement":"Different original bytes must produce a change even when lossy UTF-8 decodes identically."},
+  {"id":"B02","path":"a.html","old":"<a href=\"/old\">link</a>","new":"<a href=\"/new\">link</a>","requirement":"Meaningful attributes participate in semantic comparison."},
+  {"id":"B03","path":"a.json","old":"{\"value\":1}","new":"{\"value\":\"1\"}","requirement":"Scalar type changes remain observable."},
+  {"id":"B04","path":"a.yaml","old":"parent:\n    child: 1","new":"parent:\n    child: 2","requirement":"Four-space nested YAML retains values."}
+]
