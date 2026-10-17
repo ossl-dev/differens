@@ -17,6 +17,10 @@ struct Expectation {
     file: String,
     kind: String,
     label: String,
+    #[serde(default)]
+    llm_contains: Vec<String>,
+    #[serde(default)]
+    llm_excludes: Vec<String>,
 }
 
 fn git(repo: &Path, args: &[&str]) -> Result<Vec<u8>> {
@@ -262,6 +266,9 @@ fn audit(
         if bytes.is_empty() {
             return Err(format!("{}: empty {format}", spec.name).into());
         }
+        if format == "llm" {
+            validate_llm(&spec.expected, &bytes)?;
+        }
         fs::write(output.join(format!("{}-{format}.txt", spec.name)), bytes)?;
     }
     let measurements = measure(binary, baseline, &repo, spec, &report, samples)?;
@@ -277,6 +284,21 @@ fn audit(
     Ok(
         json!({"name":spec.name,"url":spec.url,"old":spec.old,"new":spec.new,"files":changed.len(),"actions":report["perFile"].as_array().map_or(0,Vec::len),"fallbacks":report.get("fallbacks").cloned().unwrap_or_else(||json!([])),"measurements":measurements}),
     )
+}
+
+fn validate_llm(expected: &Expectation, bytes: &[u8]) -> Result<()> {
+    let output = std::str::from_utf8(bytes)?;
+    for required in &expected.llm_contains {
+        if !output.contains(required) {
+            return Err(format!("LLM report lost expected fact: {required}").into());
+        }
+    }
+    for forbidden in &expected.llm_excludes {
+        if output.contains(forbidden) {
+            return Err(format!("LLM report contains incorrect fact: {forbidden}").into());
+        }
+    }
+    Ok(())
 }
 
 pub fn run(
@@ -353,11 +375,16 @@ mod tests {
                 file: "app.rs".into(),
                 kind: "Function".into(),
                 label: "run".into(),
+                llm_contains: vec!["function run".into()],
+                llm_excludes: vec!["function wrong".into()],
             },
         };
         let report = json!({"perFile":[{"filePath":"app.rs","action":{"node":{"kind":"Function","label":"run"}}}],"crossFileMoves":[]});
         let changed = ["app.rs"].into_iter().collect();
         validate_report(&spec, &changed, &report).unwrap();
+        validate_llm(&spec.expected, b"~ function run").unwrap();
+        assert!(validate_llm(&spec.expected, b"no named facts").is_err());
+        assert!(validate_llm(&spec.expected, b"function run\nfunction wrong").is_err());
         assert!(
             validate_report(&spec, &["app.rs", "lost.rs"].into_iter().collect(), &report).is_err()
         );

@@ -40,7 +40,18 @@
     "expected": {
       "file": "middleware/client_ip.go",
       "kind": "Function",
-      "label": "parseRemoteAddr"
+      "label": "parseRemoteAddr",
+      "llm_contains": [
+        "+ method basicWriter.flush",
+        "method flushWriter.Flush",
+        "method flushHijackWriter.Flush",
+        "method httpFancyWriter.Flush",
+        "method http2FancyWriter.Flush"
+      ],
+      "llm_excludes": [
+        "~ modified method basicWriter.flush",
+        "~ changed method basicWriter.flush"
+      ]
     }
   },
   {
