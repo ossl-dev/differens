@@ -1,0 +1,57 @@
+[
+  {
+    "name": "express",
+    "url": "https://github.com/expressjs/express.git",
+    "old": "98bd4cd96b250d25e1672c36f49cfc743bc801e7",
+    "new": "a419aa7350389a275ab45fde2e849ed1f02449ef",
+    "expected": {
+      "file": "package.json",
+      "kind": "leaf",
+      "label": "version"
+    }
+  },
+  {
+    "name": "flask",
+    "url": "https://github.com/pallets/flask.git",
+    "old": "514fc6b3e8402e4c646d5284e97a4f0ab50a7c4b",
+    "new": "d086db856be187255b8ec61ef409357393020f32",
+    "expected": {
+      "file": "pyproject.toml",
+      "kind": "leaf",
+      "label": "requires-python"
+    }
+  },
+  {
+    "name": "ripgrep",
+    "url": "https://github.com/BurntSushi/ripgrep.git",
+    "old": "d57de83a944c1b349be376b6762334009372d454",
+    "new": "3fce3b5bb0236da2df6d99672afb8a719642eca7",
+    "expected": {
+      "file": "crates/core/flags/hiargs.rs",
+      "kind": "Function",
+      "label": "index_read"
+    }
+  },
+  {
+    "name": "chi",
+    "url": "https://github.com/go-chi/chi.git",
+    "old": "ae6be7469132cf471ca099d8c7bda4010c4ff7b2",
+    "new": "3a33ba578e0dd93444e0ff386cc26e665d92e31e",
+    "expected": {
+      "file": "middleware/client_ip.go",
+      "kind": "Function",
+      "label": "parseRemoteAddr"
+    }
+  },
+  {
+    "name": "prettier",
+    "url": "https://github.com/prettier/prettier.git",
+    "old": "c95bd90928d784d2559872d7ea9b021bea1bd4eb",
+    "new": "344d6dc42c8057fbf5573326b52dbc8a43635e7e",
+    "expected": {
+      "file": "src/language-html/print-preprocess.js",
+      "kind": "Function",
+      "label": "mergeAdjacentTextNodes"
+    }
+  }
+]

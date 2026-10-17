@@ -9,6 +9,7 @@ use std::{
 mod benchmark;
 mod docs;
 mod package;
+mod repositories;
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 #[derive(Parser)]
@@ -37,6 +38,18 @@ enum Task {
     },
     /// Check Rust line/function coverage using cargo-llvm-cov.
     Coverage,
+    /// Audit pinned real repository histories, formats, ordering, and release speed.
+    AuditRepos {
+        #[arg(long)]
+        repos_dir: PathBuf,
+        #[arg(long)]
+        baseline: Option<PathBuf>,
+        #[arg(long, default_value_t = 7)]
+        samples: usize,
+        /// Fetch the exact recorded revisions into the audit directory.
+        #[arg(long)]
+        fetch: bool,
+    },
 }
 fn main() -> ExitCode {
     match run() {
@@ -104,6 +117,12 @@ fn run() -> Result<()> {
         Task::Docs => docs::build(&root()),
         Task::Package { dry_run } => package::build(&root(), dry_run),
         Task::Coverage => coverage(),
+        Task::AuditRepos {
+            repos_dir,
+            baseline,
+            samples,
+            fetch,
+        } => repositories::run(&root(), &repos_dir, baseline.as_deref(), samples, fetch),
     }
 }
 fn coverage() -> Result<()> {
