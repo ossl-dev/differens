@@ -2,7 +2,7 @@ use crate::{
     action_index, declaration, humanize_kind, is_declaration, narrate_action, preview,
     value_previews,
 };
-use differens_core::{EditAction, SemanticChange, UpdateDetail};
+use differens_core::{EditAction, NodeContext, SemanticChange, UpdateDetail};
 use indexmap::IndexMap;
 
 fn counts(changes: &[SemanticChange]) -> String {
@@ -109,10 +109,7 @@ pub fn readable_changes(changes: &[SemanticChange], limit: usize) -> Vec<Semanti
             }
             let action = &change.action;
             let node = action.node();
-            let owner = action
-                .context()
-                .iter()
-                .find(|ctx| ctx.label.is_some() && is_declaration(&ctx.kind));
+            let (owner, member) = owner_context(action);
             let named = declaration(node).filter(|candidate| {
                 !(owner.is_some()
                     && matches!(
@@ -149,7 +146,11 @@ pub fn readable_changes(changes: &[SemanticChange], limit: usize) -> Vec<Semanti
                 |ctx| {
                     format!(
                         "{} `{}`",
-                        humanize_kind(&ctx.kind),
+                        if member {
+                            "property".into()
+                        } else {
+                            humanize_kind(&ctx.kind)
+                        },
                         ctx.label.as_deref().unwrap_or_default()
                     )
                 },
@@ -196,6 +197,25 @@ type GroupKey<'a> = (
     Vec<(&'a str, Option<&'a str>)>,
     String,
 );
+
+fn owner_context(action: &EditAction) -> (Option<&NodeContext>, bool) {
+    let owner = action
+        .context()
+        .iter()
+        .find(|ctx| ctx.label.is_some() && is_declaration(&ctx.kind));
+    // Class-level assignments are members; local assignments retain their
+    // function as the readable scope.
+    let member = owner
+        .filter(|ctx| matches!(ctx.kind.as_str(), "Class" | "Struct" | "Interface"))
+        .and_then(|_| {
+            action
+                .context()
+                .iter()
+                .take_while(|ctx| !is_declaration(&ctx.kind))
+                .find(|ctx| ctx.kind == "Assignment" && ctx.label.is_some())
+        });
+    (member.or(owner), member.is_some())
+}
 
 fn grouped_entry(subject: &str, edits: &[SemanticChange]) -> Option<SemanticChange> {
     let first = edits.first()?;

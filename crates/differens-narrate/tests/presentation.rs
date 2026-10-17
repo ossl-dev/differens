@@ -292,3 +292,38 @@ fn llm_summary_counts_external_moves_and_deduplicates_file_endpoints() {
         format_llm_report(&changes, context).starts_with("differens/1 2 files 2 changes 2 named\n")
     );
 }
+
+#[test]
+fn class_member_changes_name_the_property_without_exposing_local_assignments() {
+    let member = NodeContext {
+        kind: "Assignment".into(),
+        label: Some("default_config".into()),
+    };
+    let class = NodeContext {
+        kind: "Class".into(),
+        label: Some("Flask".into()),
+    };
+    let function = NodeContext {
+        kind: "Function".into(),
+        label: Some("configure".into()),
+    };
+    for (context, subject) in [
+        (
+            vec![member.clone(), class.clone()],
+            "property `default_config`",
+        ),
+        (vec![member, function, class], "function `configure`"),
+    ] {
+        let action = EditAction::Update {
+            node: node("Token", None, Some(":")),
+            detail: UpdateDetail::ValueChanged {
+                from: Some("=".into()),
+                to: Some(":".into()),
+            },
+            context,
+        };
+        let output =
+            format_changes(&[change(action, Some("app.py"))], OutputFormat::Terminal).unwrap();
+        assert!(output.contains(subject), "{output}");
+    }
+}
