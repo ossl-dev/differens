@@ -219,3 +219,76 @@ fn llm_rolls_up_anonymous_churn_and_preserves_moves() {
     );
     assert_eq!(readable_changes(&[anonymous], 20).len(), 1);
 }
+
+#[test]
+fn truncated_values_reveal_edits_instead_of_showing_identical_prefixes() {
+    let prefix = format!("/** {}", "shared é😀 documentation ".repeat(20));
+    let old = format!("{prefix} OLD_BEHAVIOR with trailing context */");
+    let new = format!("{prefix} NEW_BEHAVIOR with trailing context */");
+    let action = EditAction::Update {
+        node: node("comment", None, Some(&new)),
+        detail: UpdateDetail::ValueChanged {
+            from: Some(old),
+            to: Some(new),
+        },
+        context: vec![],
+    };
+    let changes = vec![change(action, Some("api.rs"))];
+    for format in [
+        OutputFormat::Terminal,
+        OutputFormat::Markdown,
+        OutputFormat::Llm,
+    ] {
+        let rendered = format_changes(&changes, format).unwrap();
+        // LLM deliberately rolls comments into a count; human formats show the edit.
+        if format != OutputFormat::Llm {
+            assert!(rendered.contains("OLD_BEHAVIOR"), "{rendered}");
+            assert!(rendered.contains("NEW_BEHAVIOR"), "{rendered}");
+            assert!(rendered.len() < 300, "{rendered}");
+        }
+    }
+    let changes = vec![change(update(Some("same  text"), Some("same text")), None)];
+    let rendered = format_changes(&changes, OutputFormat::Terminal).unwrap();
+    assert!(rendered.contains("same␠␠text"), "{rendered}");
+    assert!(rendered.contains("same␠text"), "{rendered}");
+    let changes = vec![change(update(Some(""), Some("value")), None)];
+    assert!(
+        format_changes(&changes, OutputFormat::Llm)
+            .unwrap()
+            .contains("\"\" -> value")
+    );
+}
+
+#[test]
+fn plural_parser_kinds_are_not_pluralized_twice() {
+    let actions = (0..2)
+        .map(|_| EditAction::Insert {
+            node: node("arguments", None, None),
+            parent: node("call", None, None),
+            position: 0,
+            context: vec![],
+        })
+        .collect::<Vec<_>>();
+    let rendered = format_changes(&narrate(&actions, Some("app.py")), OutputFormat::Llm).unwrap();
+    assert!(rendered.contains("* 2 arguments"), "{rendered}");
+    assert!(!rendered.contains("argumentss"), "{rendered}");
+}
+
+#[test]
+fn llm_summary_counts_external_moves_and_deduplicates_file_endpoints() {
+    use differens_narrate::{LlmReportContext, format_llm_report};
+    let files = ["old.rs", "new.rs", "old.rs"];
+    let context = LlmReportContext {
+        additional_files: &files,
+        additional_changes: 1,
+        additional_named: 1,
+    };
+    assert_eq!(
+        format_llm_report(&[], context),
+        "differens/1 2 files 1 changes 1 named"
+    );
+    let changes = vec![change(update(Some("old"), Some("new")), Some("new.rs"))];
+    assert!(
+        format_llm_report(&changes, context).starts_with("differens/1 2 files 2 changes 2 named\n")
+    );
+}

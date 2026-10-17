@@ -37,6 +37,9 @@ impl std::str::FromStr for OutputFormat {
 /// Render a parser concept as human-readable words.
 #[must_use]
 pub fn humanize_kind(kind: &str) -> String {
+    if kind == "DecoratedDef" {
+        return "decorated definition".into();
+    }
     let mut out = String::with_capacity(kind.len());
     let mut previous_lower = false;
     for c in kind.chars() {
@@ -54,20 +57,58 @@ pub fn humanize_kind(kind: &str) -> String {
 }
 
 pub(crate) fn preview(value: Option<&str>, max: usize) -> Option<String> {
-    let text = value?.split_whitespace().collect::<Vec<_>>().join(" ");
-    if text.is_empty() {
-        return None;
+    let mut characters = value?
+        .split_whitespace()
+        .enumerate()
+        .flat_map(|(i, word)| (i != 0).then_some(' ').into_iter().chain(word.chars()));
+    let mut text: String = characters.by_ref().take(max).collect();
+    if characters.next().is_some() {
+        text.pop();
+        text.push('…');
     }
-    if text.chars().count() > max {
-        Some(
+    (!text.is_empty()).then_some(text)
+}
+
+// Ordinary previews keep the legacy output. If truncation hides the edit,
+// center both windows on the first differing character instead.
+pub(crate) fn value_previews(from: &str, to: &str, max: usize) -> (String, String) {
+    let old = preview(Some(from), max).unwrap_or_default();
+    let new = preview(Some(to), max).unwrap_or_default();
+    if old != new || from == to || max < 4 {
+        return (old, new);
+    }
+    let mut old = from.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut new = to.split_whitespace().collect::<Vec<_>>().join(" ");
+    if old == new {
+        let visible = |text: &str| {
             text.chars()
-                .take(max.saturating_sub(1))
-                .chain(['…'])
-                .collect(),
-        )
-    } else {
-        Some(text)
+                .map(|c| if c == ' ' { '␠' } else { c })
+                .flat_map(char::escape_debug)
+                .collect::<String>()
+        };
+        old = visible(from);
+        new = visible(to);
     }
+    let shared = old
+        .chars()
+        .zip(new.chars())
+        .take_while(|(a, b)| a == b)
+        .count();
+    let start = shared.saturating_sub(max / 3);
+    let window = |text: &str| {
+        let offset = text
+            .char_indices()
+            .nth(start)
+            .map_or(text.len(), |(offset, _)| offset);
+        let tail =
+            preview(Some(&text[offset..]), max - usize::from(start != 0)).unwrap_or_default();
+        if start == 0 {
+            tail
+        } else {
+            format!("…{tail}")
+        }
+    };
+    (window(&old), window(&new))
 }
 
 fn scope(action: &EditAction) -> Option<&NodeContext> {
@@ -118,11 +159,10 @@ pub fn narrate_action(action: &EditAction) -> String {
                 |label| format!("value of {kind} `{label}`"),
             );
             match (from, to) {
-                (Some(from), Some(to)) => format!(
-                    "changed {target} from `{}` to `{}`{phrase}",
-                    preview(Some(from), 40).unwrap_or_default(),
-                    preview(Some(to), 40).unwrap_or_default()
-                ),
+                (Some(from), Some(to)) => {
+                    let (from, to) = value_previews(from, to, 40);
+                    format!("changed {target} from `{from}` to `{to}`{phrase}")
+                }
                 (Some(_), None) => format!("removed {target}{phrase}"),
                 (None, Some(to)) => format!(
                     "set {target} to `{}`{phrase}",
@@ -364,11 +404,18 @@ fn llm_line(action: &EditAction) -> String {
         EditAction::Update {
             detail: UpdateDetail::ValueChanged { from, to },
             ..
-        } => format!(
-            "{head} {} -> {}",
-            llm_value(from.as_deref()),
-            llm_value(to.as_deref())
-        ),
+        } => {
+            let (from, to) = match (from.as_deref(), to.as_deref()) {
+                (Some(from), Some(to)) => {
+                    let (from, to) = value_previews(from, to, 60);
+                    let quoted_empty =
+                        |text: String| if text.is_empty() { "\"\"".into() } else { text };
+                    (quoted_empty(from), quoted_empty(to))
+                }
+                (from, to) => (llm_value(from), llm_value(to)),
+            };
+            format!("{head} {from} -> {to}")
+        }
         EditAction::Move { from_parent, .. } => format!(
             "{head} from {}",
             from_parent.label.as_ref().unwrap_or(&from_parent.kind)
@@ -376,7 +423,22 @@ fn llm_line(action: &EditAction) -> String {
         _ => head,
     }
 }
+/// Additional named changes that the caller renders after the per-file body.
+/// Cross-file moves count once while both endpoints contribute to the file count.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct LlmReportContext<'a> {
+    pub additional_files: &'a [&'a str],
+    pub additional_changes: usize,
+    pub additional_named: usize,
+}
+
 fn format_llm(changes: &[SemanticChange]) -> String {
+    format_llm_report(changes, LlmReportContext::default())
+}
+
+/// Format an LLM report with complete counts for externally rendered changes.
+#[must_use]
+pub fn format_llm_report(changes: &[SemanticChange], context: LlmReportContext<'_>) -> String {
     let groups = groups(changes);
     let named = groups
         .values()
@@ -391,11 +453,18 @@ fn format_llm(changes: &[SemanticChange]) -> String {
             )
             .len()
         })
-        .sum::<usize>();
+        .sum::<usize>()
+        + context.additional_named;
+    let files = groups
+        .keys()
+        .copied()
+        .chain(context.additional_files.iter().copied().map(Some))
+        .collect::<std::collections::HashSet<_>>()
+        .len();
     let mut lines = vec![format!(
         "differens/1 {} files {} changes {named} named",
-        groups.len(),
-        changes.len()
+        files,
+        changes.len() + context.additional_changes
     )];
     for (path, group) in groups {
         lines.push(format!("# {}", path.unwrap_or("(unknown)")));
@@ -431,7 +500,16 @@ fn format_llm(changes: &[SemanticChange]) -> String {
                 "* {}",
                 counts
                     .into_iter()
-                    .map(|(kind, n)| format!("{n} {kind}{}", if n == 1 { "" } else { "s" }))
+                    .map(|(kind, n)| {
+                        let suffix = if n == 1 || kind.ends_with('s') && !kind.ends_with("ss") {
+                            ""
+                        } else if kind.ends_with("ss") {
+                            "es"
+                        } else {
+                            "s"
+                        };
+                        format!("{n} {kind}{suffix}")
+                    })
                     .collect::<Vec<_>>()
                     .join(", ")
             ));
@@ -443,12 +521,11 @@ fn format_llm(changes: &[SemanticChange]) -> String {
 pub(crate) fn declaration(node: &NodeRef) -> Option<NodeRef> {
     let mut stack = vec![node.clone()];
     while let Some(node) = stack.pop() {
-        if is_declaration(&node.kind) && node.label.is_some() {
-            return Some(node);
-        }
-        if node.kind == "Export" {
+        if node.kind == "Export" || node.kind == "DecoratedDef" {
             let children: Vec<_> = node.children().collect();
             stack.extend(children.into_iter().rev());
+        } else if is_declaration(&node.kind) && node.label.is_some() {
+            return Some(node);
         }
     }
     None
@@ -457,6 +534,7 @@ pub(crate) fn is_declaration(kind: &str) -> bool {
     matches!(
         kind,
         "Function"
+            | "DecoratedDef"
             | "Method"
             | "Class"
             | "Interface"

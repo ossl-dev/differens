@@ -1,4 +1,7 @@
-use crate::{action_index, declaration, humanize_kind, is_declaration, narrate_action, preview};
+use crate::{
+    action_index, declaration, humanize_kind, is_declaration, narrate_action, preview,
+    value_previews,
+};
 use differens_core::{EditAction, SemanticChange, UpdateDetail};
 use indexmap::IndexMap;
 
@@ -66,7 +69,11 @@ fn details(changes: &[SemanticChange]) -> String {
             let short = |value: Option<&str>| {
                 preview(Some(value.unwrap_or("none")), 36).unwrap_or_default()
             };
-            format!("`{}` → `{}`", short(from), short(to))
+            let (from, to) = match (from, to) {
+                (Some(from), Some(to)) => value_previews(from, to, 36),
+                (from, to) => (short(from), short(to)),
+            };
+            format!("`{from}` → `{to}`")
         })
         .collect::<Vec<_>>();
     if updates.len() < changes.len() {
