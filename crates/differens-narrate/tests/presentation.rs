@@ -327,3 +327,20 @@ fn class_member_changes_name_the_property_without_exposing_local_assignments() {
         assert!(output.contains(subject), "{output}");
     }
 }
+
+#[test]
+fn same_named_go_methods_keep_distinct_receiver_summaries() {
+    let source = "package p\ntype A struct{}\ntype B struct{}\nfunc (w *A) Flush() { w.write(1) }\nfunc (w *B) Flush() { w.write(1) }\n";
+    let result = differens_tiers::diff_with_tier(
+        source.as_bytes(),
+        source.replace("write(1)", "write(2)").as_bytes(),
+        "writer.go",
+        "writer.go",
+        differens_tiers::SourcePresence::default(),
+    );
+    let changes = narrate(&result.changes, Some("writer.go"));
+    let output = format_changes(&changes, OutputFormat::Terminal).unwrap();
+    assert!(output.contains("method `A.Flush`"), "{output}");
+    assert!(output.contains("method `B.Flush`"), "{output}");
+    assert_eq!(readable_changes(&changes, 20).len(), 2, "{output}");
+}

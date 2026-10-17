@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{HashSet, VecDeque},
     io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
     process::{Child, ChildStdin, ChildStdout, Command, Output, Stdio},
@@ -162,23 +162,24 @@ impl GitRepository {
             ])?;
             parse_raw(&raw, true)?
         } else {
-            Vec::new()
+            let raw = self.run(&[
+                "diff",
+                "--cached",
+                "--no-ext-diff",
+                "--no-textconv",
+                "--raw",
+                "-z",
+                "--no-abbrev",
+                "--no-renames",
+                "--",
+            ])?;
+            parse_raw(&raw, true)?
         };
         let mut seen: HashSet<_> = changes
             .iter()
             .map(|change| change.new_path.clone())
             .collect();
-        let args = if head.is_some() {
-            vec!["ls-files", "--others", "--exclude-standard", "-z"]
-        } else {
-            vec![
-                "ls-files",
-                "--cached",
-                "--others",
-                "--exclude-standard",
-                "-z",
-            ]
-        };
+        let args = ["ls-files", "--others", "--exclude-standard", "-z"];
         for path in self
             .run(&args)?
             .split(|byte| *byte == 0)
@@ -190,7 +191,7 @@ impl GitRepository {
                     old_path: path.clone(),
                     new_path: path.clone(),
                     old: Source::Missing,
-                    new: Source::Disk(path, false),
+                    new: Source::Disk(path, None),
                 });
             }
         }
@@ -235,6 +236,22 @@ impl GitRepository {
         let new = self
             .resolve_ref(new)?
             .ok_or_else(|| Error::InvalidReference(new.to_owned()))?;
+        self.diff_commit_ids_stream(&old, &new)
+    }
+
+    /// Compare two already resolved commit IDs without spawning ref lookups.
+    /// Git verifies both IDs refer to commits within the diff operation.
+    ///
+    /// # Errors
+    /// Rejects non-hex IDs, non-commit objects, Git failures, and unsupported paths.
+    pub fn diff_commit_ids_stream(&self, old: &str, new: &str) -> Result<FilePairs> {
+        for id in [old, new] {
+            if !matches!(id.len(), 40 | 64) || !id.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                return Err(Error::InvalidReference(id.to_owned()));
+            }
+        }
+        let old = format!("{old}^{{commit}}");
+        let new = format!("{new}^{{commit}}");
         let raw = self.run(&[
             "diff",
             "--no-ext-diff",
@@ -273,7 +290,7 @@ enum Source {
     Missing,
     Blob(String),
     Submodule(String),
-    Disk(String, bool),
+    Disk(String, Option<String>),
 }
 
 #[derive(Debug)]
@@ -328,7 +345,12 @@ fn parse_raw(raw: &[u8], working: bool) -> Result<Vec<PathChange>> {
         };
         let old = object_source(metadata[0], metadata[2])?;
         let new = if working && metadata[1] != b"000000" {
-            Source::Disk(new_path.clone(), metadata[1] == b"160000")
+            let gitlink = if metadata[1] == b"160000" {
+                Some(git_path(metadata[3])?)
+            } else {
+                None
+            };
+            Source::Disk(new_path.clone(), gitlink)
         } else {
             object_source(metadata[1], metadata[3])?
         };
@@ -366,24 +388,8 @@ impl FilePairs {
         match source {
             Source::Missing => Ok((Vec::new(), false)),
             Source::Submodule(id) => Ok((submodule_content(id), true)),
-            Source::Disk(path, false) => read_optional(&self.root.join(path)),
-            Source::Disk(path, true) => {
-                let root = self.root.join(path);
-                if !root.exists() {
-                    return Ok((Vec::new(), false));
-                }
-                let output = Command::new("git")
-                    .current_dir(&root)
-                    .args(["rev-parse", "HEAD"])
-                    .output()
-                    .map_err(Error::Process)?;
-                if !output.status.success() {
-                    return Err(command_error("rev-parse", &output));
-                }
-                let id = String::from_utf8(output.stdout)
-                    .map_err(|_| Error::Protocol("invalid submodule commit".into()))?;
-                Ok((submodule_content(id.trim()), true))
-            }
+            Source::Disk(path, None) => read_optional(&self.root.join(path)),
+            Source::Disk(path, Some(commit)) => read_submodule(&self.root.join(path), commit),
             Source::Blob(id) => {
                 if self.reader.is_none() {
                     self.reader = Some(BatchReader::new(&self.root)?);
@@ -396,6 +402,31 @@ impl FilePairs {
             }
         }
     }
+
+    fn prepare_blobs(&mut self, current: &PathChange) -> Result<()> {
+        if !matches!(current.old, Source::Blob(_)) && !matches!(current.new, Source::Blob(_)) {
+            return Ok(());
+        }
+        let ids: Vec<_> = std::iter::once(current)
+            .chain(self.paths.as_slice())
+            .flat_map(|change| [&change.old, &change.new])
+            .filter_map(|source| match source {
+                Source::Blob(id) => Some(id.as_str()),
+                _ => None,
+            })
+            .take(BLOB_LOOKAHEAD)
+            .collect();
+        if ids.is_empty() {
+            return Ok(());
+        }
+        if self.reader.is_none() {
+            self.reader = Some(BatchReader::new(&self.root)?);
+        }
+        if let Some(reader) = &mut self.reader {
+            reader.queue(&ids)?;
+        }
+        Ok(())
+    }
 }
 
 impl Iterator for FilePairs {
@@ -406,6 +437,7 @@ impl Iterator for FilePairs {
         }
         let change = self.paths.next()?;
         let result = (|| {
+            self.prepare_blobs(&change)?;
             let (old_source, old_exists) = self.read(&change.old)?;
             let (new_source, new_exists) = self.read(&change.new)?;
             Ok(FilePair {
@@ -422,6 +454,56 @@ impl Iterator for FilePairs {
     }
 }
 
+fn read_submodule(root: &Path, index_commit: &str) -> Result<(Vec<u8>, bool)> {
+    if !root.try_exists().map_err(|source| Error::Read {
+        path: root.to_owned(),
+        source,
+    })? {
+        return Ok((Vec::new(), false));
+    }
+    match std::fs::symlink_metadata(root.join(".git")) {
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok((submodule_content(index_commit), true));
+        }
+        Err(source) => {
+            return Err(Error::Read {
+                path: root.join(".git"),
+                source,
+            });
+        }
+    }
+    let output = Command::new("git")
+        .current_dir(root)
+        .args(["rev-parse", "--verify", "HEAD"])
+        .output()
+        .map_err(Error::Process)?;
+    if !output.status.success() {
+        return Err(command_error("rev-parse", &output));
+    }
+    let id = String::from_utf8(output.stdout)
+        .map_err(|_| Error::Protocol("invalid submodule commit".into()))?;
+    let status = Command::new("git")
+        .current_dir(root)
+        .args([
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=normal",
+            "--ignore-submodules=none",
+        ])
+        .output()
+        .map_err(Error::Process)?;
+    if !status.status.success() {
+        return Err(command_error("status", &status));
+    }
+    let id = if status.stdout.is_empty() {
+        id.trim().to_owned()
+    } else {
+        format!("{}-dirty", id.trim())
+    };
+    Ok((submodule_content(&id), true))
+}
+
 fn submodule_content(id: &str) -> Vec<u8> {
     format!("Subproject commit {id}\n").into_bytes()
 }
@@ -430,7 +512,13 @@ struct BatchReader {
     child: Child,
     input: Option<ChildStdin>,
     output: BufReader<ChildStdout>,
+    pending: VecDeque<String>,
 }
+
+// Six SHA-256 requests occupy at most 390 bytes, below POSIX's minimum pipe
+// capacity. This lookahead overlaps Git's work without buffering blob bodies or
+// blocking while a large response fills the opposite pipe.
+const BLOB_LOOKAHEAD: usize = 6;
 
 impl BatchReader {
     fn new(root: &Path) -> Result<Self> {
@@ -454,17 +542,51 @@ impl BatchReader {
             child,
             input: Some(input),
             output: BufReader::new(output),
+            pending: VecDeque::new(),
         })
     }
 
-    fn read_blob(&mut self, id: &str) -> Result<Vec<u8>> {
+    fn queue(&mut self, ids: &[&str]) -> Result<()> {
+        if self.pending.len() > ids.len()
+            || !self
+                .pending
+                .iter()
+                .zip(ids)
+                .all(|(pending, id)| pending == id)
+        {
+            return Err(Error::Protocol("blob request order changed".into()));
+        }
+        let new = &ids[self.pending.len()..];
+        if new.is_empty() {
+            return Ok(());
+        }
         let input = self
             .input
             .as_mut()
             .ok_or_else(|| Error::Protocol("closed Git input".into()))?;
-        writeln!(input, "{id}").map_err(Error::Process)?;
+        let mut request = String::with_capacity(new.len() * 65);
+        for id in new {
+            request.push_str(id);
+            request.push('\n');
+        }
+        input
+            .write_all(request.as_bytes())
+            .map_err(Error::Process)?;
         input.flush().map_err(Error::Process)?;
-        read_blob_record(&mut self.output, id)
+        self.pending.extend(new.iter().map(|id| (*id).to_owned()));
+        Ok(())
+    }
+
+    fn read_blob(&mut self, id: &str) -> Result<Vec<u8>> {
+        if self.pending.is_empty() {
+            self.queue(&[id])?;
+        }
+        if self.pending.front().map(String::as_str) != Some(id) {
+            return Err(Error::Protocol("unexpected blob request".into()));
+        }
+        let bytes = read_blob_record(&mut self.output, id)?;
+        self.pending.pop_front();
+        Ok(bytes)
     }
 }
 
@@ -596,7 +718,7 @@ mod tests {
                 old_path: "module".into(),
                 new_path: "module".into(),
                 old: Source::Missing,
-                new: Source::Disk("module".into(), true),
+                new: Source::Disk("module".into(), Some("index-commit".into())),
             }],
         );
         assert!(!stream.next().unwrap().unwrap().new_exists);
@@ -612,7 +734,7 @@ mod tests {
                 old_path: "module".into(),
                 new_path: "module".into(),
                 old: Source::Missing,
-                new: Source::Disk("module".into(), true),
+                new: Source::Disk("module".into(), Some("index-commit".into())),
             }],
         );
         assert!(stream.next().unwrap().is_err());

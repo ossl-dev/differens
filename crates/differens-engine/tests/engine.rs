@@ -152,9 +152,80 @@ fn cross_file_moves_appear_once_and_keep_original_raw_json_edits() {
         &[] as &[serde_json::Value]
     );
     let llm = rendered(inputs, OutputFormat::Llm, false, 1);
+    assert_eq!(
+        llm.lines().next(),
+        Some("differens/1 2 files 1 changes 1 named")
+    );
     assert!(
         llm.contains("# cross-file\n> validate utils.ts -> validators.ts"),
         "{llm}"
+    );
+}
+
+#[test]
+fn llm_move_context_does_not_double_count_files_with_other_edits() {
+    let moved = "function validate(input: string): boolean { return !!input; }\n";
+    let inputs = vec![
+        pair(
+            "utils.ts",
+            &format!("{moved}export const keep = 1;\n"),
+            "export const keep = 2;\n",
+        ),
+        pair(
+            "validators.ts",
+            "export const v = 1;\n",
+            &format!("export const v = 1;\n{moved}"),
+        ),
+    ];
+    let llm = rendered(inputs, OutputFormat::Llm, false, 1);
+    assert_eq!(
+        llm.lines().next(),
+        Some("differens/1 2 files 2 changes 2 named"),
+        "{llm}"
+    );
+    assert!(llm.contains("# cross-file\n> validate utils.ts -> validators.ts"));
+}
+
+#[test]
+fn llm_groups_go_methods_with_receiver_identity_before_detaching_nodes() {
+    let old = "package main\n\
+type A struct {}\n\
+type B struct {}\n\
+func (a A) Flush() int { return 1 }\n\
+func (b B) Flush() int { return 2 }\n";
+    let new = old
+        .replace("return 1", "return 3")
+        .replace("return 2", "return 4");
+    let llm = rendered(
+        vec![pair("flush.go", old, &new)],
+        OutputFormat::Llm,
+        false,
+        1,
+    );
+    assert!(llm.contains("A.Flush"), "{llm}");
+    assert!(llm.contains("B.Flush"), "{llm}");
+    assert!(
+        llm.lines()
+            .next()
+            .unwrap()
+            .starts_with("differens/1 1 files 2 changes "),
+        "{llm}"
+    );
+
+    let grouped = rendered(
+        vec![pair(
+            "one.ts",
+            "function run() { return 1 + 2; }",
+            "function run() { return 3 + 4; }",
+        )],
+        OutputFormat::Llm,
+        false,
+        1,
+    );
+    assert_eq!(
+        grouped.lines().next(),
+        Some("differens/1 1 files 2 changes 1 named"),
+        "{grouped}"
     );
 }
 

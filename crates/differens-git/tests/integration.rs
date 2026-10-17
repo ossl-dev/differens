@@ -73,6 +73,46 @@ fn detects_worktree_resolves_commits_and_rejects_invalid_refs() {
 }
 
 #[test]
+fn sha256_repositories_preserve_full_blob_and_commit_ids() {
+    let dir = tempdir().unwrap();
+    let initialized = Command::new("git")
+        .current_dir(dir.path())
+        .args(["init", "-q", "--object-format=sha256"])
+        .output()
+        .unwrap();
+    if !initialized.status.success() {
+        // Git builds without SHA-256 support cannot create this fixture.
+        assert!(String::from_utf8_lossy(&initialized.stderr).contains("sha256"));
+        return;
+    }
+    run(dir.path(), &["config", "user.name", "Test"]);
+    run(dir.path(), &["config", "user.email", "test@example.com"]);
+    let path = "unicode ☃\nfile.bin";
+    write(dir.path(), path, b"old\0bytes");
+    run(dir.path(), &["add", "."]);
+    run(dir.path(), &["commit", "-qm", "initial"]);
+    let repo = GitRepository::discover(dir.path()).unwrap();
+    let old = repo.resolve_ref("HEAD").unwrap().unwrap();
+    assert_eq!(old.len(), 64);
+    write(dir.path(), path, b"new\0bytes");
+    let working = repo.diff_working_tree().unwrap();
+    assert_eq!(working.len(), 1);
+    assert_eq!(working[0].old_source, b"old\0bytes");
+    assert_eq!(working[0].new_source, b"new\0bytes");
+    run(dir.path(), &["commit", "-qam", "updated"]);
+    let new = repo.resolve_ref("HEAD").unwrap().unwrap();
+    assert_eq!(new.len(), 64);
+    let pairs = repo
+        .diff_commit_ids_stream(&old, &new)
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    assert_eq!(pairs, working);
+    assert_eq!(repo.get_head_content(path).unwrap().unwrap(), b"new\0bytes");
+    assert_eq!(repo.diff_commit_range("HEAD~1..HEAD").unwrap(), pairs);
+}
+
+#[test]
 fn working_tree_tracks_modified_deleted_untracked_and_empty_files_once() {
     let fixture = Repo::new(&[("a.ts", b"old"), ("gone", b"gone")]);
     assert_eq!(
@@ -226,6 +266,41 @@ fn ranges_preserve_renames_additions_deletions_and_presence() {
     assert!(matches!(
         fixture.repo.diff_commit_range("nope..HEAD"),
         Err(Error::InvalidReference(_))
+    ));
+}
+
+#[test]
+fn resolved_commit_comparisons_validate_ids_and_reject_blob_objects() {
+    let fixture = Repo::new(&[("file", b"one")]);
+    let old = fixture.repo.resolve_ref("HEAD").unwrap().unwrap();
+    fixture.write("file", b"two");
+    fixture.git(&["commit", "-qam", "second"]);
+    let new = fixture.repo.resolve_ref("HEAD").unwrap().unwrap();
+    let direct = fixture
+        .repo
+        .diff_commit_ids_stream(&old, &new)
+        .unwrap()
+        .collect::<differens_git::Result<Vec<_>>>()
+        .unwrap();
+    assert_eq!(
+        direct,
+        fixture.repo.diff_commit_range("HEAD~1..HEAD").unwrap()
+    );
+    for invalid in [
+        "--output=/tmp/bad",
+        "HEAD",
+        "bad",
+        "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+    ] {
+        assert!(matches!(
+            fixture.repo.diff_commit_ids_stream(invalid, &new),
+            Err(Error::InvalidReference(_))
+        ));
+    }
+    let blob = String::from_utf8(fixture.git(&["rev-parse", "HEAD:file"])).unwrap();
+    assert!(matches!(
+        fixture.repo.diff_commit_ids_stream(blob.trim(), &new),
+        Err(Error::Git { .. })
     ));
 }
 
@@ -450,6 +525,82 @@ fn preserves_submodule_commit_identity_in_working_and_committed_snapshots() {
         .unwrap();
     assert_eq!(committed.old_source, pair.old_source);
     assert_eq!(committed.new_source, pair.new_source);
+
+    write(&module, "file", b"dirty tracked content");
+    let dirty = fixture.repo.diff_working_tree().unwrap().pop().unwrap();
+    assert_eq!(
+        dirty.new_source,
+        format!("Subproject commit {}-dirty\n", new.trim()).as_bytes()
+    );
+    run(&module, &["checkout", "--", "file"]);
+    write(&module, "untracked", b"new file");
+    let dirty = fixture.repo.diff_working_tree().unwrap().pop().unwrap();
+    assert_eq!(
+        dirty.new_source,
+        format!("Subproject commit {}-dirty\n", new.trim()).as_bytes()
+    );
+}
+
+#[test]
+fn uninitialized_submodules_preserve_index_commit_instead_of_parent_head() {
+    let fixture = Repo::new(&[]);
+    let old = "1111111111111111111111111111111111111111";
+    let new = "2222222222222222222222222222222222222222";
+    fixture.git(&[
+        "update-index",
+        "--add",
+        "--cacheinfo",
+        &format!("160000,{old},module"),
+    ]);
+    fixture.git(&["commit", "-qm", "old module"]);
+    fixture.git(&[
+        "update-index",
+        "--cacheinfo",
+        &format!("160000,{new},module"),
+    ]);
+    fs::create_dir(fixture.dir.path().join("module")).unwrap();
+    let pair = fixture.repo.diff_working_tree().unwrap().pop().unwrap();
+    assert_eq!(
+        pair.old_source,
+        format!("Subproject commit {old}\n").as_bytes()
+    );
+    assert_eq!(
+        pair.new_source,
+        format!("Subproject commit {new}\n").as_bytes()
+    );
+    fs::remove_dir(fixture.dir.path().join("module")).unwrap();
+    let pair = fixture.repo.diff_working_tree().unwrap().pop().unwrap();
+    assert!(!pair.new_exists);
+    assert_eq!(pair.new_source, b"");
+}
+
+#[test]
+fn unborn_head_supports_staged_gitlinks_without_a_checkout() {
+    let directory = tempdir().unwrap();
+    run(directory.path(), &["init", "-q"]);
+    let commit = "1111111111111111111111111111111111111111";
+    run(
+        directory.path(),
+        &[
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            &format!("160000,{commit},module"),
+        ],
+    );
+    fs::create_dir(directory.path().join("module")).unwrap();
+    let pair = GitRepository::discover(directory.path())
+        .unwrap()
+        .diff_working_tree()
+        .unwrap()
+        .pop()
+        .unwrap();
+    assert!(!pair.old_exists);
+    assert!(pair.new_exists);
+    assert_eq!(
+        pair.new_source,
+        format!("Subproject commit {commit}\n").as_bytes()
+    );
 }
 
 #[test]

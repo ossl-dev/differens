@@ -26,6 +26,9 @@ pub fn load_config(start_dir: impl AsRef<Path>) -> DifferensConfig {
                     .or_else(|| legacy_toml(&raw))
             };
             if let Some(value) = parsed {
+                if !value.is_object() {
+                    continue;
+                }
                 let format = value
                     .get("format")
                     .and_then(serde_json::Value::as_str)

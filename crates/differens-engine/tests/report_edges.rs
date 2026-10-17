@@ -189,6 +189,24 @@ fn malformed_config_skips_to_alternate_file_and_handles_unquoted_legacy_values()
     assert_eq!(config.driver_extensions, None);
 }
 
+#[test]
+fn non_object_json_config_does_not_hide_valid_ancestor_defaults() {
+    let root = tempfile::tempdir().unwrap();
+    let child = root.path().join("child");
+    fs::create_dir(&child).unwrap();
+    fs::write(root.path().join("differens.toml"), "format = 'llm'\n").unwrap();
+    for value in ["null", "[]", "42", "true", "\"json\""] {
+        fs::write(child.join(".differensrc.json"), value).unwrap();
+        assert_eq!(
+            load_config(&child).format,
+            Some(OutputFormat::Llm),
+            "{value}"
+        );
+    }
+    fs::write(child.join(".differensrc.json"), "{}").unwrap();
+    assert_eq!(load_config(&child).format, None);
+}
+
 struct BrokenWriter;
 impl Write for BrokenWriter {
     fn write(&mut self, _: &[u8]) -> io::Result<usize> {

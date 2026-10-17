@@ -172,7 +172,7 @@ where
         .map(|(_, change)| change)
         .collect();
     if format == OutputFormat::Llm {
-        return write_llm(&changes, &moves, output);
+        return write_llm(&changes, &moves, state.source_change_count, output);
     }
     if !state.fallbacks.is_empty() {
         writeln!(
@@ -207,6 +207,7 @@ where
 struct ReportState {
     candidates: Option<crate::candidates::CandidateStorage>,
     file_count: usize,
+    source_change_count: usize,
     narratives: Vec<(Option<ActionId>, SemanticChange)>,
     fallbacks: Vec<Fallback>,
     json_separator: bool,
@@ -221,6 +222,7 @@ impl ReportState {
     ) -> Result<()> {
         let file_index = self.file_count;
         self.file_count += 1;
+        self.source_change_count += result.changes.len();
         if let Some(fallback) = &result.fallback {
             self.fallbacks.push(Fallback {
                 file_path: result.file_path.clone(),
@@ -309,7 +311,12 @@ impl ReportState {
                 self.narratives.push((None, change));
             }
         } else {
-            for mut change in other {
+            let prepared = if format == OutputFormat::Llm {
+                differens_narrate::prepare_llm_changes(&other)
+            } else {
+                other
+            };
+            for mut change in prepared {
                 detach_action(&mut change.action)?;
                 self.narratives.push((None, change));
             }
@@ -352,9 +359,25 @@ impl ReportState {
 fn write_llm(
     changes: &[SemanticChange],
     moves: &[CrossFileMatch],
+    source_change_count: usize,
     output: &mut impl Write,
 ) -> Result<()> {
-    writeln!(output, "{}", format_changes(changes, OutputFormat::Llm)?)?;
+    let files: Vec<_> = moves
+        .iter()
+        .flat_map(|movement| [movement.from_file.as_str(), movement.to_file.as_str()])
+        .collect();
+    let context = differens_narrate::LlmReportContext {
+        additional_files: &files,
+        additional_changes: source_change_count
+            .saturating_sub(moves.len())
+            .saturating_sub(changes.len()),
+        additional_named: moves.len(),
+    };
+    writeln!(
+        output,
+        "{}",
+        differens_narrate::format_llm_report(changes, context)
+    )?;
     if !moves.is_empty() {
         writeln!(output, "# cross-file")?;
         for movement in moves {

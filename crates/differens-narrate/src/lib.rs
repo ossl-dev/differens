@@ -5,6 +5,7 @@ use differens_core::{EditAction, NodeContext, NodeRef, SemanticChange, UpdateDet
 use indexmap::IndexMap;
 pub use readable::readable_changes;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 /// Stable output formats understood by the native CLI.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -119,12 +120,29 @@ fn scope(action: &EditAction) -> Option<&NodeContext> {
     })
 }
 
+pub(crate) fn qualified_label<'a>(
+    kind: &str,
+    label: &'a str,
+    identity: Option<&str>,
+) -> Cow<'a, str> {
+    if kind == "Method" {
+        if let Some(receiver) = identity.and_then(|key| key.strip_prefix("go::")) {
+            return Cow::Owned(format!("{receiver}.{label}"));
+        }
+    }
+    Cow::Borrowed(label)
+}
+
 /// Describe one edit without hiding its containing scope.
 #[must_use]
 pub fn narrate_action(action: &EditAction) -> String {
     let node = action.node();
     let kind = humanize_kind(&node.kind);
-    let name = preview(node.label.as_deref(), 100).or_else(|| preview(node.value.as_deref(), 40));
+    let label = node
+        .label
+        .as_deref()
+        .map(|label| qualified_label(&node.kind, label, node.match_key()));
+    let name = preview(label.as_deref(), 100).or_else(|| preview(node.value.as_deref(), 40));
     let what = name.map_or_else(|| kind.clone(), |name| format!("{kind} `{name}`"));
     let context = scope(action);
     let phrase = context.map_or_else(String::new, |ctx| {
@@ -149,12 +167,16 @@ pub fn narrate_action(action: &EditAction) -> String {
         EditAction::Update {
             detail: UpdateDetail::Renamed { from, to },
             ..
-        } => format!("renamed {kind} `{from}` to `{to}`{phrase}"),
+        } => format!(
+            "renamed {kind} `{}` to `{}`{phrase}",
+            qualified_label(&node.kind, from, node.match_key()),
+            qualified_label(&node.kind, to, node.match_key())
+        ),
         EditAction::Update {
             detail: UpdateDetail::ValueChanged { from, to },
             ..
         } => {
-            let target = node.label.as_ref().map_or_else(
+            let target = label.as_ref().map_or_else(
                 || kind.clone(),
                 |label| format!("value of {kind} `{label}`"),
             );
@@ -363,6 +385,20 @@ fn minor(action: &EditAction) -> bool {
         "line" | "word" | "Comment" | "comment"
     ) || (!matches!(action, EditAction::Update { .. }) && action.node().label.is_none())
 }
+
+/// Group named LLM facts while tree ancestry is still available, retaining minor
+/// edits for their later per-kind tallies. Callers retaining only projections
+/// must keep the original raw edit count for the report header.
+#[must_use]
+pub fn prepare_llm_changes(changes: &[SemanticChange]) -> Vec<SemanticChange> {
+    let (minor_changes, major): (Vec<_>, Vec<_>) = changes
+        .iter()
+        .cloned()
+        .partition(|change| minor(&change.action));
+    let mut grouped = readable_changes(&major, usize::MAX);
+    grouped.extend(minor_changes);
+    grouped
+}
 fn llm_value(value: Option<&str>) -> String {
     value.map_or_else(
         || "none".into(),
@@ -373,13 +409,17 @@ fn llm_line(action: &EditAction) -> String {
     let node = action.node();
     let kind = humanize_kind(&node.kind);
     let name = if node.kind == "file" {
-        ""
+        Cow::Borrowed("")
     } else {
-        node.label.as_deref().unwrap_or_default()
+        qualified_label(
+            &node.kind,
+            node.label.as_deref().unwrap_or_default(),
+            node.match_key(),
+        )
     };
     let at = node.line.map_or_else(String::new, |n| format!(" :{n}"));
     let within = scope(action)
-        .filter(|ctx| ctx.label.as_deref() != Some(name))
+        .filter(|ctx| ctx.label.as_deref() != Some(name.as_ref()))
         .map_or_else(String::new, |ctx| {
             format!(
                 " < {} {}",

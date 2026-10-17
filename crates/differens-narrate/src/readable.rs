@@ -1,6 +1,6 @@
 use crate::{
     action_index, declaration, humanize_kind, is_declaration, narrate_action, preview,
-    value_previews,
+    qualified_label, value_previews,
 };
 use differens_core::{EditAction, NodeContext, SemanticChange, UpdateDetail};
 use indexmap::IndexMap;
@@ -110,6 +110,7 @@ pub fn readable_changes(changes: &[SemanticChange], limit: usize) -> Vec<Semanti
             let action = &change.action;
             let node = action.node();
             let (owner, member) = owner_context(action);
+            let identity = owner.and_then(|context| owner_identity(action, context));
             let named = declaration(node).filter(|candidate| {
                 !(owner.is_some()
                     && matches!(
@@ -151,7 +152,7 @@ pub fn readable_changes(changes: &[SemanticChange], limit: usize) -> Vec<Semanti
                         } else {
                             humanize_kind(&ctx.kind)
                         },
-                        ctx.label.as_deref().unwrap_or_default()
+                        scope_label(ctx, identity)
                     )
                 },
             );
@@ -165,6 +166,7 @@ pub fn readable_changes(changes: &[SemanticChange], limit: usize) -> Vec<Semanti
                 owner.map(|ctx| (ctx.kind.as_str(), ctx.label.as_deref())),
                 context,
                 subject.clone(),
+                identity,
             );
             buckets
                 .entry(key)
@@ -177,17 +179,7 @@ pub fn readable_changes(changes: &[SemanticChange], limit: usize) -> Vec<Semanti
                 .into_values()
                 .filter_map(|(subject, edits)| grouped_entry(&subject, &edits)),
         );
-        output.extend(entries.iter().take(limit).cloned());
-        if entries.len() > limit {
-            let rest = &entries[limit..];
-            let mut more = rest[0].clone();
-            more.description = format!(
-                "{} more changes ({}); use --format=json for details",
-                rest.len(),
-                counts(rest)
-            );
-            output.push(more);
-        }
+        append_limited(&mut output, &entries, limit);
     }
     output
 }
@@ -196,7 +188,40 @@ type GroupKey<'a> = (
     Option<(&'a str, Option<&'a str>)>,
     Vec<(&'a str, Option<&'a str>)>,
     String,
+    Option<&'a str>,
 );
+
+fn append_limited(output: &mut Vec<SemanticChange>, entries: &[SemanticChange], limit: usize) {
+    output.extend(entries.iter().take(limit).cloned());
+    if entries.len() > limit {
+        let rest = &entries[limit..];
+        let mut more = rest[0].clone();
+        more.description = format!(
+            "{} more changes ({}); use --format=json for details",
+            rest.len(),
+            counts(rest)
+        );
+        output.push(more);
+    }
+}
+
+fn owner_identity<'a>(action: &'a EditAction, owner: &NodeContext) -> Option<&'a str> {
+    let node = action.node();
+    let mut parent = node.parent;
+    while let Some(id) = parent {
+        let context = node.tree.node(id);
+        if context.kind == owner.kind && context.label == owner.label {
+            return node.tree.match_key(id);
+        }
+        parent = context.parent;
+    }
+    None
+}
+
+fn scope_label(owner: &NodeContext, identity: Option<&str>) -> String {
+    let label = owner.label.as_deref().unwrap_or_default();
+    qualified_label(&owner.kind, label, identity).into_owned()
+}
 
 fn owner_context(action: &EditAction) -> (Option<&NodeContext>, bool) {
     let owner = action

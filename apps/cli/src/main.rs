@@ -276,7 +276,7 @@ fn handle_diff(
                     let range = format!("{old}..{new}");
                     report(
                         &engine()?,
-                        repo.diff_commit_range_stream(&range)?,
+                        repo.diff_commit_ids_stream(&old, &new)?,
                         format,
                         &format!("nothing changed in range: {range}"),
                         options,

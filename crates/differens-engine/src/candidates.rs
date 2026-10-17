@@ -12,6 +12,10 @@ use crate::{Error, Result, spill::CandidateSpool};
 
 const DEFAULT_MEMORY_BYTES: usize = 8 * 1024 * 1024;
 
+pub(crate) fn name_hash(label: Option<&str>) -> u64 {
+    label.map_or(0, differens_core::hash_text)
+}
+
 pub(crate) fn metadata(id: ActionId, file: &str, action: &EditAction) -> CandidateMeta {
     let node = action.node();
     let named = if node.label.is_some() {
@@ -51,16 +55,19 @@ struct MemoryStore {
     deletions: HashMap<u64, Vec<usize>>,
     insertions: HashMap<u64, Vec<usize>>,
     exact: HashMap<u64, Vec<usize>>,
+    named: HashMap<(u64, u64), Vec<usize>>,
     retained: usize,
 }
 
 fn retained_bytes(meta: &CandidateMeta, node: &NodeRef) -> usize {
     // Account for payload allocations plus a conservative allowance for entry,
     // hash-table, and vector capacity growth. Projection never pins sibling ASTs.
-    let mut bytes = 4 * size_of::<Entry>()
+    let mut bytes = 5 * size_of::<Entry>()
         + meta.file.len()
         + meta.kind.len()
         + meta.label.as_ref().map_or(0, String::len);
+    // Include detached span maps and sparse identities in the retained budget.
+    bytes = bytes.saturating_add(node.tree.auxiliary_heap_bytes());
     for index in node.id.0 + 1 - node.size..=node.id.0 {
         let node = node.tree.node(NodeId(index));
         bytes = bytes
@@ -80,7 +87,7 @@ fn retained_bytes(meta: &CandidateMeta, node: &NodeRef) -> usize {
 }
 
 impl MemoryStore {
-    fn push(&mut self, meta: CandidateMeta, node: &NodeRef, bytes: usize) {
+    fn push(&mut self, meta: CandidateMeta, node: NodeRef, bytes: usize) {
         let index = self.entries.len();
         if meta.deleted {
             if !self.deletions.contains_key(&meta.structure_hash) {
@@ -96,10 +103,14 @@ impl MemoryStore {
                 .or_default()
                 .push(index);
             self.exact.entry(meta.exact_key).or_default().push(index);
+            self.named
+                .entry((meta.structure_hash, name_hash(meta.label.as_deref())))
+                .or_default()
+                .push(index);
         }
         self.entries.push(Entry {
             meta,
-            node: node.detached(),
+            node,
             claimed: Cell::new(false),
         });
         self.retained = self.retained.saturating_add(bytes);
@@ -142,6 +153,16 @@ impl CandidateStore for MemoryStore {
     fn is_claimed(&self, index: usize) -> Result<bool> {
         Ok(self.entry(index)?.claimed.get())
     }
+    fn named_candidates<'a>(
+        &'a self,
+        structure_hash: u64,
+        label: Option<&'a str>,
+    ) -> Result<CandidateIndices<'a, Error>> {
+        let ids = self.named.get(&(structure_hash, name_hash(label)));
+        Ok(Box::new(
+            ids.map_or(&[][..], Vec::as_slice).iter().copied().map(Ok),
+        ))
+    }
     fn claim(&self, index: usize) -> Result<()> {
         self.entry(index)?.claimed.set(true);
         Ok(())
@@ -170,8 +191,8 @@ impl Default for CandidateStorage {
 impl CandidateStorage {
     pub(crate) fn push(&mut self, id: ActionId, file: &str, action: &EditAction) -> Result<()> {
         let meta = metadata(id, file, action);
-        let node = action.node();
-        let bytes = retained_bytes(&meta, node);
+        let node = action.node().detached();
+        let bytes = retained_bytes(&meta, &node);
         if let Storage::Memory(memory) = &self.storage {
             if memory.retained.saturating_add(bytes) > self.budget {
                 let mut disk = CandidateSpool::new()?;
@@ -186,7 +207,7 @@ impl CandidateStorage {
         }
         match &mut self.storage {
             Storage::Memory(memory) => memory.push(meta, node, bytes),
-            Storage::Disk(disk) => disk.push_meta(&meta, node)?,
+            Storage::Disk(disk) => disk.push_meta(&meta, &node)?,
         }
         Ok(())
     }
@@ -228,6 +249,16 @@ impl CandidateStore for CandidateStorage {
         match &self.storage {
             Storage::Memory(memory) => memory.is_claimed(index),
             Storage::Disk(disk) => disk.is_claimed(index),
+        }
+    }
+    fn named_candidates<'a>(
+        &'a self,
+        structure_hash: u64,
+        label: Option<&'a str>,
+    ) -> Result<CandidateIndices<'a, Error>> {
+        match &self.storage {
+            Storage::Memory(memory) => memory.named_candidates(structure_hash, label),
+            Storage::Disk(disk) => disk.named_candidates(structure_hash, label),
         }
     }
     fn claim(&self, index: usize) -> Result<()> {
@@ -320,6 +351,56 @@ mod tests {
         assert!(storage.is_claimed(0).unwrap());
         assert_eq!(storage.load(0).unwrap().label.as_deref(), Some("first"));
         assert_eq!(storage.metadata(1).unwrap().file, "second.rs");
+        let structure = storage.metadata(0).unwrap().structure_hash;
+        assert_eq!(
+            storage
+                .named_candidates(structure, Some("first"))
+                .unwrap()
+                .collect::<Result<Vec<_>>>()
+                .unwrap(),
+            [0]
+        );
+    }
+
+    #[test]
+    fn memory_name_index_preserves_order_without_scanning_unrelated_names() {
+        let mut storage = CandidateStorage::default();
+        for index in 0..100 {
+            let name = if [3, 70].contains(&index) {
+                "wanted"
+            } else {
+                "other"
+            };
+            storage
+                .push(
+                    ActionId {
+                        file: index,
+                        action: 0,
+                    },
+                    &format!("{index}.rs"),
+                    &inserted(node("Function", name, "value")),
+                )
+                .unwrap();
+        }
+        let structure = storage.metadata(0).unwrap().structure_hash;
+        let indexes = storage
+            .named_candidates(structure, Some("wanted"))
+            .unwrap()
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
+        assert_eq!(indexes, [3, 70]);
+        assert_eq!(
+            storage.named_candidates(structure, None).unwrap().count(),
+            0
+        );
+        assert_eq!(
+            storage
+                .named_candidates(structure, Some("missing"))
+                .unwrap()
+                .count(),
+            0
+        );
+        assert!(matches!(storage.storage, Storage::Memory(_)));
     }
 
     #[test]
@@ -345,6 +426,48 @@ mod tests {
         assert!(owner.upgrade().is_none());
         assert_eq!(storage.load(0).unwrap().tree.len(), 1);
         assert!(matches!(storage.storage, Storage::Memory(_)));
+    }
+
+    #[test]
+    fn detached_unicode_maps_stay_small_and_are_included_in_the_budget() {
+        let source = "😀".repeat(100_000);
+        let mut builder = TreeBuilder::with_source(&source);
+        let mut function = NodeSpec::new("Function");
+        function.byte_range = [source.len() - 4, source.len()];
+        let root = builder.push(function).unwrap();
+        let node = NodeRef::new(builder.finish(root).unwrap(), root);
+        assert!(node.tree.auxiliary_heap_bytes() > 1024 * 1024);
+        let mut storage = CandidateStorage {
+            budget: 1024 * 1024,
+            ..CandidateStorage::default()
+        };
+        storage
+            .push(
+                ActionId { file: 0, action: 0 },
+                "unicode.ts",
+                &deleted(node.clone()),
+            )
+            .unwrap();
+        assert!(matches!(storage.storage, Storage::Memory(_)));
+        let compact = storage.load(0).unwrap();
+        let auxiliary = compact.tree.auxiliary_heap_bytes();
+        assert!((1..1024).contains(&auxiliary));
+        assert_eq!(
+            serde_json::to_value(&compact).unwrap(),
+            serde_json::to_value(&node).unwrap()
+        );
+
+        // A budget allowing the node alone but not its compact span map spills.
+        let action = deleted(node);
+        let meta = metadata(ActionId { file: 0, action: 0 }, "unicode.ts", &action);
+        let mut tight = CandidateStorage {
+            budget: retained_bytes(&meta, &compact) - auxiliary / 2,
+            ..CandidateStorage::default()
+        };
+        tight
+            .push(ActionId { file: 0, action: 0 }, "unicode.ts", &action)
+            .unwrap();
+        assert!(matches!(tight.storage, Storage::Disk(_)));
     }
 
     #[test]

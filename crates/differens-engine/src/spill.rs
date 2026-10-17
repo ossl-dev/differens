@@ -4,18 +4,19 @@
 use std::{
     cell::RefCell,
     fs::{File, OpenOptions},
-    io::{self, BufReader, Read, Seek, SeekFrom, Write},
+    io::{self, BufReader, BufWriter, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
 };
 
 use differens_core::{FlatSnapshot, NodeRef};
-use differens_correlate::{CandidateGroup, CandidateMeta, CandidateStore};
+use differens_correlate::{CandidateGroup, CandidateIndices, CandidateMeta, CandidateStore};
 use tempfile::TempDir;
 
 use crate::{Error, Result};
 
 const INDEX_BYTES: u64 = 40;
 const INDEX_RECORD_BYTES: usize = 40;
+const WRITE_BUFFER_BYTES: usize = 64 * 1024;
 
 pub(crate) struct CandidateSpool {
     directory: TempDir,
@@ -36,6 +37,15 @@ fn create(path: &Path) -> Result<File> {
         .create_new(true)
         .open(path)
         .map_err(storage)
+}
+
+fn write_record(writer: &mut impl Write, value: &impl serde::Serialize) -> Result<()> {
+    let mut buffered = BufWriter::with_capacity(WRITE_BUFFER_BYTES, writer);
+    serde_json::to_writer(&mut buffered, value).map_err(|error| {
+        let kind = error.io_error_kind().unwrap_or(io::ErrorKind::InvalidData);
+        storage(io::Error::new(kind, error))
+    })?;
+    buffered.flush().map_err(storage)
 }
 
 impl CandidateSpool {
@@ -60,11 +70,11 @@ impl CandidateSpool {
     pub(crate) fn push_meta(&mut self, meta: &CandidateMeta, node: &NodeRef) -> Result<()> {
         let mut payloads = self.payloads.borrow_mut();
         let payload_start = payloads.seek(SeekFrom::End(0)).map_err(storage)?;
-        serde_json::to_writer(&mut *payloads, &node.snapshot())?;
+        write_record(&mut *payloads, &node.snapshot())?;
         let payload_end = payloads.stream_position().map_err(storage)?;
         let mut metadata = self.metadata.borrow_mut();
         let meta_start = metadata.seek(SeekFrom::End(0)).map_err(storage)?;
-        serde_json::to_writer(&mut *metadata, meta)?;
+        write_record(&mut *metadata, meta)?;
         let meta_end = metadata.stream_position().map_err(storage)?;
         let mut record = [0u8; INDEX_RECORD_BYTES];
         for (slot, number) in record.chunks_exact_mut(8).zip([
@@ -89,6 +99,11 @@ impl CandidateSpool {
         } else {
             self.append_bucket(CandidateGroup::Insertions(meta.structure_hash), self.count)?;
             self.append_bucket(CandidateGroup::ExactInsertions(meta.exact_key), self.count)?;
+            self.append_index(
+                self.named_path(meta.structure_hash, meta.label.as_deref()),
+                self.count,
+                None,
+            )?;
         }
         self.count += 1;
         Ok(())
@@ -104,11 +119,25 @@ impl CandidateSpool {
     }
 
     fn append_bucket(&self, group: CandidateGroup, candidate: usize) -> Result<()> {
-        let path = self.bucket_path(group);
+        let group_hash = match group {
+            CandidateGroup::Deletions(hash) => Some(hash),
+            _ => None,
+        };
+        self.append_index(self.bucket_path(group), candidate, group_hash)
+    }
+
+    fn named_path(&self, structure_hash: u64, label: Option<&str>) -> PathBuf {
+        self.directory.path().join(format!(
+            "n-{structure_hash:016x}-{:016x}",
+            super::candidates::name_hash(label)
+        ))
+    }
+
+    fn append_index(&self, path: PathBuf, candidate: usize, group_hash: Option<u64>) -> Result<()> {
         let bucket = OpenOptions::new().write(true).create_new(true).open(&path);
         let mut bucket = match bucket {
             Ok(bucket) => {
-                if let CandidateGroup::Deletions(hash) = group {
+                if let Some(hash) = group_hash {
                     OpenOptions::new()
                         .append(true)
                         .open(self.directory.path().join("groups"))
@@ -208,13 +237,16 @@ impl CandidateStore for CandidateSpool {
         let [_, _, offset, length, _] = self.record(candidate)?;
         let mut file = self.metadata.borrow_mut();
         file.seek(SeekFrom::Start(offset)).map_err(storage)?;
-        serde_json::from_reader((&mut *file).take(length)).map_err(Into::into)
+        serde_json::from_reader(BufReader::new((&mut *file).take(length))).map_err(Into::into)
     }
     fn load(&self, candidate: usize) -> Result<NodeRef> {
         let [offset, length, _, _, _] = self.record(candidate)?;
         let mut file = self.payloads.borrow_mut();
         file.seek(SeekFrom::Start(offset)).map_err(storage)?;
-        let snapshot: FlatSnapshot = serde_json::from_reader((&mut *file).take(length))?;
+        let snapshot: FlatSnapshot = serde_json::from_reader(BufReader::with_capacity(
+            WRITE_BUFFER_BYTES,
+            (&mut *file).take(length),
+        ))?;
         Ok(snapshot.into_node_ref()?)
     }
     fn is_claimed(&self, candidate: usize) -> Result<bool> {
@@ -244,6 +276,19 @@ impl CandidateStore for CandidateSpool {
                 !matches!(group, CandidateGroup::Deletions(_)),
             )?
             .map(|value| {
+                value.and_then(|value| {
+                    usize::try_from(value).map_err(|error| storage(io::Error::other(error)))
+                })
+            }),
+        ))
+    }
+    fn named_candidates<'a>(
+        &'a self,
+        structure_hash: u64,
+        label: Option<&'a str>,
+    ) -> Result<CandidateIndices<'a, Error>> {
+        Ok(Box::new(
+            numbers(&self.named_path(structure_hash, label), true)?.map(|value| {
                 value.and_then(|value| {
                     usize::try_from(value).map_err(|error| storage(io::Error::other(error)))
                 })
@@ -313,6 +358,60 @@ mod tests {
     }
 
     #[test]
+    fn newline_rich_payloads_use_bounded_buffered_writes_and_keep_record_offsets() {
+        #[derive(Default)]
+        struct CountingWriter {
+            bytes: Vec<u8>,
+            writes: usize,
+        }
+        impl Write for CountingWriter {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                self.writes += 1;
+                self.bytes.extend_from_slice(bytes);
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        let source = "line é\\value\n".repeat(10_000);
+        let candidate = node("large", &source);
+        let mut writer = CountingWriter::default();
+        write_record(&mut writer, &candidate.snapshot()).unwrap();
+        assert!(
+            writer.writes < 10,
+            "{} underlying writes for {} bytes",
+            writer.writes,
+            writer.bytes.len()
+        );
+        let restored: FlatSnapshot = serde_json::from_slice(&writer.bytes).unwrap();
+        assert_eq!(
+            restored.into_node_ref().unwrap().value.as_deref(),
+            Some(source.as_str())
+        );
+        let files = vec![
+            FileChanges {
+                file_path: "old.rs".into(),
+                actions: vec![deletion(candidate)],
+            },
+            FileChanges {
+                file_path: "new.rs".into(),
+                actions: vec![insertion(node("small", "after large payload"))],
+            },
+        ];
+        let storage = spool(&files);
+        assert_eq!(
+            storage.load(0).unwrap().value.as_deref(),
+            Some(source.as_str())
+        );
+        assert_eq!(
+            storage.load(1).unwrap().value.as_deref(),
+            Some("after large payload")
+        );
+        assert_eq!(storage.metadata(1).unwrap().file, "new.rs");
+    }
+
+    #[test]
     fn spilled_correlation_matches_in_memory_order_and_one_to_one_claims() {
         let files = vec![
             FileChanges {
@@ -371,6 +470,46 @@ mod tests {
             identities(&correlate_store(&storage, options).unwrap()),
             identities(&correlate(&files, options))
         );
+        let structure = storage.metadata(0).unwrap().structure_hash;
+        let names: Vec<_> = storage
+            .named_candidates(structure, Some("target"))
+            .unwrap()
+            .collect::<Result<_>>()
+            .unwrap();
+        assert_eq!(names, [41]);
+    }
+
+    #[test]
+    fn named_disk_index_verifies_hash_collisions_before_similarity_cap() {
+        let files = vec![
+            FileChanges {
+                file_path: "old.rs".into(),
+                actions: vec![deletion(node("target", "return input value alpha"))],
+            },
+            FileChanges {
+                file_path: "new.rs".into(),
+                actions: (0..80)
+                    .map(|index| {
+                        insertion(node(
+                            if index == 79 { "target" } else { "other" },
+                            "return input value beta",
+                        ))
+                    })
+                    .collect(),
+            },
+        ];
+        let storage = spool(&files);
+        let structure = storage.metadata(0).unwrap().structure_hash;
+        // Simulate a hash collision placing 79 wrong names before the real match.
+        let mut indexes = Vec::new();
+        for index in 1u64..=80 {
+            indexes.extend_from_slice(&index.to_le_bytes());
+        }
+        std::fs::write(storage.named_path(structure, Some("target")), indexes).unwrap();
+        let moves = correlate_store(&storage, CorrelateOptions::default()).unwrap();
+        assert_eq!(moves.len(), 1);
+        assert_eq!(moves[0].insertion.action, 79);
+        assert!(moves[0].modified);
     }
 
     #[test]
